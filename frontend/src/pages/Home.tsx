@@ -8,13 +8,13 @@ interface Post {
   title?: string;
   content?: string;
   votes?: number;
-  username?: string; // 👈 Added username
 }
 
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMerchPopup, setShowMerchPopup] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,19 +38,54 @@ export default function Home() {
 
   return (
     <div className="home-root">
-      {/* ✅ Background image */}
+      {/* ✅ Background */}
       <img
         src="/FlexibleMoralsPicture.png"
         alt="Flexible Morals Background"
         className="home-background-balanced"
       />
 
-      {/* ✅ Vote button */}
+      {/* ✅ Vote button near candle */}
       <div className="vote-button-container">
         <button onClick={() => navigate("/vote")} className="vote-button">
           Vote
         </button>
       </div>
+
+      {/* ✅ Offering button near bowl */}
+      <div className="offering-link-container">
+        <a
+          href="https://www.paypal.com/donate/?business=E9ZG5U75GEYBQ&no_recurring=0&item_name=Thank+you+for+keeping+the+vision+alive%21&currency_code=USD"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="offering-link"
+        >
+          Offering
+        </a>
+      </div>
+
+      {/* ✅ Merch button (independent position) */}
+      <div className="merch-link-container">
+        <button onClick={() => setShowMerchPopup(true)} className="merch-link">
+          Merch
+        </button>
+      </div>
+
+      {/* ✅ Merch Popup */}
+      {showMerchPopup && (
+        <div className="popup-overlay" onClick={() => setShowMerchPopup(false)}>
+          <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+            <h2>🛍️ Coming Soon!</h2>
+            <p>Our merch collection is in the works.</p>
+            <button
+              onClick={() => setShowMerchPopup(false)}
+              className="popup-close"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ✅ Commandments */}
       <div className="overlay-stones">
@@ -61,15 +96,10 @@ export default function Home() {
             {!loading &&
               !error &&
               col.map((post) => (
-                <div key={post.id} className="commandment-border tooltip-container">
+                <div key={post.id} className="commandment-border">
                   {post.title || post.content}
                   {post.votes !== undefined && (
                     <span className="vote-count"> ({post.votes} votes)</span>
-                  )}
-
-                  {/* ✅ Tooltip with username */}
-                  {post.username && (
-                    <span className="tooltip-text">Posted by {post.username}</span>
                   )}
                 </div>
               ))}
