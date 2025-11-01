@@ -53,8 +53,10 @@ export const createPost = async (content: string) => {
   return res.data;
 };
 
-export const voteOnPost = async (id: string, type: "up" | "down") => {
-  const res = await api.post(`/votes/${id}`, { type });
+// ✅ FIX THIS PART ONLY in src/api.ts
+export const voteOnPost = async (id: string | number, direction: "up" | "down") => {
+  // Matches backend route: POST /posts/:id/vote
+  const res = await api.post(`/posts/${id}/vote`, { direction });
   return res.data;
 };
 
