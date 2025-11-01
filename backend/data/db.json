@@ -1,0 +1,142 @@
+{
+  "posts": [
+    {
+      "id": "1",
+      "title": "Honesty is Flexible",
+      "body": "Sometimes telling the truth depends on who’s listening.",
+      "votes": 29,
+      "createdAt": "2025-10-30T00:00:00.000Z",
+      "createdBy": {
+        "id": "demo",
+        "name": "Grant"
+      }
+    },
+    {
+      "id": "2",
+      "title": "Morality is Situational",
+      "body": "Context shapes correctness — always.",
+      "votes": 21,
+      "createdAt": "2025-10-29T00:00:00.000Z",
+      "createdBy": {
+        "id": "demo",
+        "name": "Grant"
+      }
+    },
+    {
+      "id": "QWL20YQ3",
+      "title": "Please Wipe With Your Left Hand",
+      "body": "I dont want to shake your right hand if you wipe with your right",
+      "votes": 2,
+      "createdAt": "2025-10-30T17:50:40.651Z",
+      "createdBy": {
+        "id": "IRs-CfyukB",
+        "name": "Grant"
+      }
+    },
+    {
+      "id": "IOIifHHo",
+      "title": "In and Out Should be in Every City",
+      "body": "Burger time",
+      "votes": 3,
+      "createdAt": "2025-10-30T18:03:01.909Z",
+      "createdBy": {
+        "id": "k7-ozNn8d1",
+        "name": "Bob"
+      }
+    },
+    {
+      "id": "u88yzk-Y",
+      "title": "Cats are better than Dogs",
+      "body": "Meow",
+      "votes": 4,
+      "createdAt": "2025-10-30T18:04:51.047Z",
+      "createdBy": {
+        "id": "k7-ozNn8d1",
+        "name": "Bob"
+      }
+    },
+    {
+      "id": "SI_Snlww",
+      "title": "Everyone Is a Meat Eater Now",
+      "body": "Cow goes moo",
+      "votes": 2,
+      "createdAt": "2025-10-30T18:10:02.371Z",
+      "createdBy": {
+        "id": "k7-ozNn8d1",
+        "name": "Bob"
+      }
+    },
+    {
+      "id": "0IhhS0Y4",
+      "title": "You MUST love your husband unconditionally",
+      "body": ":D",
+      "votes": 1,
+      "createdAt": "2025-10-30T18:28:30.444Z",
+      "createdBy": {
+        "id": "W1UyfAvsWq",
+        "name": "Emily"
+      }
+    },
+    {
+      "id": "TSaPXjSE",
+      "title": "Chess Is a Sport",
+      "body": "1.c4",
+      "votes": 2,
+      "createdAt": "2025-10-30T18:54:39.031Z",
+      "createdBy": {
+        "id": "pzfaf1hGI5",
+        "name": "ChessLover"
+      }
+    },
+    {
+      "id": "_4yP0a4W",
+      "title": "Dont Kill People",
+      "body": "obviously",
+      "votes": 2,
+      "createdAt": "2025-10-30T18:55:12.732Z",
+      "createdBy": {
+        "id": "aE1yqEsC24",
+        "name": "Mysterious123"
+      }
+    },
+    {
+      "id": "SpD4nhTC",
+      "title": "No one can wear shoes in your house",
+      "body": "Actually not a fan of this. Totally fine to have shoes on.",
+      "votes": 1,
+      "createdAt": "2025-10-30T19:19:52.941Z",
+      "createdBy": {
+        "id": "aE1yqEsC24",
+        "name": "Mysterious123"
+      }
+    }
+  ],
+  "votes": {
+    "IRs-CfyukB:QWL20YQ3": 1,
+    "IRs-CfyukB:2": 1,
+    "IRs-CfyukB:1": 1,
+    "k7-ozNn8d1:IOIifHHo": 1,
+    "k7-ozNn8d1:QWL20YQ3": 1,
+    "k7-ozNn8d1:2": 1,
+    "k7-ozNn8d1:u88yzk-Y": 1,
+    "aE1yqEsC24:SI_Snlww": 1,
+    "aE1yqEsC24:TSaPXjSE": 1,
+    "aE1yqEsC24:IOIifHHo": 1,
+    "aE1yqEsC24:u88yzk-Y": 1,
+    "aE1yqEsC24:QWL20YQ3": -1,
+    "aE1yqEsC24:1": 1,
+    "aE1yqEsC24:_4yP0a4W": 1,
+    "cpZGuHzgQs:u88yzk-Y": 1,
+    "UOdYsIcx8v:QWL20YQ3": 1,
+    "UOdYsIcx8v:1": 1,
+    "UOdYsIcx8v:2": 1,
+    "UOdYsIcx8v:u88yzk-Y": 1,
+    "UOdYsIcx8v:IOIifHHo": 1,
+    "UOdYsIcx8v:_4yP0a4W": 1,
+    "UOdYsIcx8v:TSaPXjSE": 1,
+    "UOdYsIcx8v:SI_Snlww": 1,
+    "UOdYsIcx8v:SpD4nhTC": 1,
+    "UOdYsIcx8v:0IhhS0Y4": 1,
+    "TRcVApYTlW:1": 1
+  }
+}

@@ -1,0 +1,78 @@
+import React, { useState, useEffect } from "react";
+import LoginPrompt from "../components/LoginPrompt";
+import "../App.css";
+
+interface Post {
+  id: number;
+  author: string;
+  text: string;
+}
+
+export default function Posts() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [newPost, setNewPost] = useState("");
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    fetch("http://localhost:3001/api/posts")
+      .then((res) => res.json())
+      .then((data) => setPosts(data))
+      .catch((err) => console.error("Failed to load posts:", err));
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!newPost.trim()) return;
+
+    try {
+      const res = await fetch("http://localhost:3001/api/posts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newPost }),
+      });
+
+      if (res.status === 401) {
+        setShowPrompt(true);
+        return;
+      }
+
+      if (!res.ok) throw new Error("Failed to submit post");
+
+      const data = await res.json();
+      setPosts([...posts, data]);
+      setNewPost("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div className="posts-page">
+      <div className="home-content">
+        <h1>Community Posts</h1>
+
+        <div className="post-list">
+          {posts.map((post) => (
+            <div key={post.id} className="post-item">
+              <p>{post.text}</p>
+              <span>— {post.author}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="post-input">
+          <textarea
+            value={newPost}
+            onChange={(e) => setNewPost(e.target.value)}
+            placeholder="Share your thoughts..."
+          />
+          <button onClick={handleSubmit} className="home-button">
+            Submit
+          </button>
+        </div>
+      </div>
+
+      {showPrompt && <LoginPrompt onClose={() => setShowPrompt(false)} />}
+    </div>
+  );
+}
