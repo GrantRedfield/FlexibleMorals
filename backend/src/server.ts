@@ -1,109 +1,132 @@
 // backend/src/server.ts
 import express from "express";
 import cors from "cors";
-import { DynamoDBClient, ScanCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
-import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
+import bodyParser from "body-parser";
+import { DynamoDBClient, ScanCommand, GetItemCommand, PutItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 
-// ✅ Initialize Express
 const app = express();
-const PORT = 3001;
+app.use(cors({ origin: "http://localhost:5173" }));
+app.use(bodyParser.json());
 
-// === Middleware ===
-app.use(express.json());
-app.use(
-  cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"],
-    credentials: true,
-  })
-);
-
-// === DynamoDB Local connection ===
-const db = new DynamoDBClient({
-  region: "us-west-2",
-  endpoint: "http://localhost:8000", // DynamoDB local endpoint
+const client = new DynamoDBClient({
+  region: "local",
+  endpoint: "http://localhost:8000",
 });
 
 const TABLE_NAME = "FlexibleTable";
 
-/* ======================================================
-   ✅ ROUTES
-====================================================== */
+// === Helper ===
+const getAllPosts = async () => {
+  const command = new ScanCommand({ TableName: TABLE_NAME });
+  const result = await client.send(command);
+  const posts = (result.Items || [])
+    .filter((i) => i.SK?.S === "META")
+    .map((i) => unmarshall(i));
+  return posts;
+};
 
-// === GET /posts — Fetch all posts from DynamoDB
+// === GET /posts ===
 app.get("/posts", async (req, res) => {
   try {
-    const command = new ScanCommand({ TableName: TABLE_NAME });
-    const result = await db.send(command);
-    const items = result.Items ? result.Items.map((i) => unmarshall(i)) : [];
-
-    console.log("📦 Raw DynamoDB items:", JSON.stringify(items, null, 2));
-
-    // Map DynamoDB schema → frontend-friendly schema
-    const posts = items.map((item) => {
-      const pk = item.PK || item.id || "";
-      const id = pk.startsWith("POST#") ? pk.replace("POST#", "") : pk;
-
-      return {
-        id,
-        title: item.title || "(Untitled)",
-        content: item.content || "",
-        votes: item.votes ?? 0,
-      };
-    });
-
-    console.log("✅ Mapped posts:", posts);
-    res.json(posts);
+    const posts = await getAllPosts();
+    res.json(posts.map((p) => ({
+      id: p.PK?.replace("POST#", ""),
+      title: p.title,
+      votes: Number(p.votes ?? 0),
+    })));
   } catch (err) {
     console.error("❌ Error fetching posts:", err);
-    res.status(500).json({ error: "Failed to fetch posts" });
+    res.status(500).json({ error: "Failed to fetch posts." });
   }
 });
 
-// === POST /posts/:id/vote — Update vote count for a post
-app.post("/posts/:id/vote", async (req, res) => {
-  const { direction } = req.body;
-  const postId = req.params.id;
-
-  if (!["up", "down"].includes(direction)) {
-    return res.status(400).json({ error: "Invalid vote direction" });
-  }
+// === POST /posts ===
+app.post("/posts", async (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: "Missing content" });
 
   try {
-    const delta = direction === "up" ? 1 : -1;
-
-    const command = new UpdateItemCommand({
-      TableName: TABLE_NAME,
-      Key: marshall({ PK: `POST#${postId}`, SK: "META" }),
-      UpdateExpression: "SET votes = if_not_exists(votes, :zero) + :delta",
-      ExpressionAttributeValues: marshall({
-        ":delta": delta,
-        ":zero": 0,
-      }),
-      ReturnValues: "ALL_NEW",
-    });
-
-    const result = await db.send(command);
-    const updated = result.Attributes ? unmarshall(result.Attributes) : null;
-
-    const response = {
-      id: updated.PK.replace("POST#", ""),
-      title: updated.title || "(Untitled)",
-      votes: updated.votes || 0,
-      content: updated.content || "",
+    const newId = Date.now().toString();
+    const item = {
+      PK: { S: `POST#${newId}` },
+      SK: { S: "META" },
+      title: { S: content },
+      votes: { N: "0" },
     };
-
-    console.log(`🗳️ Updated votes for post ${postId}:`, response);
-    res.json(response);
+    await client.send(new PutItemCommand({ TableName: TABLE_NAME, Item: item }));
+    res.json({ id: newId, title: content, votes: 0 });
   } catch (err) {
-    console.error("❌ Error updating votes:", err);
-    res.status(500).json({ error: "Failed to update vote count" });
+    console.error("❌ Failed to create post:", err);
+    res.status(500).json({ error: "Failed to create post" });
   }
 });
 
-/* ======================================================
-   ✅ START SERVER
-====================================================== */
+// === POST /posts/:id/vote ===
+// Simulate Reddit-style voting (with local userId)
+app.post("/posts/:id/vote", async (req, res) => {
+  const { id } = req.params;
+  const { direction, userId = "guest" } = req.body;
+
+  if (!direction || !["up", "down"].includes(direction))
+    return res.status(400).json({ error: "Invalid direction" });
+
+  try {
+    // Fetch current post
+    const getRes = await client.send(
+      new GetItemCommand({
+        TableName: TABLE_NAME,
+        Key: marshall({ PK: `POST#${id}`, SK: "META" }),
+      })
+    );
+    if (!getRes.Item) return res.status(404).json({ error: "Post not found" });
+
+    const post = unmarshall(getRes.Item);
+    let votes = Number(post.votes ?? 0);
+    let userVotes = post.userVotes || {};
+
+    const previousVote = userVotes[userId];
+    let newVoteState = direction;
+
+    if (previousVote === direction) {
+      // same vote again — ignore
+      console.log(`User ${userId} repeated same vote on post ${id}`);
+      return res.json({ id, votes });
+    }
+
+    if (!previousVote) {
+      votes += direction === "up" ? 1 : -1;
+    } else if (previousVote === "up" && direction === "down") {
+      votes -= 2;
+    } else if (previousVote === "down" && direction === "up") {
+      votes += 2;
+    }
+
+    userVotes[userId] = newVoteState;
+
+    // Update item
+    await client.send(
+      new UpdateItemCommand({
+        TableName: TABLE_NAME,
+        Key: marshall({ PK: `POST#${id}`, SK: "META" }),
+        UpdateExpression: "SET votes = :v, userVotes = :u",
+        ExpressionAttributeValues: marshall({
+          ":v": votes,
+          ":u": userVotes,
+        }),
+      })
+    );
+
+    console.log(`✅ Post ${id} new total votes: ${votes}`);
+    res.json({ id, votes });
+  } catch (err) {
+    console.error("❌ Vote update failed:", err);
+    res.status(500).json({ error: "Vote update failed" });
+  }
+});
+
+// === Start Server ===
+const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`✅ FlexibleMorals backend running on http://localhost:${PORT}`);
-  console.log(`🪣 Connected to DynamoDB Local → Table: ${TABLE_NAME}`);
 });

@@ -1,6 +1,6 @@
 // frontend/src/pages/Vote.tsx
 import { useEffect, useState } from "react";
-import { getPosts, voteOnPost } from "../utils/api";
+import { getPosts, voteOnPost, createPost } from "../utils/api";
 
 interface Post {
   id: string | number;
@@ -13,6 +13,8 @@ export default function Vote() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newCommandment, setNewCommandment] = useState("");
+  const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -28,14 +30,72 @@ export default function Vote() {
       }
     };
     load();
+
+    const saved = localStorage.getItem("userVotes");
+    if (saved) setUserVotes(JSON.parse(saved));
   }, []);
 
-  const handleVote = async (postId: string | number, direction: "up" | "down") => {
+  useEffect(() => {
+    localStorage.setItem("userVotes", JSON.stringify(userVotes));
+  }, [userVotes]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommandment.trim()) return;
     try {
-      const updated = await voteOnPost(postId, direction);
-      console.log("✅ Vote updated:", updated);
+      const newPost = await createPost(newCommandment.trim());
+      setPosts((prev) => [...prev, newPost]);
+      setNewCommandment("");
+    } catch (err) {
+      console.error("❌ Failed to create post:", err);
+      alert("Could not create new commandment.");
+    }
+  };
+
+  const handleVote = async (postId: string | number, direction: "up" | "down") => {
+    const pid = String(postId);
+    const prevVote = userVotes[pid];
+    console.log(`Voting on post ${pid}, direction ${direction}, previous vote: ${prevVote}`);
+
+    if (prevVote === direction) {
+      console.log("🚫 Already voted this way — ignoring");
+      return;
+    }
+
+    // Compute UI delta
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (String(p.id) !== pid) return p;
+        const current = p.votes ?? 0;
+        let newVotes = current;
+        if (!prevVote) {
+          // first vote
+          newVotes += direction === "up" ? 1 : -1;
+        } else if (prevVote === "up" && direction === "down") {
+          newVotes -= 2;
+        } else if (prevVote === "down" && direction === "up") {
+          newVotes += 2;
+        }
+        console.log(`Post ${pid} UI votes changed from ${current} → ${newVotes}`);
+        return { ...p, votes: newVotes };
+      })
+    );
+
+    // update userVotes record
+    setUserVotes((prev) => ({
+      ...prev,
+      [pid]: direction,
+    }));
+
+    try {
+      const updated = await voteOnPost(pid, direction);
+      console.log("✅ Backend responded with:", updated);
       setPosts((prev) =>
-        prev.map((p) => (p.id === updated.id ? updated : p))
+        prev.map((p) =>
+          String(p.id) === String(updated.id)
+            ? { ...p, votes: updated.votes }
+            : p
+        )
       );
     } catch (err) {
       console.error("❌ Vote failed:", err);
@@ -47,7 +107,6 @@ export default function Vote() {
 
   return (
     <div
-      className="p-4 space-y-4"
       style={{
         backgroundImage: "url('/Voting_Background.png')",
         backgroundSize: "cover",
@@ -58,6 +117,7 @@ export default function Vote() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        paddingTop: "4rem",
       }}
     >
       <div
@@ -71,40 +131,63 @@ export default function Vote() {
         }}
       >
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-900">
-          Vote on Posts
+          Vote on Commandments
         </h1>
 
-        {posts.length === 0 && (
-          <p className="text-center text-gray-600">No posts found.</p>
-        )}
-
-        {posts.map((post) => (
-          <div
-            key={post.id}
-            className="border border-gray-300 p-3 rounded flex justify-between items-center mb-3 bg-white shadow"
+        <form onSubmit={handleSubmit} className="flex mb-4 space-x-2">
+          <input
+            type="text"
+            placeholder="Enter a new commandment..."
+            value={newCommandment}
+            onChange={(e) => setNewCommandment(e.target.value)}
+            className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          />
+          <button
+            type="submit"
+            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
           >
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                {post.title || post.content}
-              </h2>
-              <p className="text-sm text-gray-600">{post.votes ?? 0} votes</p>
+            Submit
+          </button>
+        </form>
+
+        {posts.length === 0 && <p className="text-center text-gray-600">No commandments found.</p>}
+
+        {posts.map((post) => {
+          const userVote = userVotes[String(post.id)];
+          return (
+            <div
+              key={post.id}
+              className="border border-gray-300 p-3 rounded flex justify-between items-center mb-3 bg-white shadow"
+            >
+              <div>
+                <h2 className="font-semibold text-gray-900">{post.title || post.content}</h2>
+                <p className="text-sm text-gray-600">{post.votes ?? 0} votes</p>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  className={`px-3 py-1 rounded transition ${
+                    userVote === "up"
+                      ? "bg-green-700 text-white"
+                      : "bg-green-500 text-white hover:bg-green-600"
+                  }`}
+                  onClick={() => handleVote(post.id, "up")}
+                >
+                  👍
+                </button>
+                <button
+                  className={`px-3 py-1 rounded transition ${
+                    userVote === "down"
+                      ? "bg-red-700 text-white"
+                      : "bg-red-500 text-white hover:bg-red-600"
+                  }`}
+                  onClick={() => handleVote(post.id, "down")}
+                >
+                  👎
+                </button>
+              </div>
             </div>
-            <div className="flex space-x-2">
-              <button
-                className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition"
-                onClick={() => handleVote(post.id, "up")}
-              >
-                👍
-              </button>
-              <button
-                className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                onClick={() => handleVote(post.id, "down")}
-              >
-                👎
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
