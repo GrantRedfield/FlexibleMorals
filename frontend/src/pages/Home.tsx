@@ -8,6 +8,7 @@ interface Post {
   title?: string;
   content?: string;
   votes?: number;
+  username?: string; // 👈 Added username
 }
 
 export default function Home() {
@@ -37,7 +38,7 @@ export default function Home() {
 
   return (
     <div className="home-root">
-      {/* ✅ Background layer (fills width & shows full image) */}
+      {/* ✅ Background image */}
       <img
         src="/FlexibleMoralsPicture.png"
         alt="Flexible Morals Background"
@@ -60,10 +61,15 @@ export default function Home() {
             {!loading &&
               !error &&
               col.map((post) => (
-                <div key={post.id} className="commandment-border">
+                <div key={post.id} className="commandment-border tooltip-container">
                   {post.title || post.content}
                   {post.votes !== undefined && (
                     <span className="vote-count"> ({post.votes} votes)</span>
+                  )}
+
+                  {/* ✅ Tooltip with username */}
+                  {post.username && (
+                    <span className="tooltip-text">Posted by {post.username}</span>
                   )}
                 </div>
               ))}

@@ -1,4 +1,3 @@
-// frontend/src/pages/Vote.tsx
 import { useEffect, useState } from "react";
 import { getPosts, voteOnPost, createPost } from "../utils/api";
 
@@ -15,7 +14,9 @@ export default function Vote() {
   const [error, setError] = useState<string | null>(null);
   const [newCommandment, setNewCommandment] = useState("");
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
+  const [username, setUsername] = useState<string | null>(null);
 
+  // ✅ Load posts, votes, and username from storage
   useEffect(() => {
     const load = async () => {
       try {
@@ -31,17 +32,36 @@ export default function Vote() {
     };
     load();
 
-    const saved = localStorage.getItem("userVotes");
-    if (saved) setUserVotes(JSON.parse(saved));
+    const savedVotes = localStorage.getItem("userVotes");
+    if (savedVotes) setUserVotes(JSON.parse(savedVotes));
+
+    const savedUser = localStorage.getItem("username");
+    if (savedUser) setUsername(savedUser);
   }, []);
 
   useEffect(() => {
     localStorage.setItem("userVotes", JSON.stringify(userVotes));
   }, [userVotes]);
 
+  // ✅ Require login before certain actions
+  const requireLogin = () => {
+    if (username) return true;
+    const name = prompt("🔒 Please log in to continue.\nEnter your username:");
+    if (name && name.trim()) {
+      setUsername(name.trim());
+      localStorage.setItem("username", name.trim());
+      return true;
+    }
+    alert("You must log in to perform this action.");
+    return false;
+  };
+
+  // ✅ Submit new commandment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireLogin()) return;
     if (!newCommandment.trim()) return;
+
     try {
       const newPost = await createPost(newCommandment.trim());
       setPosts((prev) => [...prev, newPost]);
@@ -52,7 +72,10 @@ export default function Vote() {
     }
   };
 
+  // ✅ Voting handler with login check
   const handleVote = async (postId: string | number, direction: "up" | "down") => {
+    if (!requireLogin()) return;
+
     const pid = String(postId);
     const prevVote = userVotes[pid];
     console.log(`Voting on post ${pid}, direction ${direction}, previous vote: ${prevVote}`);
@@ -69,7 +92,6 @@ export default function Vote() {
         const current = p.votes ?? 0;
         let newVotes = current;
         if (!prevVote) {
-          // first vote
           newVotes += direction === "up" ? 1 : -1;
         } else if (prevVote === "up" && direction === "down") {
           newVotes -= 2;
@@ -81,7 +103,7 @@ export default function Vote() {
       })
     );
 
-    // update userVotes record
+    // update local record
     setUserVotes((prev) => ({
       ...prev,
       [pid]: direction,
@@ -92,14 +114,18 @@ export default function Vote() {
       console.log("✅ Backend responded with:", updated);
       setPosts((prev) =>
         prev.map((p) =>
-          String(p.id) === String(updated.id)
-            ? { ...p, votes: updated.votes }
-            : p
+          String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
         )
       );
     } catch (err) {
       console.error("❌ Vote failed:", err);
     }
+  };
+
+  // ✅ Logout button
+  const handleLogout = () => {
+    setUsername(null);
+    localStorage.removeItem("username");
   };
 
   if (loading) return <p className="p-4 text-gray-500">Loading...</p>;
@@ -134,6 +160,33 @@ export default function Vote() {
           Vote on Commandments
         </h1>
 
+        {/* ✅ Login Info Bar */}
+        <div className="flex justify-between items-center mb-4">
+          {username ? (
+            <p className="text-gray-800 text-sm">
+              Logged in as <span className="font-semibold">{username}</span>
+            </p>
+          ) : (
+            <p className="text-gray-600 text-sm italic">Not logged in</p>
+          )}
+          {username ? (
+            <button
+              onClick={handleLogout}
+              className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800 transition"
+            >
+              Log Out
+            </button>
+          ) : (
+            <button
+              onClick={() => requireLogin()}
+              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition"
+            >
+              Log In
+            </button>
+          )}
+        </div>
+
+        {/* ✅ Create Post Form */}
         <form onSubmit={handleSubmit} className="flex mb-4 space-x-2">
           <input
             type="text"
@@ -152,6 +205,7 @@ export default function Vote() {
 
         {posts.length === 0 && <p className="text-center text-gray-600">No commandments found.</p>}
 
+        {/* ✅ Commandments with Voting */}
         {posts.map((post) => {
           const userVote = userVotes[String(post.id)];
           return (

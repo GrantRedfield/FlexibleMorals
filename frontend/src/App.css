@@ -10,15 +10,15 @@
   background-color: #000;
 }
 
-
+/* === Background stretches fully === */
 .home-background-balanced {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;          /* stretch across full width */
-  height: 100vh;         /* stretch full height */
-  object-fit: fill;      /* 🔥 stretch both dimensions, no black sides */
-  object-position: center top; /* keep top aligned */
+  width: 100vw;
+  height: 100vh;
+  object-fit: fill; /* 🔥 fully stretches horizontally and vertically */
+  object-position: center top;
   z-index: 0;
   pointer-events: none;
 }
@@ -78,11 +78,40 @@
   text-align: center;
   width: 260px;
   transition: all 0.2s ease-in-out;
+  position: relative;
 }
 
 .commandment-border:hover {
   background-color: rgba(161, 132, 52, 0.7);
   transform: scale(1.03);
+}
+
+/* === Tooltip styling === */
+.tooltip-container {
+  position: relative;
+}
+
+.tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 110%; /* appear above the card */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #fdf8e6;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }
 
 .vote-count {
