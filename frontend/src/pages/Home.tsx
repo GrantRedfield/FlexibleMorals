@@ -37,7 +37,7 @@ export default function Home() {
 
   return (
     <div className="home-root">
-      {/* ✅ The real background layer */}
+      {/* ✅ Background layer (fills width & shows full image) */}
       <img
         src="/FlexibleMoralsPicture.png"
         alt="Flexible Morals Background"

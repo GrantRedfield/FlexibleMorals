@@ -10,18 +10,15 @@
   background-color: #000;
 }
 
-/* === Balanced fullscreen background === */
+
 .home-background-balanced {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scaleX(1.15); /* slight side stretch */
-  transform-origin: center;
-  width: auto;
-  height: 100vh; /* ensures full vertical visibility */
-  min-width: 100vw; /* fills horizontally if narrow */
-  object-fit: contain; /* no vertical crop */
-  object-position: center top; /* keep top anchored */
+  top: 0;
+  left: 0;
+  width: 100vw;          /* stretch across full width */
+  height: 100vh;         /* stretch full height */
+  object-fit: fill;      /* 🔥 stretch both dimensions, no black sides */
+  object-position: center top; /* keep top aligned */
   z-index: 0;
   pointer-events: none;
 }
