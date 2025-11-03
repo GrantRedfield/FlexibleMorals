@@ -7,12 +7,24 @@
   ],
   "scripts": {
     "install:all": "npm run -ws install",
-    "dev:all": "npm-run-all -p dev:backend dev:frontend",
+
+
+    "dev": "npm run dev:all",
+    "dev:all": "npm-run-all -p dev:dynamodb dev:backend dev:frontend",
+
+  
+    "dev:dynamodb": "java -Djava.library.path=C:\\DynamoDB\\DynamoDBLocal_lib -jar C:\\DynamoDB\\DynamoDBLocal.jar -sharedDb -port 8000",
+
+
     "dev:backend": "npm --workspace backend run dev",
     "dev:frontend": "npm --workspace frontend start",
+
+
     "build:all": "npm-run-all -s build:backend build:frontend",
     "build:backend": "npm --workspace backend run build || echo \"(skip if JS only)\"",
     "build:frontend": "npm --workspace frontend run build",
+
+
     "lint:all": "npm-run-all -s lint:*",
     "lint:backend": "npm --workspace backend run lint || echo \"no backend lint script\"",
     "lint:frontend": "npm --workspace frontend run lint || echo \"no frontend lint script\""

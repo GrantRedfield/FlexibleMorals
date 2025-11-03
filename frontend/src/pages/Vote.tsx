@@ -19,6 +19,7 @@ export default function Vote() {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
 
+  // === Load Posts ===
   useEffect(() => {
     const load = async () => {
       try {
@@ -37,10 +38,12 @@ export default function Vote() {
     if (savedVotes) setUserVotes(JSON.parse(savedVotes));
   }, []);
 
+  // === Persist userVotes locally ===
   useEffect(() => {
     localStorage.setItem("userVotes", JSON.stringify(userVotes));
   }, [userVotes]);
 
+  // === Require login before posting or voting ===
   const requireLogin = (): boolean => {
     if (user) return true;
     const name = prompt("🔒 Please log in to continue.\nEnter your username:");
@@ -52,13 +55,15 @@ export default function Vote() {
     return false;
   };
 
+  // === Handle new post submission ===
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requireLogin()) return;
     if (!newCommandment.trim()) return;
 
     try {
-      const newPost = await createPost(newCommandment.trim());
+      // ✅ Send username to backend
+      const newPost = await createPost(newCommandment.trim(), user);
       setPosts((prev) => [...prev, newPost]);
       setNewCommandment("");
     } catch (err) {
@@ -67,6 +72,7 @@ export default function Vote() {
     }
   };
 
+  // === Handle vote action ===
   const handleVote = async (postId: string | number, direction: "up" | "down") => {
     if (!requireLogin()) return;
 
@@ -74,6 +80,7 @@ export default function Vote() {
     const prevVote = userVotes[pid];
     if (prevVote === direction) return;
 
+    // Optimistic UI update
     setPosts((prev) =>
       prev.map((p) => {
         if (String(p.id) !== pid) return p;
@@ -93,7 +100,7 @@ export default function Vote() {
     setUserVotes((prev) => ({ ...prev, [pid]: direction }));
 
     try {
-      const updated = await voteOnPost(pid, direction);
+      const updated = await voteOnPost(pid, direction, user);
       setPosts((prev) =>
         prev.map((p) =>
           String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
@@ -104,9 +111,11 @@ export default function Vote() {
     }
   };
 
+  // === Loading & Error States ===
   if (loading) return <p className="p-4 text-gray-500">Loading...</p>;
   if (error) return <p className="p-4 text-red-600">{error}</p>;
 
+  // === Render ===
   return (
     <div
       style={{
@@ -132,12 +141,9 @@ export default function Vote() {
           boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
         }}
       >
-        {/* ✅ Home Button */}
+        {/* 🏠 Home Button */}
         <div className="flex justify-end mb-4">
-          <button
-            onClick={() => navigate("/")}
-            className="home-button"
-          >
+          <button onClick={() => navigate("/")} className="home-button">
             🏠 Home
           </button>
         </div>
@@ -146,7 +152,7 @@ export default function Vote() {
           Vote on Commandments
         </h1>
 
-        {/* ✅ Login Info */}
+        {/* 👤 Login Info */}
         <div className="flex justify-between items-center mb-4">
           {user ? (
             <p className="text-gray-800 text-sm">
@@ -172,7 +178,7 @@ export default function Vote() {
           )}
         </div>
 
-        {/* ✅ Create Post Form */}
+        {/* ✍️ Create Post Form */}
         <form onSubmit={handleSubmit} className="flex mb-4 space-x-2">
           <input
             type="text"
@@ -189,7 +195,10 @@ export default function Vote() {
           </button>
         </form>
 
-        {posts.length === 0 && <p className="text-center text-gray-600">No commandments found.</p>}
+        {/* 🗳️ Commandments List */}
+        {posts.length === 0 && (
+          <p className="text-center text-gray-600">No commandments found.</p>
+        )}
 
         {posts.map((post) => {
           const userVote = userVotes[String(post.id)];
@@ -199,8 +208,12 @@ export default function Vote() {
               className="border border-gray-300 p-3 rounded flex justify-between items-center mb-3 bg-white shadow"
             >
               <div>
-                <h2 className="font-semibold text-gray-900">{post.title || post.content}</h2>
-                <p className="text-sm text-gray-600">{post.votes ?? 0} votes</p>
+                <h2 className="font-semibold text-gray-900">
+                  {post.title || post.content}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {post.votes ?? 0} votes
+                </p>
               </div>
               <div className="flex space-x-2">
                 <button

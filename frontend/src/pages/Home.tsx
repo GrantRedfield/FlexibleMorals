@@ -67,11 +67,15 @@ export default function Home() {
 
       {/* ✅ Merch link */}
       <div className="merch-link-container">
-        <button
-          onClick={() => setShowMerchPopup(true)}
-          className="merch-link"
-        >
+        <button onClick={() => setShowMerchPopup(true)} className="merch-link">
           Merch
+        </button>
+      </div>
+
+      {/* ✅ "What in the world is this?!" link */}
+      <div className="info-link-container">
+        <button onClick={() => navigate("/about")} className="info-link">
+          What in the world is this?!
         </button>
       </div>
 

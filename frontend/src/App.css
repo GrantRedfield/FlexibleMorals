@@ -275,3 +275,27 @@
     margin: 0;
   }
 }
+/* === Info Link ("What in the world is this?!") === */
+.info-link-container {
+  position: absolute;
+  bottom: 20%; /* adjust this to fine-tune placement */
+  right: 6%; /* separate from merch/offering */
+  z-index: 10;
+}
+
+.info-link {
+  background-color: #b79b3d;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+.info-link:hover {
+  background-color: #d3b956;
+  transform: scale(1.05);
+}

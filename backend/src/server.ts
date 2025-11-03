@@ -2,7 +2,13 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { DynamoDBClient, ScanCommand, GetItemCommand, PutItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBClient,
+  ScanCommand,
+  GetItemCommand,
+  PutItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 
 const app = express();
@@ -16,13 +22,18 @@ const client = new DynamoDBClient({
 
 const TABLE_NAME = "FlexibleTable";
 
-// === Helper ===
+// === Helper: Fetch all posts ===
 const getAllPosts = async () => {
   const command = new ScanCommand({ TableName: TABLE_NAME });
   const result = await client.send(command);
+
   const posts = (result.Items || [])
-    .filter((i) => i.SK?.S === "META")
+    // Support both "META" and "META#POST" structures
+    .filter((i) =>
+      i.SK?.S === "META" || i.SK?.S === "META#POST"
+    )
     .map((i) => unmarshall(i));
+
   return posts;
 };
 
@@ -30,11 +41,15 @@ const getAllPosts = async () => {
 app.get("/posts", async (req, res) => {
   try {
     const posts = await getAllPosts();
-    res.json(posts.map((p) => ({
+    const formatted = posts.map((p) => ({
       id: p.PK?.replace("POST#", ""),
-      title: p.title,
-      votes: Number(p.votes ?? 0),
-    })));
+      title: p.title ?? "",
+      content: p.body ?? "",
+      votes: Number(p.votes ?? p.score ?? 0),
+      username: p.authorId ?? "unknown",
+      createdAt: p.createdAt ?? null,
+    }));
+    res.json(formatted);
   } catch (err) {
     console.error("❌ Error fetching posts:", err);
     res.status(500).json({ error: "Failed to fetch posts." });
@@ -43,19 +58,29 @@ app.get("/posts", async (req, res) => {
 
 // === POST /posts ===
 app.post("/posts", async (req, res) => {
-  const { content } = req.body;
+  const { content, authorId = "anonymous" } = req.body;
   if (!content) return res.status(400).json({ error: "Missing content" });
 
   try {
     const newId = Date.now().toString();
     const item = {
       PK: { S: `POST#${newId}` },
-      SK: { S: "META" },
+      SK: { S: "META#POST" },
       title: { S: content },
+      body: { S: content },
       votes: { N: "0" },
+      authorId: { S: authorId },
+      createdAt: { S: new Date().toISOString() },
     };
+
     await client.send(new PutItemCommand({ TableName: TABLE_NAME, Item: item }));
-    res.json({ id: newId, title: content, votes: 0 });
+
+    res.json({
+      id: newId,
+      title: content,
+      votes: 0,
+      username: authorId,
+    });
   } catch (err) {
     console.error("❌ Failed to create post:", err);
     res.status(500).json({ error: "Failed to create post" });
@@ -63,22 +88,23 @@ app.post("/posts", async (req, res) => {
 });
 
 // === POST /posts/:id/vote ===
-// Simulate Reddit-style voting (with local userId)
 app.post("/posts/:id/vote", async (req, res) => {
   const { id } = req.params;
   const { direction, userId = "guest" } = req.body;
 
-  if (!direction || !["up", "down"].includes(direction))
+  if (!direction || !["up", "down"].includes(direction)) {
     return res.status(400).json({ error: "Invalid direction" });
+  }
 
   try {
     // Fetch current post
     const getRes = await client.send(
       new GetItemCommand({
         TableName: TABLE_NAME,
-        Key: marshall({ PK: `POST#${id}`, SK: "META" }),
+        Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
       })
     );
+
     if (!getRes.Item) return res.status(404).json({ error: "Post not found" });
 
     const post = unmarshall(getRes.Item);
@@ -89,7 +115,6 @@ app.post("/posts/:id/vote", async (req, res) => {
     let newVoteState = direction;
 
     if (previousVote === direction) {
-      // same vote again — ignore
       console.log(`User ${userId} repeated same vote on post ${id}`);
       return res.json({ id, votes });
     }
@@ -104,11 +129,10 @@ app.post("/posts/:id/vote", async (req, res) => {
 
     userVotes[userId] = newVoteState;
 
-    // Update item
     await client.send(
       new UpdateItemCommand({
         TableName: TABLE_NAME,
-        Key: marshall({ PK: `POST#${id}`, SK: "META" }),
+        Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
         UpdateExpression: "SET votes = :v, userVotes = :u",
         ExpressionAttributeValues: marshall({
           ":v": votes,
