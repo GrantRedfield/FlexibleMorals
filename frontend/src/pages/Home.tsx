@@ -8,6 +8,7 @@ interface Post {
   title?: string;
   content?: string;
   votes?: number;
+  username?: string;
 }
 
 export default function Home() {
@@ -45,14 +46,14 @@ export default function Home() {
         className="home-background-balanced"
       />
 
-      {/* ✅ Vote button near candle */}
+      {/* ✅ Vote button */}
       <div className="vote-button-container">
         <button onClick={() => navigate("/vote")} className="vote-button">
           Vote
         </button>
       </div>
 
-      {/* ✅ Offering button near bowl */}
+      {/* ✅ Offering link */}
       <div className="offering-link-container">
         <a
           href="https://www.paypal.com/donate/?business=E9ZG5U75GEYBQ&no_recurring=0&item_name=Thank+you+for+keeping+the+vision+alive%21&currency_code=USD"
@@ -64,14 +65,17 @@ export default function Home() {
         </a>
       </div>
 
-      {/* ✅ Merch button (independent position) */}
+      {/* ✅ Merch link */}
       <div className="merch-link-container">
-        <button onClick={() => setShowMerchPopup(true)} className="merch-link">
+        <button
+          onClick={() => setShowMerchPopup(true)}
+          className="merch-link"
+        >
           Merch
         </button>
       </div>
 
-      {/* ✅ Merch Popup */}
+      {/* ✅ Merch popup */}
       {showMerchPopup && (
         <div className="popup-overlay" onClick={() => setShowMerchPopup(false)}>
           <div className="popup-box" onClick={(e) => e.stopPropagation()}>
@@ -87,24 +91,51 @@ export default function Home() {
         </div>
       )}
 
-      {/* ✅ Commandments */}
+      {/* ✅ Commandments overlay */}
       <div className="overlay-stones">
-        {[leftPosts, rightPosts].map((col, i) => (
-          <div key={i} className="stone-column">
-            {loading && <div className="commandment-border">Loading...</div>}
-            {error && <div className="commandment-border">{error}</div>}
-            {!loading &&
-              !error &&
-              col.map((post) => (
-                <div key={post.id} className="commandment-border">
-                  {post.title || post.content}
-                  {post.votes !== undefined && (
-                    <span className="vote-count"> ({post.votes} votes)</span>
-                  )}
-                </div>
-              ))}
-          </div>
-        ))}
+        {/* Left Stone */}
+        <div className="stone-column">
+          {loading && <div className="commandment-border">Loading...</div>}
+          {error && <div className="commandment-border">{error}</div>}
+          {!loading &&
+            !error &&
+            leftPosts.map((post) => (
+              <div
+                key={post.id}
+                className="commandment-border tooltip-container"
+              >
+                {post.title || post.content}
+                {post.votes !== undefined && (
+                  <span className="vote-count"> ({post.votes} votes)</span>
+                )}
+                <span className="tooltip-text">
+                  username: {post.username ? post.username : "unknown"}
+                </span>
+              </div>
+            ))}
+        </div>
+
+        {/* Right Stone */}
+        <div className="stone-column">
+          {loading && <div className="commandment-border">Loading...</div>}
+          {error && <div className="commandment-border">{error}</div>}
+          {!loading &&
+            !error &&
+            rightPosts.map((post) => (
+              <div
+                key={post.id}
+                className="commandment-border tooltip-container"
+              >
+                {post.title || post.content}
+                {post.votes !== undefined && (
+                  <span className="vote-count"> ({post.votes} votes)</span>
+                )}
+                <span className="tooltip-text">
+                  username: {post.username ? post.username : "unknown"}
+                </span>
+              </div>
+            ))}
+        </div>
       </div>
     </div>
   );

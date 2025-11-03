@@ -10,24 +10,24 @@
   background-color: #000;
 }
 
-/* === Background stretches fully === */
+/* === Balanced fullscreen background === */
 .home-background-balanced {
   position: absolute;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  object-fit: fill; /* 🔥 fully stretches horizontally and vertically */
+  object-fit: fill;
   object-position: center top;
   z-index: 0;
   pointer-events: none;
 }
 
-/* === Vote button === */
+/* === Vote button (bottom right) === */
 .vote-button-container {
   position: absolute;
-  top: 80%;
-  right: 80%;
+  bottom: 12%;
+  right: 10%;
   z-index: 10;
 }
 
@@ -35,9 +35,10 @@
   background-color: #b79b3d;
   border: none;
   border-radius: 8px;
-  padding: 10px 18px;
+  padding: 12px 24px;
   color: white;
   font-weight: 600;
+  font-size: 1.1rem;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease-in-out;
@@ -48,83 +49,12 @@
   transform: scale(1.05);
 }
 
-/* === Commandment overlay === */
-.overlay-stones {
-  position: relative;
-  z-index: 5;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 10%;
-  gap: 3rem;
-  flex-wrap: wrap;
-}
-
-.stone-column {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-}
-
-/* === Commandment cards === */
-.commandment-border {
-  border: 2px solid #d1b97b;
-  border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.55);
-  padding: 10px 14px;
-  color: #fdf8e6;
-  font-size: 1.1rem;
-  text-align: center;
-  width: 260px;
-  transition: all 0.2s ease-in-out;
-  position: relative;
-}
-
-.commandment-border:hover {
-  background-color: rgba(161, 132, 52, 0.7);
-  transform: scale(1.03);
-}
-
-/* === Tooltip styling === */
-.tooltip-container {
-  position: relative;
-}
-
-.tooltip-text {
-  visibility: hidden;
-  opacity: 0;
-  position: absolute;
-  bottom: 110%; /* appear above the card */
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.85);
-  color: #fdf8e6;
-  font-size: 0.9rem;
-  padding: 6px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
-  pointer-events: none;
-  z-index: 20;
-}
-
-.tooltip-container:hover .tooltip-text {
-  visibility: visible;
-  opacity: 1;
-}
-
-.vote-count {
-  font-size: 0.8rem;
-  opacity: 0.8;
-}
-
-/* === Offering button near bowl === */
+/* === Offering link (bottom left area) === */
 .offering-link-container {
   position: absolute;
-  top: 90%;      /* adjust this to match the bowl’s height */
-  left: 47%;     /* adjust to match the bowl’s position */
-  transform: translate(-50%, -50%);
+  bottom: 10%;
+  left: 33%;
+  transform: translateX(-50%);
   z-index: 10;
 }
 
@@ -145,12 +75,12 @@
   transform: scale(1.05);
 }
 
-/* === Merch button (independent position) === */
+/* === Merch link (bottom center) === */
 .merch-link-container {
   position: absolute;
-  top: 90%;      /* adjust this to place near bowl or other area */
-  left: 80.5%;     /* move horizontally as needed */
-  transform: translate(-50%, -50%);
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
 }
 
@@ -230,5 +160,118 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* === Commandments Overlay === */
+.overlay-stones {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  z-index: 5;
+  gap: 8rem; /* Increase or decrease to control spacing between stones */
+}
+
+.stone-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.stone-column:first-child {
+  margin-left: -6%;
+}
+
+.stone-column:last-child {
+  margin-right: -6%;
+}
+
+/* === Commandment Cards === */
+.commandment-border {
+  border: 2px solid #d1b97b;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.55);
+  padding: 10px 14px;
+  color: #fdf8e6;
+  font-size: 1.1rem;
+  text-align: center;
+  width: 260px;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  z-index: 10;
+}
+
+.commandment-border:hover {
+  background-color: rgba(161, 132, 52, 0.7);
+  transform: scale(1.03);
+}
+
+.vote-count {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* === Tooltip for Username Bubble === */
+.tooltip-container {
+  position: relative;
+  cursor: pointer;
+  z-index: 15;
+}
+
+.tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #fdf8e6;
+  text-align: center;
+  border-radius: 8px;
+  padding: 6px 10px;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.9rem;
+  z-index: 100;
+  transition: opacity 0.25s ease-in-out, visibility 0.25s;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* === Responsive tweaks === */
+@media (max-width: 900px) {
+  .overlay-stones {
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    top: 18%;
+  }
+
+  .stone-column:first-child,
+  .stone-column:last-child {
+    margin: 0;
   }
 }

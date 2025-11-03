@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getPosts, voteOnPost, createPost } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 
 interface Post {
   id: string | number;
@@ -14,14 +16,13 @@ export default function Vote() {
   const [error, setError] = useState<string | null>(null);
   const [newCommandment, setNewCommandment] = useState("");
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
-  const [username, setUsername] = useState<string | null>(null);
+  const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
 
-  // ✅ Load posts, votes, and username from storage
   useEffect(() => {
     const load = async () => {
       try {
         const data = await getPosts();
-        console.log("📊 Vote fetched posts:", data);
         setPosts(data);
       } catch (err: any) {
         console.error("Error fetching posts:", err);
@@ -34,29 +35,23 @@ export default function Vote() {
 
     const savedVotes = localStorage.getItem("userVotes");
     if (savedVotes) setUserVotes(JSON.parse(savedVotes));
-
-    const savedUser = localStorage.getItem("username");
-    if (savedUser) setUsername(savedUser);
   }, []);
 
   useEffect(() => {
     localStorage.setItem("userVotes", JSON.stringify(userVotes));
   }, [userVotes]);
 
-  // ✅ Require login before certain actions
-  const requireLogin = () => {
-    if (username) return true;
+  const requireLogin = (): boolean => {
+    if (user) return true;
     const name = prompt("🔒 Please log in to continue.\nEnter your username:");
     if (name && name.trim()) {
-      setUsername(name.trim());
-      localStorage.setItem("username", name.trim());
+      login(name.trim());
       return true;
     }
     alert("You must log in to perform this action.");
     return false;
   };
 
-  // ✅ Submit new commandment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requireLogin()) return;
@@ -72,20 +67,13 @@ export default function Vote() {
     }
   };
 
-  // ✅ Voting handler with login check
   const handleVote = async (postId: string | number, direction: "up" | "down") => {
     if (!requireLogin()) return;
 
     const pid = String(postId);
     const prevVote = userVotes[pid];
-    console.log(`Voting on post ${pid}, direction ${direction}, previous vote: ${prevVote}`);
+    if (prevVote === direction) return;
 
-    if (prevVote === direction) {
-      console.log("🚫 Already voted this way — ignoring");
-      return;
-    }
-
-    // Compute UI delta
     setPosts((prev) =>
       prev.map((p) => {
         if (String(p.id) !== pid) return p;
@@ -98,20 +86,14 @@ export default function Vote() {
         } else if (prevVote === "down" && direction === "up") {
           newVotes += 2;
         }
-        console.log(`Post ${pid} UI votes changed from ${current} → ${newVotes}`);
         return { ...p, votes: newVotes };
       })
     );
 
-    // update local record
-    setUserVotes((prev) => ({
-      ...prev,
-      [pid]: direction,
-    }));
+    setUserVotes((prev) => ({ ...prev, [pid]: direction }));
 
     try {
       const updated = await voteOnPost(pid, direction);
-      console.log("✅ Backend responded with:", updated);
       setPosts((prev) =>
         prev.map((p) =>
           String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
@@ -120,12 +102,6 @@ export default function Vote() {
     } catch (err) {
       console.error("❌ Vote failed:", err);
     }
-  };
-
-  // ✅ Logout button
-  const handleLogout = () => {
-    setUsername(null);
-    localStorage.removeItem("username");
   };
 
   if (loading) return <p className="p-4 text-gray-500">Loading...</p>;
@@ -156,29 +132,39 @@ export default function Vote() {
           boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
         }}
       >
+        {/* ✅ Home Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => navigate("/")}
+            className="home-button"
+          >
+            🏠 Home
+          </button>
+        </div>
+
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-900">
           Vote on Commandments
         </h1>
 
-        {/* ✅ Login Info Bar */}
+        {/* ✅ Login Info */}
         <div className="flex justify-between items-center mb-4">
-          {username ? (
+          {user ? (
             <p className="text-gray-800 text-sm">
-              Logged in as <span className="font-semibold">{username}</span>
+              Logged in as <span className="font-semibold">{user}</span>
             </p>
           ) : (
             <p className="text-gray-600 text-sm italic">Not logged in</p>
           )}
-          {username ? (
+          {user ? (
             <button
-              onClick={handleLogout}
+              onClick={logout}
               className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800 transition"
             >
               Log Out
             </button>
           ) : (
             <button
-              onClick={() => requireLogin()}
+              onClick={requireLogin}
               className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition"
             >
               Log In
@@ -205,7 +191,6 @@ export default function Vote() {
 
         {posts.length === 0 && <p className="text-center text-gray-600">No commandments found.</p>}
 
-        {/* ✅ Commandments with Voting */}
         {posts.map((post) => {
           const userVote = userVotes[String(post.id)];
           return (
