@@ -16,8 +16,52 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMerchPopup, setShowMerchPopup] = useState(false);
+  const [showInfoPopup, setShowInfoPopup] = useState(false); // ✅ NEW: info popup
+  const [daysLeft, setDaysLeft] = useState<number>(0);
+  const [showPrayerHands, setShowPrayerHands] = useState(false);
+  const [showCoins, setShowCoins] = useState(false);
   const navigate = useNavigate();
 
+  // ✅ Countdown logic
+  useEffect(() => {
+    const today = new Date();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const diffTime = endOfMonth.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDaysLeft(diffDays);
+  }, []);
+
+  // ✅ Prayer hands animation every 30 seconds
+  useEffect(() => {
+    const showHands = () => {
+      setShowPrayerHands(true);
+      setTimeout(() => setShowPrayerHands(false), 3000);
+    };
+
+    // Show immediately on load
+    showHands();
+
+    // Then repeat every 30 seconds
+    const interval = setInterval(showHands, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Coins falling animation every 60 seconds
+  useEffect(() => {
+    const dropCoins = () => {
+      setShowCoins(true);
+      setTimeout(() => setShowCoins(false), 3000);
+    };
+
+    // Show after 2 seconds on load
+    setTimeout(dropCoins, 2000);
+
+    // Then repeat every 60 seconds
+    const interval = setInterval(dropCoins, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Fetch posts
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -33,9 +77,10 @@ export default function Home() {
     fetchPosts();
   }, []);
 
-  const midpoint = Math.ceil(posts.length / 2);
-  const leftPosts = posts.slice(0, midpoint);
-  const rightPosts = posts.slice(midpoint);
+  // Sort by votes (highest first) and take top 10
+  const sortedPosts = [...posts].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
+  const leftPosts = sortedPosts.slice(0, 5);
+  const rightPosts = sortedPosts.slice(5, 10);
 
   return (
     <div className="home-root">
@@ -46,8 +91,54 @@ export default function Home() {
         className="home-background-balanced"
       />
 
+      {/* ✅ Countdown (Top Right Corner) */}
+      <div
+        style={{
+          position: "fixed",
+          top: "1rem",
+          right: "1rem",
+          border: "2px solid #d4af37",
+          borderRadius: "12px",
+          padding: "0.8rem 1.2rem",
+          backgroundColor: "rgba(0,0,0,0.85)",
+          color: "white",
+          textAlign: "center",
+          zIndex: 1000,
+          boxShadow: "0 0 12px rgba(212,175,55,0.3)",
+        }}
+      >
+        <h3
+          style={{
+            color: "#d4af37",
+            fontSize: "1rem",
+            marginBottom: "0.3rem",
+            fontWeight: 600,
+          }}
+        >
+          Number Of Days Until Moral Reset
+        </h3>
+        <p
+          style={{
+            fontSize: "1.8rem",
+            fontWeight: "bold",
+            margin: 0,
+            lineHeight: 1.2,
+          }}
+        >
+          {daysLeft}
+        </p>
+      </div>
+
       {/* ✅ Vote button */}
       <div className="vote-button-container">
+        {showPrayerHands && (
+          <>
+            <span className="prayer-hands prayer-left">🙏</span>
+            <span className="prayer-hands prayer-right">🙏</span>
+            <span className="prayer-hands prayer-top">🙏</span>
+            <span className="prayer-hands prayer-bottom">🙏</span>
+          </>
+        )}
         <button onClick={() => navigate("/vote")} className="vote-button">
           Vote
         </button>
@@ -55,6 +146,15 @@ export default function Home() {
 
       {/* ✅ Offering link */}
       <div className="offering-link-container">
+        {showCoins && (
+          <div className="coin-animation">
+            <div className="coin coin-1">$</div>
+            <div className="coin coin-2">$</div>
+            <div className="coin coin-3">$</div>
+            <div className="coin coin-4">$</div>
+            <div className="coin coin-5">$</div>
+          </div>
+        )}
         <a
           href="https://www.paypal.com/donate/?business=E9ZG5U75GEYBQ&no_recurring=0&item_name=Thank+you+for+keeping+the+vision+alive%21&currency_code=USD"
           target="_blank"
@@ -72,9 +172,9 @@ export default function Home() {
         </button>
       </div>
 
-      {/* ✅ "What in the world is this?!" link */}
+      {/* ✅ "What in the world is this?!" link (now opens popup) */}
       <div className="info-link-container">
-        <button onClick={() => navigate("/about")} className="info-link">
+        <button onClick={() => setShowInfoPopup(true)} className="info-link">
           What in the world is this?!
         </button>
       </div>
@@ -82,11 +182,213 @@ export default function Home() {
       {/* ✅ Merch popup */}
       {showMerchPopup && (
         <div className="popup-overlay" onClick={() => setShowMerchPopup(false)}>
-          <div className="popup-box" onClick={(e) => e.stopPropagation()}>
-            <h2>🛍️ Coming Soon!</h2>
-            <p>Our merch collection is in the works.</p>
+          <div
+            className="popup-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "600px", padding: "1.5rem", backgroundColor: "#1a1a1a" }}
+          >
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem" }}>
+              Flexible Morals Tee
+            </h2>
+            <p style={{ marginBottom: "1rem", color: "#aaa", fontSize: "0.9rem" }}>
+              Coming Soon! Each month's top commandments on the back.
+            </p>
+
+            {/* T-Shirt mockup */}
+            <div
+              style={{
+                position: "relative",
+                width: "320px",
+                margin: "0 auto",
+              }}
+            >
+              {/* T-shirt shape */}
+              <svg viewBox="0 0 200 240" style={{ width: "100%" }}>
+                {/* Shirt body */}
+                <path
+                  d="M30 50 L30 230 L170 230 L170 50 L140 50 L130 30 Q100 20 70 30 L60 50 Z"
+                  fill="#2d2d2d"
+                  stroke="#444"
+                  strokeWidth="2"
+                />
+                {/* Left sleeve */}
+                <path
+                  d="M30 50 L0 80 L15 95 L30 75 Z"
+                  fill="#2d2d2d"
+                  stroke="#444"
+                  strokeWidth="2"
+                />
+                {/* Right sleeve */}
+                <path
+                  d="M170 50 L200 80 L185 95 L170 75 Z"
+                  fill="#2d2d2d"
+                  stroke="#444"
+                  strokeWidth="2"
+                />
+                {/* Collar */}
+                <ellipse cx="100" cy="35" rx="30" ry="12" fill="#1a1a1a" stroke="#444" strokeWidth="2" />
+              </svg>
+
+              {/* Month and Year - top left */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "85px",
+                  left: "60px",
+                  color: "#d4af37",
+                  fontSize: "12px",
+                  fontFamily: "Cinzel, serif",
+                  fontWeight: "bold",
+                }}
+              >
+                {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </div>
+
+              {/* Tablets image with commandments - centered */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: "200px",
+                  height: "150px",
+                  marginTop: "15px",
+                }}
+              >
+                {/* Background tablets image */}
+                <img
+                  src="/FlexibleMoralsPicture.png"
+                  alt="Tablets"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center 25%",
+                    borderRadius: "4px",
+                  }}
+                />
+
+                {/* Left tablet commandments */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "18%",
+                    left: "30%",
+                    transform: "translateX(-50%)",
+                    width: "28%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "3px",
+                  }}
+                >
+                  {!loading &&
+                    leftPosts.slice(0, 5).map((post) => (
+                      <div
+                        key={post.id}
+                        style={{
+                          fontSize: "6px",
+                          color: "#fdf8e6",
+                          backgroundColor: "rgba(0,0,0,0.55)",
+                          padding: "2px 3px",
+                          borderRadius: "2px",
+                          border: "1px solid #d1b97b",
+                          textAlign: "center",
+                          width: "100%",
+                          fontFamily: "Cinzel, serif",
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {(post.title || post.content || "").slice(0, 20)}
+                        {(post.title || post.content || "").length > 20 ? "..." : ""}
+                      </div>
+                    ))}
+                </div>
+
+                {/* Right tablet commandments */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "18%",
+                    left: "70%",
+                    transform: "translateX(-50%)",
+                    width: "28%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "3px",
+                  }}
+                >
+                  {!loading &&
+                    rightPosts.slice(0, 5).map((post) => (
+                      <div
+                        key={post.id}
+                        style={{
+                          fontSize: "6px",
+                          color: "#fdf8e6",
+                          backgroundColor: "rgba(0,0,0,0.55)",
+                          padding: "2px 3px",
+                          borderRadius: "2px",
+                          border: "1px solid #d1b97b",
+                          textAlign: "center",
+                          width: "100%",
+                          fontFamily: "Cinzel, serif",
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {(post.title || post.content || "").slice(0, 20)}
+                        {(post.title || post.content || "").length > 20 ? "..." : ""}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#888" }}>
+              * Design updates monthly with new commandments
+            </p>
             <button
               onClick={() => setShowMerchPopup(false)}
+              className="popup-close"
+              style={{ marginTop: "1rem" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Info popup (new) */}
+      {showInfoPopup && (
+        <div className="popup-overlay" onClick={() => setShowInfoPopup(false)}>
+          <div
+            className="popup-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "700px",
+              lineHeight: "1.6",
+              textAlign: "center",
+            }}
+          >
+            <h1 style={{ color: "#d4af37", marginBottom: "1rem" }}>
+              What in the world is this?!
+            </h1>
+            <p>
+              I'd like to think of this as the first "democratic religion", where
+              it's only bounded by users' imagination on what morals to follow.
+              All commandments reset at the beginning of every month, giving everyone
+              a fresh start to shape the new moral code. It's a social experiment in
+              crowd-sourced ethics. Users write and vote on commandments — some
+              serious, some absurd — creating a living reflection of our
+              collective values, humor, and contradictions.
+            </p>
+            <p style={{ marginTop: "1rem", opacity: 0.8 }}>
+              Whether divine wisdom or chaos, every vote shapes the moral
+              mosaic.
+            </p>
+            <button
+              onClick={() => setShowInfoPopup(false)}
               className="popup-close"
             >
               Close
