@@ -17,3 +17,37 @@ export const createPost = async (content: string, authorId?: string) => {
   const res = await axios.post(`${API_BASE}/posts`, { content, authorId });
   return res.data;
 };
+
+// === Donor API ===
+
+export const getDonorStatus = async (username: string) => {
+  const res = await axios.get(`${API_BASE}/api/donor/status/${username}`);
+  return res.data;
+};
+
+export const getBulkDonorStatus = async (usernames: string[]) => {
+  const res = await axios.get(`${API_BASE}/api/donor/bulk-status`, {
+    params: { usernames: usernames.join(",") },
+  });
+  return res.data;
+};
+
+export const getMyDonorStatus = async (username: string) => {
+  const res = await axios.get(`${API_BASE}/api/donor/my-status`, {
+    params: { username },
+  });
+  return res.data;
+};
+
+export const linkPayPalEmail = async (paypalEmail: string, username: string) => {
+  const res = await axios.post(`${API_BASE}/api/donor/link-email`, {
+    paypalEmail,
+    username,
+  });
+  return res.data;
+};
+
+export const getDonorTiers = async () => {
+  const res = await axios.get(`${API_BASE}/api/donor/tiers`);
+  return res.data;
+};

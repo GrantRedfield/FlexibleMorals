@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPosts } from "../utils/api";
+import DonationPopup from "../components/DonationPopup";
+import DonorBadge from "../components/DonorBadge";
+import { useDonor } from "../context/DonorContext";
 import "../App.css";
 
 interface Post {
@@ -16,11 +19,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMerchPopup, setShowMerchPopup] = useState(false);
-  const [showInfoPopup, setShowInfoPopup] = useState(false); // ✅ NEW: info popup
+  const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [showDonationPopup, setShowDonationPopup] = useState(false);
   const [daysLeft, setDaysLeft] = useState<number>(0);
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
   const navigate = useNavigate();
+  const { donorStatuses, loadDonorStatuses } = useDonor();
 
   // ✅ Countdown logic
   useEffect(() => {
@@ -76,6 +81,18 @@ export default function Home() {
     };
     fetchPosts();
   }, []);
+
+  // Load donor statuses for displayed posts
+  useEffect(() => {
+    if (posts.length > 0) {
+      const usernames = posts
+        .map((p) => p.username)
+        .filter((u): u is string => !!u && u !== "unknown");
+      if (usernames.length > 0) {
+        loadDonorStatuses(usernames);
+      }
+    }
+  }, [posts, loadDonorStatuses]);
 
   // Sort by votes (highest first) and take top 10
   const sortedPosts = [...posts].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
@@ -155,15 +172,20 @@ export default function Home() {
             <div className="coin coin-5">$</div>
           </div>
         )}
-        <a
-          href="https://www.paypal.com/donate/?business=E9ZG5U75GEYBQ&no_recurring=0&item_name=Thank+you+for+keeping+the+vision+alive%21&currency_code=USD"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => setShowDonationPopup(true)}
           className="offering-link"
+          style={{ border: "none", fontFamily: "inherit" }}
         >
           Offering
-        </a>
+        </button>
       </div>
+
+      {/* ✅ Donation popup */}
+      <DonationPopup
+        isOpen={showDonationPopup}
+        onClose={() => setShowDonationPopup(false)}
+      />
 
       {/* ✅ Merch link */}
       <div className="merch-link-container">
@@ -405,20 +427,25 @@ export default function Home() {
           {error && <div className="commandment-border">{error}</div>}
           {!loading &&
             !error &&
-            leftPosts.map((post) => (
-              <div
-                key={post.id}
-                className="commandment-border tooltip-container"
-              >
-                {post.title || post.content}
-                {post.votes !== undefined && (
-                  <span className="vote-count"> ({post.votes} votes)</span>
-                )}
-                <span className="tooltip-text">
-                  username: {post.username ? post.username : "unknown"}
-                </span>
-              </div>
-            ))}
+            leftPosts.map((post) => {
+              const donorStatus = post.username ? donorStatuses[post.username] : null;
+              return (
+                <div
+                  key={post.id}
+                  className="commandment-border tooltip-container"
+                >
+                  {post.title || post.content}
+                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  {post.votes !== undefined && (
+                    <span className="vote-count"> ({post.votes} votes)</span>
+                  )}
+                  <span className="tooltip-text">
+                    username: {post.username ? post.username : "unknown"}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </span>
+                </div>
+              );
+            })}
         </div>
 
         {/* Right Stone */}
@@ -427,20 +454,25 @@ export default function Home() {
           {error && <div className="commandment-border">{error}</div>}
           {!loading &&
             !error &&
-            rightPosts.map((post) => (
-              <div
-                key={post.id}
-                className="commandment-border tooltip-container"
-              >
-                {post.title || post.content}
-                {post.votes !== undefined && (
-                  <span className="vote-count"> ({post.votes} votes)</span>
-                )}
-                <span className="tooltip-text">
-                  username: {post.username ? post.username : "unknown"}
-                </span>
-              </div>
-            ))}
+            rightPosts.map((post) => {
+              const donorStatus = post.username ? donorStatuses[post.username] : null;
+              return (
+                <div
+                  key={post.id}
+                  className="commandment-border tooltip-container"
+                >
+                  {post.title || post.content}
+                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  {post.votes !== undefined && (
+                    <span className="vote-count"> ({post.votes} votes)</span>
+                  )}
+                  <span className="tooltip-text">
+                    username: {post.username ? post.username : "unknown"}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </span>
+                </div>
+              );
+            })}
         </div>
       </div>
     </div>

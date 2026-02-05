@@ -10,10 +10,20 @@ import {
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
+import { handlePayPalWebhook } from "./webhooks/paypal.ts";
+import donorRoutes from "./routes/donorRoutes.ts";
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
+
+// PayPal webhook needs raw body for signature verification
+// Must be registered before bodyParser.json()
+app.post("/webhooks/paypal", express.raw({ type: "application/json" }), handlePayPalWebhook);
+
 app.use(bodyParser.json());
+
+// Donor API routes
+app.use("/api/donor", donorRoutes);
 
 const client = new DynamoDBClient({
   region: "local",
