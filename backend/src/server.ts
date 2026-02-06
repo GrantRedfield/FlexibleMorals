@@ -13,6 +13,7 @@ import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 import { handlePayPalWebhook } from "./webhooks/paypal.ts";
 import donorRoutes from "./routes/donorRoutes.ts";
 import chatRoutes from "./routes/chatRoutes.ts";
+import commentRoutes from "./routes/commentRoutes.ts";
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
@@ -28,6 +29,9 @@ app.use("/api/donor", donorRoutes);
 
 // Chat API routes
 app.use("/api/chat", chatRoutes);
+
+// Comment API routes
+app.use("/api/comments", commentRoutes);
 
 const client = new DynamoDBClient({
   region: "local",

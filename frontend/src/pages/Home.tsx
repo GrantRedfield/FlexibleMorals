@@ -116,42 +116,31 @@ export default function Home() {
       {/* ✅ Chat Box (Right Side) */}
       <ChatBox />
 
-      {/* ✅ Countdown (Top Right Corner) */}
+      {/* ✅ Countdown (aligned with info button) */}
       <div
         style={{
           position: "fixed",
-          top: "1rem",
+          top: "8rem",
           right: "1rem",
-          border: "2px solid #d4af37",
-          borderRadius: "12px",
-          padding: "0.8rem 1.2rem",
-          backgroundColor: "rgba(0,0,0,0.85)",
-          color: "white",
+          zIndex: 999,
           textAlign: "center",
-          zIndex: 1000,
-          boxShadow: "0 0 12px rgba(212,175,55,0.3)",
+          transform: "translateY(-120%)",
         }}
       >
-        <h3
+        <span
           style={{
-            color: "#d4af37",
-            fontSize: "1rem",
-            marginBottom: "0.3rem",
-            fontWeight: 600,
-          }}
-        >
-          Number Of Days Until Moral Reset
-        </h3>
-        <p
-          style={{
-            fontSize: "1.8rem",
-            fontWeight: "bold",
-            margin: 0,
-            lineHeight: 1.2,
+            fontFamily: "'Cinzel', serif",
+            fontSize: "5rem",
+            fontWeight: 900,
+            color: "#c8b070",
+            textShadow:
+              "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+            letterSpacing: "0.05em",
+            lineHeight: 1,
           }}
         >
           {daysLeft}
-        </p>
+        </span>
       </div>
 
       {/* ✅ Vote button */}
@@ -442,10 +431,12 @@ export default function Home() {
                   key={post.id}
                   className="commandment-border tooltip-container"
                 >
-                  {post.title || post.content}
-                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  <div className="commandment-text">
+                    {post.title || post.content}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </div>
                   {post.votes !== undefined && (
-                    <span className="vote-count"> ({post.votes} votes)</span>
+                    <div className="vote-count">{post.votes} votes</div>
                   )}
                   <span className="tooltip-text">
                     username: {post.username ? post.username : "unknown"}
@@ -469,10 +460,12 @@ export default function Home() {
                   key={post.id}
                   className="commandment-border tooltip-container"
                 >
-                  {post.title || post.content}
-                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  <div className="commandment-text">
+                    {post.title || post.content}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </div>
                   {post.votes !== undefined && (
-                    <span className="vote-count"> ({post.votes} votes)</span>
+                    <div className="vote-count">{post.votes} votes</div>
                   )}
                   <span className="tooltip-text">
                     username: {post.username ? post.username : "unknown"}
