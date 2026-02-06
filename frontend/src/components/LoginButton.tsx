@@ -1,41 +1,35 @@
-import { useState } from "react";
+import { useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useDonor } from "../context/DonorContext";
+import DonorBadge from "./DonorBadge";
 
 export default function LoginButton() {
-  const [user, setUser] = useState<string | null>(null);
+  const { user, login, logout } = useAuth();
+  const { getDonorStatus, loadDonorStatuses } = useDonor();
 
-  const handleLogin = async () => {
-    try {
-      // Try to log in (you can later replace this with real OAuth)
-      const res = await fetch("http://localhost:3001/auth/login", {
-        method: "POST",
-        credentials: "include",
-      });
+  useEffect(() => {
+    if (user) loadDonorStatuses([user]);
+  }, [user, loadDonorStatuses]);
 
-      if (!res.ok) throw new Error("Login failed");
-      const data = await res.json();
-      setUser(data.username || "User");
-    } catch (err) {
-      console.error("Login error:", err);
-      alert("You must be logged in to perform this action.");
-    }
+  const handleLogin = () => {
+    const name = prompt("Enter your username:");
+    if (name && name.trim()) login(name.trim());
   };
 
-  const handleLogout = async () => {
-    await fetch("http://localhost:3001/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
-    setUser(null);
-  };
+  const donorStatus = user ? getDonorStatus(user) : null;
 
   return (
-    <div>
+    <div className="login-button-container">
       {user ? (
-        <button onClick={handleLogout} className="home-button">
-          Logout ({user})
-        </button>
+        <>
+          <span className="login-username">{user}</span>
+          {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+          <button onClick={logout} className="logout-btn">
+            Logout
+          </button>
+        </>
       ) : (
-        <button onClick={handleLogin} className="home-button">
+        <button onClick={handleLogin} className="login-btn">
           Login
         </button>
       )}

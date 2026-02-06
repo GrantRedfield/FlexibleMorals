@@ -51,3 +51,16 @@ export const getDonorTiers = async () => {
   const res = await axios.get(`${API_BASE}/api/donor/tiers`);
   return res.data;
 };
+
+// === Chat API ===
+
+export const getChatMessages = async (since?: string) => {
+  const params = since ? { params: { since } } : {};
+  const res = await axios.get(`${API_BASE}/api/chat/messages`, params);
+  return res.data;
+};
+
+export const sendChatMessage = async (username: string, message: string) => {
+  const res = await axios.post(`${API_BASE}/api/chat/messages`, { username, message });
+  return res.data;
+};

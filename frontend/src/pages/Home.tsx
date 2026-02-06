@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { getPosts } from "../utils/api";
 import DonationPopup from "../components/DonationPopup";
 import DonorBadge from "../components/DonorBadge";
+import LoginButton from "../components/LoginButton";
+import ChatBox from "../components/ChatBox";
 import { useDonor } from "../context/DonorContext";
 import "../App.css";
 
@@ -107,6 +109,12 @@ export default function Home() {
         alt="Flexible Morals Background"
         className="home-background-balanced"
       />
+
+      {/* ✅ Login Button (Top Left) */}
+      <LoginButton />
+
+      {/* ✅ Chat Box (Right Side) */}
+      <ChatBox />
 
       {/* ✅ Countdown (Top Right Corner) */}
       <div

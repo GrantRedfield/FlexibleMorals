@@ -485,3 +485,63 @@
   background-color: #d3b956;
   transform: scale(1.05);
 }
+
+/* === Login Button (Top Left) === */
+.login-button-container {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(0, 0, 0, 0.85);
+  border: 2px solid #d4af37;
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+  font-family: "Cinzel", serif;
+}
+
+.login-btn {
+  background: none;
+  border: 2px solid #d4af37;
+  border-radius: 8px;
+  padding: 8px 20px;
+  color: #d4af37;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  font-family: "Cinzel", serif;
+  transition: all 0.2s ease-in-out;
+}
+
+.login-btn:hover {
+  background-color: rgba(212, 175, 55, 0.2);
+  border-color: #f0d060;
+  color: #f0d060;
+  transform: scale(1.05);
+}
+
+.login-username {
+  color: #d4af37;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #aaa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: "Cinzel", serif;
+  transition: all 0.2s ease-in-out;
+}
+
+.logout-btn:hover {
+  border-color: #d4af37;
+  color: #d4af37;
+}
