@@ -10,10 +10,24 @@ import {
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
+import { handlePayPalWebhook } from "./webhooks/paypal.ts";
+import donorRoutes from "./routes/donorRoutes.ts";
+import chatRoutes from "./routes/chatRoutes.ts";
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
+
+// PayPal webhook needs raw body for signature verification
+// Must be registered before bodyParser.json()
+app.post("/webhooks/paypal", express.raw({ type: "application/json" }), handlePayPalWebhook);
+
 app.use(bodyParser.json());
+
+// Donor API routes
+app.use("/api/donor", donorRoutes);
+
+// Chat API routes
+app.use("/api/chat", chatRoutes);
 
 const client = new DynamoDBClient({
   region: "local",
@@ -56,29 +70,65 @@ app.get("/posts", async (req, res) => {
   }
 });
 
+// === Helper: Check if user submitted today ===
+const hasUserSubmittedToday = async (authorId: string): Promise<boolean> => {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const result = await client.send(
+    new GetItemCommand({
+      TableName: TABLE_NAME,
+      Key: marshall({ PK: `USER#${authorId}`, SK: `SUBMISSION#${today}` }),
+    })
+  );
+  return !!result.Item;
+};
+
+// === Helper: Record user submission for today ===
+const recordUserSubmission = async (authorId: string) => {
+  const today = new Date().toISOString().split("T")[0];
+  await client.send(
+    new PutItemCommand({
+      TableName: TABLE_NAME,
+      Item: marshall({
+        PK: `USER#${authorId}`,
+        SK: `SUBMISSION#${today}`,
+        submittedAt: new Date().toISOString(),
+      }),
+    })
+  );
+};
+
 // === POST /posts ===
 app.post("/posts", async (req, res) => {
   const { content, authorId = "anonymous" } = req.body;
   if (!content) return res.status(400).json({ error: "Missing content" });
+  if (content.length > 80) return res.status(400).json({ error: "Commandment too long (max 80 characters)" });
 
   try {
+    // Check if user already submitted today
+    if (await hasUserSubmittedToday(authorId)) {
+      return res.status(429).json({ error: "You can only submit one commandment per day" });
+    }
+
     const newId = Date.now().toString();
     const item = {
       PK: { S: `POST#${newId}` },
       SK: { S: "META#POST" },
       title: { S: content },
       body: { S: content },
-      votes: { N: "0" },
+      votes: { N: "1" },
       authorId: { S: authorId },
       createdAt: { S: new Date().toISOString() },
     };
 
     await client.send(new PutItemCommand({ TableName: TABLE_NAME, Item: item }));
 
+    // Record that user submitted today
+    await recordUserSubmission(authorId);
+
     res.json({
       id: newId,
       title: content,
-      votes: 0,
+      votes: 1,
       username: authorId,
     });
   } catch (err) {
