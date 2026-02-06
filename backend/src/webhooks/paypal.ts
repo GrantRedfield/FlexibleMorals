@@ -2,20 +2,13 @@ import type { Request, Response } from "express";
 import https from "https";
 import crypto from "crypto";
 import {
-  DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
   UpdateItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-
-const client = new DynamoDBClient({
-  region: "local",
-  endpoint: "http://localhost:8000",
-});
-
-const TABLE_NAME = "FlexibleTable";
+import { client, TABLE_NAME } from "../lib/dynamodb.ts";
 
 // Tier thresholds in cents
 const TIER_THRESHOLDS = {

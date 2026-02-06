@@ -3,7 +3,7 @@
   right: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 300px;
+  width: 380px;
   height: 450px;
   background-color: rgba(0, 0, 0, 0.85);
   border: 2px solid #d4af37;
@@ -148,7 +148,7 @@
 
 @media (max-width: 1100px) {
   .chat-box {
-    width: 250px;
+    width: 300px;
     height: 380px;
   }
 }

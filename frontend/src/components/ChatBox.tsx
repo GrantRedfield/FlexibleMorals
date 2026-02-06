@@ -18,6 +18,7 @@ export default function ChatBox() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastTimestampRef = useRef<string | null>(null);
@@ -95,14 +96,34 @@ export default function ChatBox() {
     return () => clearInterval(interval);
   }, [isAtBottom, scrollToBottom, loadNewDonorStatuses]);
 
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const containsLink = (text: string): boolean => {
+    const urlPattern = /https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.co|\.xyz|\.dev/i;
+    return urlPattern.test(text);
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
+    if (cooldown > 0) return;
 
     if (!user) {
       const name = prompt("Enter your username to chat:");
       if (name && name.trim()) {
         login(name.trim());
       }
+      return;
+    }
+
+    if (containsLink(inputValue)) {
+      alert("Links are not allowed in chat.");
       return;
     }
 
@@ -116,6 +137,7 @@ export default function ChatBox() {
       });
       lastTimestampRef.current = sent.createdAt;
       setInputValue("");
+      setCooldown(15);
       setTimeout(scrollToBottom, 50);
     } catch (err: any) {
       const msg = err?.response?.data?.error || "Failed to send message";
@@ -156,25 +178,30 @@ export default function ChatBox() {
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input-area">
-        {!user && (
-          <div className="chat-login-prompt">Log in to chat</div>
-        )}
         <input
           className="chat-input"
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={user ? "Speak thy mind..." : "Log in to chat"}
-          disabled={!user || sending}
+          placeholder={user ? "Speak thy mind..." : "Click here to chat..."}
+          disabled={sending}
+          onFocus={() => {
+            if (!user) {
+              const name = prompt("Enter your username to chat:");
+              if (name && name.trim()) {
+                login(name.trim());
+              }
+            }
+          }}
           maxLength={200}
         />
         <button
           className="chat-send-btn"
           onClick={handleSend}
-          disabled={!inputValue.trim() || sending}
+          disabled={!inputValue.trim() || sending || cooldown > 0}
         >
-          Proclaim
+          {cooldown > 0 ? `${cooldown}s` : "Proclaim"}
         </button>
       </div>
     </div>

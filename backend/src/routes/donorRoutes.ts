@@ -2,13 +2,13 @@ import express from "express";
 import type { Request, Response } from "express";
 const { Router } = express;
 import {
-  DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
   ScanCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
+import { client, TABLE_NAME } from "../lib/dynamodb.ts";
 import {
   getDonorRecord,
   updateDonorStatus,
@@ -18,13 +18,6 @@ import {
 } from "../webhooks/paypal.ts";
 
 const router = Router();
-
-const client = new DynamoDBClient({
-  region: "local",
-  endpoint: "http://localhost:8000",
-});
-
-const TABLE_NAME = "FlexibleTable";
 
 // Badge icons for each tier
 const TIER_BADGES: Record<string, string> = {

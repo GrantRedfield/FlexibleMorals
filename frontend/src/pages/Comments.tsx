@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getPosts, getComments, createComment, voteOnComment } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useDonor } from "../context/DonorContext";
+import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 
 interface Comment {
@@ -19,6 +21,7 @@ interface Post {
   title?: string;
   content?: string;
   votes?: number;
+  username?: string;
 }
 
 type SortOption = "top" | "new";
@@ -26,7 +29,10 @@ type SortOption = "top" | "new";
 export default function Comments() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const cameFrom = (location.state as any)?.from;
   const { user, login } = useAuth();
+  const { getDonorStatus, loadDonorStatuses } = useDonor();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -86,6 +92,16 @@ export default function Comments() {
     };
     load();
   }, [postId]);
+
+  // Load donor statuses for post author and commenters
+  useEffect(() => {
+    const usernames: string[] = [];
+    if (post?.username) usernames.push(post.username);
+    comments.forEach((c) => {
+      if (c.username && !usernames.includes(c.username)) usernames.push(c.username);
+    });
+    if (usernames.length > 0) loadDonorStatuses(usernames);
+  }, [post, comments, loadDonorStatuses]);
 
   const requireLogin = useCallback((): boolean => {
     if (user) return true;
@@ -323,6 +339,9 @@ export default function Comments() {
               }}
             >
               {comment.username}
+              {getDonorStatus(comment.username)?.tier && (
+                <DonorBadge tier={getDonorStatus(comment.username)!.tier as any} size="small" />
+              )}
             </span>
             <span style={{ color: "#666", fontSize: "11px" }}>
               {new Date(comment.createdAt).toLocaleString()}
@@ -545,7 +564,7 @@ export default function Comments() {
           }}
         >
           <button
-            onClick={() => navigate("/vote")}
+            onClick={() => navigate(cameFrom === "home" ? "/" : "/vote")}
             style={{
               backgroundColor: "transparent",
               color: "#d4af37",
@@ -557,7 +576,7 @@ export default function Comments() {
               fontWeight: 600,
             }}
           >
-            ← Back to Voting
+            {cameFrom === "home" ? "← Back to Home" : "← Back to Voting"}
           </button>
         </div>
 
@@ -586,8 +605,16 @@ export default function Comments() {
             >
               {post.title || post.content}
             </h1>
-            <p style={{ color: "#d1b97b", fontSize: "13px", margin: 0 }}>
-              {post.votes ?? 0} votes
+            <p style={{ color: "#d1b97b", fontSize: "13px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>{post.votes ?? 0} votes</span>
+              {post.username && (
+                <span style={{ color: "#888", fontStyle: "italic" }}>
+                  {post.username}
+                  {getDonorStatus(post.username)?.tier && (
+                    <DonorBadge tier={getDonorStatus(post.username)!.tier as any} size="small" />
+                  )}
+                </span>
+              )}
             </p>
           </div>
         )}

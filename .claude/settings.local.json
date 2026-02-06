@@ -5,7 +5,28 @@
       "Bash(git checkout:*)",
       "Bash(git apply:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(npm run dev:backend:*)",
+      "Bash(npm run dev:frontend:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(java:*)",
+      "Bash(findstr:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(zip:*)",
+      "Bash(powershell:*)",
+      "Bash(VITE_API_URL=https://api.flexiblemorals.org npm run build:*)",
+      "Bash(aws:*)"
     ]
   }
 }

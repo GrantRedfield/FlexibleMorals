@@ -1,1 +1,24 @@
+# Dependencies
 node_modules/
+
+# Environment variables (keep .env.example, ignore actual .env)
+.env
+.env.local
+.env.production
+!.env.example
+
+# Build output
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
