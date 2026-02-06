@@ -12,7 +12,7 @@ const BADGE_CONFIG = {
     glow: "rgba(205, 127, 50, 0.6)",
   },
   patron: {
-    icon: "✦",
+    icon: "🙏",
     color: "#c0c0c0",
     label: "Patron",
     glow: "rgba(192, 192, 192, 0.6)",

@@ -1,10 +1,145 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
 
+/* === Loading Screen === */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at center, #1a1510 0%, #0a0804 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: "Cinzel", serif;
+  z-index: 9999;
+}
+
+.loading-tablets {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.loading-tablet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.tablet-arch {
+  width: 90px;
+  height: 45px;
+  border-radius: 45px 45px 0 0;
+  background: linear-gradient(180deg, #7a7a6a 0%, #5a5a4a 100%);
+  border: 2px solid #8a8a7a;
+  border-bottom: none;
+}
+
+.tablet-body {
+  width: 90px;
+  height: 110px;
+  background: linear-gradient(180deg, #5a5a4a 0%, #4a4a3a 100%);
+  border: 2px solid #8a8a7a;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+}
+
+.loading-chisel {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  transform: translateX(-50%);
+  animation: chiselHammer 0.6s ease-in-out infinite;
+  z-index: 10;
+}
+
+.chisel-tool {
+  font-size: 2.5rem;
+  filter: drop-shadow(0 0 4px rgba(212, 175, 55, 0.4));
+}
+
+.chisel-sparks {
+  position: absolute;
+  top: 30%;
+  right: -8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spark {
+  color: #d4af37;
+  font-size: 0.7rem;
+  animation: sparkle 0.6s ease-in-out infinite;
+  opacity: 0;
+}
+
+.spark:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.spark:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.spark:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.loading-text {
+  color: #d4af37;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  animation: textPulse 1.5s ease-in-out infinite;
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+@keyframes chiselHammer {
+  0%, 100% {
+    transform: translateX(-50%) rotate(-5deg) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) rotate(5deg) translateY(-8px);
+  }
+}
+
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(6px, -4px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(12px, -8px) scale(0.3);
+  }
+}
+
+@keyframes textPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* === Page root === */
 .home-root {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
   font-family: "Cinzel", serif;
   background-color: #000;
@@ -15,8 +150,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   object-fit: fill;
   object-position: center top;
   z-index: 0;
@@ -291,38 +426,42 @@
   position: absolute;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  width: 195px;
+  align-items: stretch;
+  gap: 0.4rem;
   pointer-events: auto;
+  box-sizing: border-box;
+  padding: 0 6px;
 }
 
-/* Left stone tablet */
+/* Left tablet column — measured from image: tablet is 19.5%-40.6% horizontal */
 .stone-column:first-child {
-  left: 30%;
-  top: 19%;
-  transform: translateX(-50%);
+  left: 21%;
+  width: 18%;
+  top: 27%;
+  bottom: 37%;
 }
 
-/* Right stone tablet */
+/* Right tablet column — measured from image: tablet is 53.2%-74.2% horizontal */
 .stone-column:last-child {
-  left: 63%;
-  top: 22%;
-  transform: translateX(-50%);
+  left: 54.5%;
+  width: 18%;
+  top: 27%;
+  bottom: 37%;
 }
 
 /* === Commandment Cards === */
 .commandment-border {
-  border: 2px solid #d1b97b;
-  border-radius: 8px;
+  border: 1px solid rgba(209, 185, 123, 0.6);
+  border-radius: 6px;
   background-color: rgba(0, 0, 0, 0.55);
-  padding: 8px 10px;
+  padding: 6px 8px;
   color: #fdf8e6;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   text-align: center;
-  width: 175px;
-  min-height: 60px;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease-in-out;
@@ -330,6 +469,12 @@
   z-index: 10;
   line-height: 1.3;
   word-wrap: break-word;
+  overflow: hidden;
+  flex: 1;
+}
+
+.commandment-text {
+  width: 100%;
 }
 
 .commandment-border:hover {
@@ -338,8 +483,10 @@
 }
 
 .vote-count {
-  font-size: 0.8rem;
-  opacity: 0.8;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 2px;
+  color: #d1b97b;
 }
 
 /* === Tooltip for Username Bubble === */
@@ -385,18 +532,29 @@
   opacity: 1;
 }
 
+/* === GitHub Open Source Link === */
+.github-link {
+  position: fixed;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  color: rgba(209, 185, 123, 0.4);
+  font-size: 0.7rem;
+  font-family: "Cinzel", serif;
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  z-index: 1000;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+.github-link:hover {
+  color: rgba(209, 185, 123, 0.85);
+}
+
 /* === Responsive tweaks === */
 @media (max-width: 900px) {
-  .overlay-stones {
-    flex-direction: column;
-    align-items: center;
-    gap: 2rem;
-    top: 18%;
-  }
-
-  .stone-column:first-child,
-  .stone-column:last-child {
-    margin: 0;
+  .commandment-border {
+    font-size: 0.8rem;
+    padding: 4px 6px;
   }
 }
 /* === Info Link ("What in the world is this?!") === */
@@ -405,6 +563,7 @@
   top: 8rem;
   right: 1rem;
   z-index: 1000;
+  width: 380px;
 }
 
 .info-link {
@@ -418,6 +577,9 @@
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(212, 175, 55, 0.3);
   transition: all 0.2s ease-in-out;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .info-link:hover {

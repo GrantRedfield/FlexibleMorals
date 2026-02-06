@@ -44,19 +44,72 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
         className="popup-box"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: "500px",
+          maxWidth: "520px",
           padding: "2rem",
           backgroundColor: "#1a1a1a",
           border: "2px solid #d4af37",
+          maxHeight: "90vh",
+          overflowY: "auto",
         }}
       >
         {!showCrypto ? (
           <>
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: "1.8rem" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: "1.8rem", fontFamily: "'Cinzel', serif" }}>
               Make an Offering
             </h2>
-            <p style={{ color: "#aaa", marginBottom: "1.5rem", fontSize: "1rem" }}>
-              Choose your preferred payment method
+
+            <div style={{
+              backgroundColor: "rgba(212, 175, 55, 0.06)",
+              border: "1px solid rgba(212, 175, 55, 0.2)",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              marginBottom: "1rem",
+            }}>
+              <p style={{ color: "#ccc", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 8px 0" }}>
+                Flexible Morals is built and maintained by a <span style={{ color: "#d4af37", fontWeight: 600 }}>single developer</span> with
+                a dream of building the world's first crowd-sourced religion. Your offering helps keep the servers running and
+                funds new features for our growing congregation.
+              </p>
+              <p style={{ color: "#999", fontSize: "0.8rem", margin: 0, fontStyle: "italic" }}>
+                Every dollar makes a difference. Thank you for believing.
+              </p>
+            </div>
+
+            {/* Donor Tier Flair Preview */}
+            <div style={{
+              marginBottom: "1.2rem",
+              padding: "12px 16px",
+              backgroundColor: "rgba(0,0,0,0.3)",
+              borderRadius: "10px",
+              border: "1px solid #333",
+            }}>
+              <p style={{ color: "#aaa", fontSize: "0.8rem", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                Donor Flair Tiers
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(205, 127, 50, 0.6)" }}>⭐</span>
+                  <span style={{ color: "#cd7f32", fontWeight: 600, fontSize: "0.95rem" }}>Supporter</span>
+                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$1+</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(192, 192, 192, 0.6)" }}>🙏</span>
+                  <span style={{ color: "#c0c0c0", fontWeight: 600, fontSize: "0.95rem" }}>Patron</span>
+                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$25+</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(212, 175, 55, 0.8)" }}>👑</span>
+                  <span style={{ color: "#d4af37", fontWeight: 600, fontSize: "0.95rem" }}>Benefactor</span>
+                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$100+</span>
+                </div>
+              </div>
+              <p style={{ color: "#666", fontSize: "0.75rem", margin: "10px 0 0 0", fontStyle: "italic" }}>
+                Your flair appears next to your name across the site
+              </p>
+            </div>
+
+            <p style={{ color: "#aaa", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
+              Choose your preferred method
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>

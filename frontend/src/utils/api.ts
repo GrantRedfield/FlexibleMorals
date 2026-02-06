@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:3001";
+// Vite exposes env vars prefixed with VITE_ at build time
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export const getPosts = async () => {
   const res = await axios.get(`${API_BASE}/posts`);
@@ -62,5 +63,39 @@ export const getChatMessages = async (since?: string) => {
 
 export const sendChatMessage = async (username: string, message: string) => {
   const res = await axios.post(`${API_BASE}/api/chat/messages`, { username, message });
+  return res.data;
+};
+
+// === Comments API ===
+
+export const getComments = async (postId: string) => {
+  const res = await axios.get(`${API_BASE}/api/comments/${postId}`);
+  return res.data;
+};
+
+export const createComment = async (
+  postId: string,
+  username: string,
+  text: string,
+  parentId?: string
+) => {
+  const res = await axios.post(`${API_BASE}/api/comments/${postId}`, {
+    username,
+    text,
+    parentId,
+  });
+  return res.data;
+};
+
+export const voteOnComment = async (
+  postId: string,
+  commentId: string,
+  direction: "up" | "down",
+  userId?: string
+) => {
+  const res = await axios.post(
+    `${API_BASE}/api/comments/${postId}/${commentId}/vote`,
+    { direction, userId }
+  );
   return res.data;
 };

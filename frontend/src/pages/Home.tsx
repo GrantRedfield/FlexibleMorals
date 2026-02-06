@@ -101,6 +101,32 @@ export default function Home() {
   const leftPosts = sortedPosts.slice(0, 5);
   const rightPosts = sortedPosts.slice(5, 10);
 
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-tablets">
+          <div className="loading-tablet left-tablet">
+            <div className="tablet-arch"></div>
+            <div className="tablet-body"></div>
+            <div className="chisel-sparks">
+              <span className="spark">✦</span>
+              <span className="spark">✧</span>
+              <span className="spark">✦</span>
+            </div>
+          </div>
+          <div className="loading-chisel">
+            <div className="chisel-tool">🪨</div>
+          </div>
+          <div className="loading-tablet right-tablet">
+            <div className="tablet-arch"></div>
+            <div className="tablet-body"></div>
+          </div>
+        </div>
+        <p className="loading-text">Loading morals....</p>
+      </div>
+    );
+  }
+
   return (
     <div className="home-root">
       {/* ✅ Background */}
@@ -116,42 +142,31 @@ export default function Home() {
       {/* ✅ Chat Box (Right Side) */}
       <ChatBox />
 
-      {/* ✅ Countdown (Top Right Corner) */}
+      {/* ✅ Countdown (aligned with info button) */}
       <div
         style={{
           position: "fixed",
-          top: "1rem",
+          top: "8rem",
           right: "1rem",
-          border: "2px solid #d4af37",
-          borderRadius: "12px",
-          padding: "0.8rem 1.2rem",
-          backgroundColor: "rgba(0,0,0,0.85)",
-          color: "white",
+          zIndex: 999,
           textAlign: "center",
-          zIndex: 1000,
-          boxShadow: "0 0 12px rgba(212,175,55,0.3)",
+          transform: "translateY(-120%)",
         }}
       >
-        <h3
+        <span
           style={{
-            color: "#d4af37",
-            fontSize: "1rem",
-            marginBottom: "0.3rem",
-            fontWeight: 600,
-          }}
-        >
-          Number Of Days Until Moral Reset
-        </h3>
-        <p
-          style={{
-            fontSize: "1.8rem",
-            fontWeight: "bold",
-            margin: 0,
-            lineHeight: 1.2,
+            fontFamily: "'Cinzel', serif",
+            fontSize: "5rem",
+            fontWeight: 900,
+            color: "#c8b070",
+            textShadow:
+              "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+            letterSpacing: "0.05em",
+            lineHeight: 1,
           }}
         >
           {daysLeft}
-        </p>
+        </span>
       </div>
 
       {/* ✅ Vote button */}
@@ -215,7 +230,7 @@ export default function Home() {
           <div
             className="popup-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "600px", padding: "1.5rem", backgroundColor: "#1a1a1a" }}
+            style={{ maxWidth: "900px", width: "90%", padding: "2rem", backgroundColor: "#1a1a1a" }}
           >
             <h2 style={{ color: "#d4af37", marginBottom: "0.5rem" }}>
               Flexible Morals Tee
@@ -224,156 +239,18 @@ export default function Home() {
               Coming Soon! Each month's top commandments on the back.
             </p>
 
-            {/* T-Shirt mockup */}
-            <div
+            {/* T-Shirt photo */}
+            <img
+              src="/merch_tee.png"
+              alt="Flexible Morals Tee - Front and Back"
               style={{
-                position: "relative",
-                width: "320px",
+                width: "100%",
+                maxWidth: "800px",
+                borderRadius: "8px",
+                display: "block",
                 margin: "0 auto",
               }}
-            >
-              {/* T-shirt shape */}
-              <svg viewBox="0 0 200 240" style={{ width: "100%" }}>
-                {/* Shirt body */}
-                <path
-                  d="M30 50 L30 230 L170 230 L170 50 L140 50 L130 30 Q100 20 70 30 L60 50 Z"
-                  fill="#2d2d2d"
-                  stroke="#444"
-                  strokeWidth="2"
-                />
-                {/* Left sleeve */}
-                <path
-                  d="M30 50 L0 80 L15 95 L30 75 Z"
-                  fill="#2d2d2d"
-                  stroke="#444"
-                  strokeWidth="2"
-                />
-                {/* Right sleeve */}
-                <path
-                  d="M170 50 L200 80 L185 95 L170 75 Z"
-                  fill="#2d2d2d"
-                  stroke="#444"
-                  strokeWidth="2"
-                />
-                {/* Collar */}
-                <ellipse cx="100" cy="35" rx="30" ry="12" fill="#1a1a1a" stroke="#444" strokeWidth="2" />
-              </svg>
-
-              {/* Month and Year - top left */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "85px",
-                  left: "60px",
-                  color: "#d4af37",
-                  fontSize: "12px",
-                  fontFamily: "Cinzel, serif",
-                  fontWeight: "bold",
-                }}
-              >
-                {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </div>
-
-              {/* Tablets image with commandments - centered */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  width: "200px",
-                  height: "150px",
-                  marginTop: "15px",
-                }}
-              >
-                {/* Background tablets image */}
-                <img
-                  src="/FlexibleMoralsPicture.png"
-                  alt="Tablets"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center 25%",
-                    borderRadius: "4px",
-                  }}
-                />
-
-                {/* Left tablet commandments */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "18%",
-                    left: "30%",
-                    transform: "translateX(-50%)",
-                    width: "28%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "3px",
-                  }}
-                >
-                  {!loading &&
-                    leftPosts.slice(0, 5).map((post) => (
-                      <div
-                        key={post.id}
-                        style={{
-                          fontSize: "6px",
-                          color: "#fdf8e6",
-                          backgroundColor: "rgba(0,0,0,0.55)",
-                          padding: "2px 3px",
-                          borderRadius: "2px",
-                          border: "1px solid #d1b97b",
-                          textAlign: "center",
-                          width: "100%",
-                          fontFamily: "Cinzel, serif",
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        {(post.title || post.content || "").slice(0, 20)}
-                        {(post.title || post.content || "").length > 20 ? "..." : ""}
-                      </div>
-                    ))}
-                </div>
-
-                {/* Right tablet commandments */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "18%",
-                    left: "70%",
-                    transform: "translateX(-50%)",
-                    width: "28%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "3px",
-                  }}
-                >
-                  {!loading &&
-                    rightPosts.slice(0, 5).map((post) => (
-                      <div
-                        key={post.id}
-                        style={{
-                          fontSize: "6px",
-                          color: "#fdf8e6",
-                          backgroundColor: "rgba(0,0,0,0.55)",
-                          padding: "2px 3px",
-                          borderRadius: "2px",
-                          border: "1px solid #d1b97b",
-                          textAlign: "center",
-                          width: "100%",
-                          fontFamily: "Cinzel, serif",
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        {(post.title || post.content || "").slice(0, 20)}
-                        {(post.title || post.content || "").length > 20 ? "..." : ""}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
+            />
 
             <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#888" }}>
               * Design updates monthly with new commandments
@@ -429,6 +306,62 @@ export default function Home() {
 
       {/* ✅ Commandments overlay */}
       <div className="overlay-stones">
+        {/* Empty state when no commandments exist */}
+        {!loading && !error && posts.length === 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "30%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              textAlign: "center",
+              zIndex: 10,
+              width: "60%",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "1.3rem",
+                fontWeight: 700,
+                color: "#d4af37",
+                textShadow: "1px 1px 4px rgba(0,0,0,0.8)",
+                margin: "0 0 8px 0",
+              }}
+            >
+              The tablets are empty.
+            </p>
+            <p
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "0.95rem",
+                color: "#c8b070",
+                textShadow: "1px 1px 3px rgba(0,0,0,0.8)",
+                margin: "0 0 12px 0",
+              }}
+            >
+              Be the first to create a commandment and define the morals for humanity.
+            </p>
+            <button
+              onClick={() => navigate("/vote")}
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#fdf8e6",
+                backgroundColor: "#b79b3d",
+                border: "2px solid #d4af37",
+                borderRadius: "8px",
+                padding: "10px 24px",
+                cursor: "pointer",
+                textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+              }}
+            >
+              Inscribe a Commandment
+            </button>
+          </div>
+        )}
+
         {/* Left Stone */}
         <div className="stone-column">
           {loading && <div className="commandment-border">Loading...</div>}
@@ -441,11 +374,15 @@ export default function Home() {
                 <div
                   key={post.id}
                   className="commandment-border tooltip-container"
+                  onClick={() => navigate(`/comments/${post.id}`, { state: { from: "home" } })}
+                  style={{ cursor: "pointer" }}
                 >
-                  {post.title || post.content}
-                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  <div className="commandment-text">
+                    {post.title || post.content}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </div>
                   {post.votes !== undefined && (
-                    <span className="vote-count"> ({post.votes} votes)</span>
+                    <div className="vote-count">{post.votes} votes</div>
                   )}
                   <span className="tooltip-text">
                     username: {post.username ? post.username : "unknown"}
@@ -468,11 +405,15 @@ export default function Home() {
                 <div
                   key={post.id}
                   className="commandment-border tooltip-container"
+                  onClick={() => navigate(`/comments/${post.id}`, { state: { from: "home" } })}
+                  style={{ cursor: "pointer" }}
                 >
-                  {post.title || post.content}
-                  {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  <div className="commandment-text">
+                    {post.title || post.content}
+                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+                  </div>
                   {post.votes !== undefined && (
-                    <span className="vote-count"> ({post.votes} votes)</span>
+                    <div className="vote-count">{post.votes} votes</div>
                   )}
                   <span className="tooltip-text">
                     username: {post.username ? post.username : "unknown"}
@@ -483,6 +424,17 @@ export default function Home() {
             })}
         </div>
       </div>
+
+      {/* GitHub open source link */}
+      <a
+        href="https://github.com/GrantRedfield/FlexibleMorals"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="github-link"
+        title="View source on GitHub"
+      >
+        ⛧ Open Source
+      </a>
     </div>
   );
 }

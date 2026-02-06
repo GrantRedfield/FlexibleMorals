@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { getPosts, voteOnPost, createPost } from "../utils/api";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { getPosts, voteOnPost, createPost, getComments } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 
 interface Post {
@@ -9,11 +9,18 @@ interface Post {
   content?: string;
   votes?: number;
   createdAt?: string;
+  username?: string;
 }
 
 type SortOption = "top" | "hot" | "new" | "random";
+type AnimState = "visible" | "voted" | "fadingOut" | "fadingIn";
 
-const POSTS_PER_PAGE = 16;
+interface VisibleSlot {
+  postId: string;
+  animState: AnimState;
+}
+
+const VISIBLE_COUNT = 4;
 
 export default function Vote() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -21,25 +28,34 @@ export default function Vote() {
   const [error, setError] = useState<string | null>(null);
   const [newCommandment, setNewCommandment] = useState("");
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
-  const [currentPage, setCurrentPage] = useState(1);
   const [sortOption, setSortOption] = useState<SortOption>("top");
   const [shuffleTrigger, setShuffleTrigger] = useState(0);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [visibleSlots, setVisibleSlots] = useState<VisibleSlot[]>([]);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Sorting logic - memoized to prevent reshuffling on every render
+  // Track which posts have been shown to avoid re-showing them before queue exhausts
+  const shownPostIds = useRef<Set<string>>(new Set());
+
+  // Sorting logic
   const sortedPosts = useMemo(() => {
     const sorted = [...posts];
     switch (sortOption) {
       case "top":
         return sorted.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
       case "hot":
-        // Hot = votes weighted by recency (higher score for newer posts with votes)
         return sorted.sort((a, b) => {
+          const now = Date.now();
           const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          const aScore = (a.votes ?? 0) + (aTime / 1000000000000);
-          const bScore = (b.votes ?? 0) + (bTime / 1000000000000);
+          // Hours since creation — newer posts get a bigger boost
+          const aAge = Math.max((now - aTime) / 3600000, 0.1);
+          const bAge = Math.max((now - bTime) / 3600000, 0.1);
+          // Hot score: votes divided by age (gravity decay)
+          const aScore = (a.votes ?? 0) / Math.pow(aAge, 1.5);
+          const bScore = (b.votes ?? 0) / Math.pow(bAge, 1.5);
           return bScore - aScore;
         });
       case "new":
@@ -55,10 +71,48 @@ export default function Vote() {
     }
   }, [posts, sortOption, shuffleTrigger]);
 
-  // Pagination calculations
-  const totalPages = Math.ceil(sortedPosts.length / POSTS_PER_PAGE);
-  const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
-  const paginatedPosts = sortedPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+  // Get the next unvoted post to show (in sort order), excluding currently visible ones
+  const getNextPost = useCallback(
+    (currentVisibleIds: Set<string>): Post | null => {
+      // First try unvoted posts not yet shown this cycle
+      for (const post of sortedPosts) {
+        const pid = String(post.id);
+        if (!userVotes[pid] && !currentVisibleIds.has(pid) && !shownPostIds.current.has(pid)) {
+          return post;
+        }
+      }
+      // If all have been shown, allow re-showing unvoted ones not currently visible
+      for (const post of sortedPosts) {
+        const pid = String(post.id);
+        if (!userVotes[pid] && !currentVisibleIds.has(pid)) {
+          return post;
+        }
+      }
+      return null;
+    },
+    [sortedPosts, userVotes]
+  );
+
+  // Ref to always access latest userVotes without re-triggering effects
+  const userVotesRef = useRef(userVotes);
+  useEffect(() => { userVotesRef.current = userVotes; }, [userVotes]);
+
+  // Ref to always access latest sortedPosts without re-triggering effects
+  const sortedPostsRef = useRef(sortedPosts);
+  useEffect(() => { sortedPostsRef.current = sortedPosts; }, [sortedPosts]);
+
+  // Initialize visible slots when posts load or sort changes
+  const initializeSlots = useCallback(() => {
+    const votes = userVotesRef.current;
+    const currentSorted = sortedPostsRef.current;
+    const unvoted = currentSorted.filter((p) => !votes[String(p.id)]);
+    const initial = unvoted.slice(0, VISIBLE_COUNT).map((p) => ({
+      postId: String(p.id),
+      animState: "visible" as AnimState,
+    }));
+    shownPostIds.current = new Set(initial.map((s) => s.postId));
+    setVisibleSlots(initial);
+  }, []);
 
   // === Load Posts ===
   useEffect(() => {
@@ -66,6 +120,35 @@ export default function Vote() {
       try {
         const data = await getPosts();
         setPosts(data);
+
+        // Merge server-side userVotes with localStorage
+        const savedVotes = localStorage.getItem("userVotes");
+        const localVotes: Record<string, "up" | "down" | null> = savedVotes ? JSON.parse(savedVotes) : {};
+        const merged = { ...localVotes };
+        if (user) {
+          data.forEach((p: any) => {
+            const pid = String(p.id);
+            const serverVote = p.userVotes?.[user];
+            if (serverVote) {
+              merged[pid] = serverVote;
+            }
+          });
+        }
+        setUserVotes(merged);
+
+        // Fetch comment counts for all posts
+        const counts: Record<string, number> = {};
+        await Promise.all(
+          data.map(async (p: any) => {
+            try {
+              const res = await getComments(String(p.id));
+              counts[String(p.id)] = (res.comments || []).length;
+            } catch {
+              counts[String(p.id)] = 0;
+            }
+          })
+        );
+        setCommentCounts(counts);
       } catch (err: any) {
         console.error("Error fetching posts:", err);
         setError("Failed to load posts.");
@@ -74,20 +157,51 @@ export default function Vote() {
       }
     };
     load();
+  }, [user]);
 
-    const savedVotes = localStorage.getItem("userVotes");
-    if (savedVotes) setUserVotes(JSON.parse(savedVotes));
-  }, []);
+  // Re-merge server votes when user changes (e.g. login after page load)
+  useEffect(() => {
+    if (!user || posts.length === 0) return;
+    setUserVotes((prev) => {
+      const merged = { ...prev };
+      posts.forEach((p: any) => {
+        const pid = String(p.id);
+        const serverVote = p.userVotes?.[user];
+        if (serverVote) {
+          merged[pid] = serverVote;
+        }
+      });
+      return merged;
+    });
+  }, [user, posts]);
 
-  // === Persist userVotes locally ===
+  // Initialize slots when sort changes or posts first load
+  const [postsLoaded, setPostsLoaded] = useState(false);
+  useEffect(() => {
+    if (sortedPosts.length > 0 && !postsLoaded) {
+      setPostsLoaded(true);
+    }
+  }, [sortedPosts.length]);
+
+  useEffect(() => {
+    if (postsLoaded) {
+      initializeSlots();
+    }
+  }, [postsLoaded, sortOption, shuffleTrigger]);
+
+  // Persist userVotes locally
   useEffect(() => {
     localStorage.setItem("userVotes", JSON.stringify(userVotes));
   }, [userVotes]);
 
-  // === Require login before posting or voting ===
+  // Voted count
+  const votedCount = Object.keys(userVotes).filter((k) => userVotes[k]).length;
+  const totalCount = posts.length;
+
+  // === Require login ===
   const requireLogin = (): boolean => {
     if (user) return true;
-    const name = prompt("🔒 Please log in to continue.\nEnter your username:");
+    const name = prompt("Please log in to continue.\nEnter your username:");
     if (name && name.trim()) {
       login(name.trim());
       return true;
@@ -118,14 +232,17 @@ export default function Vote() {
     }
 
     try {
-      // ✅ Send username to backend
       const newPost = await createPost(newCommandment.trim(), user);
       setPosts((prev) => [...prev, newPost]);
       setNewCommandment("");
-      // Record submission time
       localStorage.setItem(`lastSubmission_${user}`, new Date().toISOString());
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 4000);
+      // Switch to "New" sort so user sees their submission
+      setSortOption("new");
+      setShuffleTrigger((t) => t + 1);
     } catch (err: any) {
-      console.error("❌ Failed to create post:", err);
+      console.error("Failed to create post:", err);
       if (err.response?.status === 429) {
         alert("You can only submit one commandment per day. Come back tomorrow!");
       } else {
@@ -134,11 +251,15 @@ export default function Vote() {
     }
   };
 
-  // === Handle vote action ===
-  const handleVote = async (postId: string | number, direction: "up" | "down") => {
+  // === Handle vote with fade animation ===
+  const handleVote = (postId: string | number, direction: "up" | "down") => {
     if (!requireLogin()) return;
 
     const pid = String(postId);
+    // Block voting on your own post
+    const post = posts.find((p) => String(p.id) === pid);
+    if (post?.username === user) return;
+
     const prevVote = userVotes[pid];
     if (prevVote === direction) return;
 
@@ -161,20 +282,109 @@ export default function Vote() {
 
     setUserVotes((prev) => ({ ...prev, [pid]: direction }));
 
-    try {
-      const updated = await voteOnPost(pid, direction, user);
-      setPosts((prev) =>
-        prev.map((p) =>
-          String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
+    // Fire API call in background (don't block animation)
+    voteOnPost(pid, direction, user)
+      .then((updated) => {
+        setPosts((prev) =>
+          prev.map((p) =>
+            String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
+          )
+        );
+      })
+      .catch((err) => console.error("Vote failed:", err));
+
+    // Immediately show "voted" state, then start fade-out after brief flash
+    setVisibleSlots((prev) =>
+      prev.map((slot) =>
+        slot.postId === pid ? { ...slot, animState: "voted" as AnimState } : slot
+      )
+    );
+
+    // Start fade-out shortly after the voted flash
+    setTimeout(() => {
+      setVisibleSlots((prev) =>
+        prev.map((slot) =>
+          slot.postId === pid ? { ...slot, animState: "fadingOut" as AnimState } : slot
         )
       );
-    } catch (err) {
-      console.error("❌ Vote failed:", err);
+    }, 150);
+
+    // After fade-out completes, replace with next card
+    setTimeout(() => {
+      setVisibleSlots((prev) => {
+        const currentVisibleIds = new Set(prev.map((s) => s.postId));
+        const nextPost = getNextPost(currentVisibleIds);
+
+        if (nextPost) {
+          const nextPid = String(nextPost.id);
+          shownPostIds.current.add(nextPid);
+          return prev.map((slot) =>
+            slot.postId === pid
+              ? { postId: nextPid, animState: "fadingIn" as AnimState }
+              : slot
+          );
+        } else {
+          // No more unvoted posts, remove the slot
+          return prev.filter((slot) => slot.postId !== pid);
+        }
+      });
+
+      // Trigger fade-in after a brief delay
+      setTimeout(() => {
+        setVisibleSlots((prev) =>
+          prev.map((slot) =>
+            slot.animState === "fadingIn"
+              ? { ...slot, animState: "visible" as AnimState }
+              : slot
+          )
+        );
+      }, 50);
+    }, 450);
+  };
+
+  // Get animation styles for a slot
+  const getAnimStyle = (animState: AnimState): React.CSSProperties => {
+    switch (animState) {
+      case "voted":
+        return { opacity: 0.6, transform: "scale(0.97)", borderColor: "#d4af37" };
+      case "fadingOut":
+        return { opacity: 0, transform: "translateY(-10px) scale(0.95)" };
+      case "fadingIn":
+        return { opacity: 0, transform: "translateY(10px)" };
+      case "visible":
+      default:
+        return { opacity: 1, transform: "translateY(0)" };
     }
   };
 
+  // Find post by ID
+  const getPost = (postId: string): Post | undefined =>
+    posts.find((p) => String(p.id) === postId);
+
   // === Loading & Error States ===
-  if (loading) return <p className="p-4 text-gray-500">Loading...</p>;
+  if (loading) return (
+    <div className="loading-screen">
+      <div className="loading-tablets">
+        <div className="loading-tablet left-tablet">
+          <div className="tablet-arch"></div>
+          <div className="tablet-body"></div>
+          <div className="chisel-sparks">
+            <span className="spark">✦</span>
+            <span className="spark">✧</span>
+            <span className="spark">✦</span>
+          </div>
+        </div>
+        <div className="loading-chisel">
+          <div className="chisel-tool">🪨</div>
+        </div>
+        <div className="loading-tablet right-tablet">
+          <div className="tablet-arch"></div>
+          <div className="tablet-body"></div>
+        </div>
+      </div>
+      <p className="loading-text">Loading morals....</p>
+    </div>
+  );
   if (error) return <p className="p-4 text-red-600">{error}</p>;
 
   // === Render ===
@@ -185,99 +395,86 @@ export default function Vote() {
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        minHeight: "100vh",
-        width: "100vw",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         paddingTop: "0.5rem",
+        overflow: "auto",
       }}
     >
       <div
         style={{
-          backgroundColor: "rgba(253, 248, 230, 0.95)",
+          backgroundColor: "rgba(20, 15, 5, 0.92)",
           borderRadius: "10px",
-          padding: "0.5rem 1rem",
-          maxWidth: "1000px",
+          padding: "0.75rem 1.5rem",
+          maxWidth: "1100px",
           width: "95%",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          border: "1px solid #d1b97b",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
+          border: "2px solid #d4af37",
         }}
       >
-        {/* 🏠 Home Button */}
+        {/* Home Button */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
           <button onClick={() => navigate("/")} className="home-button">
             🏠 Home
           </button>
         </div>
 
-        <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "0.4rem", textAlign: "center", color: "#3a2e0b" }}>
+        <h1
+          style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: "2.5rem",
+            fontWeight: 900,
+            textAlign: "center",
+            color: "#c8b070",
+            textShadow:
+              "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 15px rgba(200, 176, 112, 0.25)",
+            letterSpacing: "0.08em",
+            marginBottom: "0.4rem",
+            textTransform: "uppercase",
+          }}
+        >
           Vote on Commandments
         </h1>
 
-        {/* 👤 Login Info & Sort Options - Same Row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {user ? (
-              <button
-                onClick={logout}
-                style={{ backgroundColor: "#5c5040", color: "#fdf8e6", padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer", fontSize: "12px" }}
-              >
-                Log Out
-              </button>
-            ) : (
-              <button
-                onClick={requireLogin}
-                style={{ backgroundColor: "#b79b3d", color: "#fdf8e6", padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer", fontSize: "12px" }}
-              >
-                Log In
-              </button>
-            )}
-            {user ? (
-              <p style={{ color: "#4b3a0d", fontSize: "12px", margin: 0 }}>
-                Logged in as <span style={{ fontWeight: 600 }}>{user}</span>
-              </p>
-            ) : (
-              <p style={{ color: "#7a6a3a", fontSize: "12px", fontStyle: "italic", margin: 0 }}>Not logged in</p>
-            )}
-          </div>
-
-          {/* Sort Options */}
-          <div style={{ display: "flex", gap: "4px" }}>
-            {(["top", "hot", "new", "random"] as SortOption[]).map((option) => (
-              <button
-                key={option}
-                onClick={() => {
-                  setSortOption(option);
-                  setCurrentPage(1);
-                  if (option === "random") {
-                    setShuffleTrigger((t) => t + 1);
-                  }
-                }}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid #d1b97b",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: "12px",
-                  backgroundColor: sortOption === option ? "#b79b3d" : "#f5edd6",
-                  color: sortOption === option ? "#fdf8e6" : "#4b3a0d",
-                }}
-              >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </button>
-            ))}
-          </div>
+        {/* Login Info */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "0.5rem" }}>
+          {user ? (
+            <button
+              onClick={logout}
+              style={{ backgroundColor: "transparent", color: "#aaa", padding: "2px 8px", borderRadius: "4px", border: "1px solid #888", cursor: "pointer", fontSize: "12px" }}
+            >
+              Log Out
+            </button>
+          ) : (
+            <button
+              onClick={() => requireLogin()}
+              style={{ backgroundColor: "transparent", color: "#d4af37", padding: "2px 8px", borderRadius: "4px", border: "1px solid #d4af37", cursor: "pointer", fontSize: "12px" }}
+            >
+              Log In
+            </button>
+          )}
+          {user ? (
+            <p style={{ color: "#d4af37", fontSize: "12px", margin: 0 }}>
+              Logged in as <span style={{ fontWeight: 600 }}>{user}</span>
+            </p>
+          ) : (
+            <p style={{ color: "#888", fontSize: "12px", fontStyle: "italic", margin: 0 }}>Not logged in</p>
+          )}
         </div>
 
-        {/* ✍️ Create Post Form */}
+        {/* Create Post Form */}
         <form onSubmit={handleSubmit} style={{ marginBottom: "0.5rem", width: "100%" }}>
           <textarea
             placeholder="Enter a new commandment..."
             value={newCommandment}
             onChange={(e) => setNewCommandment(e.target.value)}
-            maxLength={80}
+            maxLength={60}
             style={{
               width: "100%",
               height: "50px",
@@ -287,12 +484,14 @@ export default function Vote() {
               fontSize: "0.95rem",
               resize: "none",
               boxSizing: "border-box",
-              backgroundColor: "#fffef9",
+              backgroundColor: "#1a1a1a",
+              color: "#fdf8e6",
+              borderColor: "#555",
             }}
           />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px", marginBottom: "4px" }}>
-            <span style={{ fontSize: "11px", color: newCommandment.length >= 70 ? "#a85032" : "#7a6a3a" }}>
-              {newCommandment.length}/80
+            <span style={{ fontSize: "11px", color: newCommandment.length >= 50 ? "#e07050" : "#888" }}>
+              {newCommandment.length}/60
             </span>
             <button
               type="submit"
@@ -312,173 +511,171 @@ export default function Vote() {
           </div>
         </form>
 
-        {/* 🗳️ Commandments List - Two Columns */}
-        {posts.length === 0 && (
-          <p className="text-center text-gray-600">No commandments found.</p>
+        {/* Submission Success Message */}
+        {submitSuccess && (
+          <div style={{
+            textAlign: "center",
+            padding: "8px 16px",
+            marginBottom: "0.5rem",
+            backgroundColor: "rgba(90, 122, 80, 0.3)",
+            border: "1px solid #5a7a50",
+            borderRadius: "8px",
+            color: "#a8d89a",
+            fontSize: "0.95rem",
+            fontFamily: "'Cinzel', serif",
+            animation: "fadeIn 0.3s ease",
+          }}>
+            ✦ Your commandment has been submitted successfully! ✦
+          </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "row", gap: "16px", overflow: "hidden", width: "100%" }}>
-          {/* Left Column */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-            {paginatedPosts.slice(0, 8).map((post) => {
-              const userVote = userVotes[String(post.id)];
-              return (
-                <div
-                  key={post.id}
-                  style={{
-                    border: "1px solid #d1b97b",
-                    padding: "14px 16px",
-                    borderRadius: "8px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    backgroundColor: "#fffef9",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0, marginRight: "10px" }}>
-                    <h2 style={{ fontWeight: 600, color: "#3a2e0b", fontSize: "18px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
-                      {post.title || post.content}
-                    </h2>
-                    <p style={{ fontSize: "14px", color: "#7a6a3a", margin: 0 }}>
-                      {post.votes ?? 0} votes
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: userVote === "up" ? "#5a7a50" : "#7a9a6a",
-                        color: "#fdf8e6",
-                        fontSize: "16px",
-                      }}
-                      onClick={() => handleVote(post.id, "up")}
-                    >
-                      👍
-                    </button>
-                    <button
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: userVote === "down" ? "#8a5a4a" : "#a87a6a",
-                        color: "#fdf8e6",
-                        fontSize: "16px",
-                      }}
-                      onClick={() => handleVote(post.id, "down")}
-                    >
-                      👎
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Right Column */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-            {paginatedPosts.slice(8, 16).map((post) => {
-              const userVote = userVotes[String(post.id)];
-              return (
-                <div
-                  key={post.id}
-                  style={{
-                    border: "1px solid #d1b97b",
-                    padding: "14px 16px",
-                    borderRadius: "8px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    backgroundColor: "#fffef9",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0, marginRight: "10px" }}>
-                    <h2 style={{ fontWeight: 600, color: "#3a2e0b", fontSize: "18px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
-                      {post.title || post.content}
-                    </h2>
-                    <p style={{ fontSize: "14px", color: "#7a6a3a", margin: 0 }}>
-                      {post.votes ?? 0} votes
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: userVote === "up" ? "#5a7a50" : "#7a9a6a",
-                        color: "#fdf8e6",
-                        fontSize: "16px",
-                      }}
-                      onClick={() => handleVote(post.id, "up")}
-                    >
-                      👍
-                    </button>
-                    <button
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: userVote === "down" ? "#8a5a4a" : "#a87a6a",
-                        color: "#fdf8e6",
-                        fontSize: "16px",
-                      }}
-                      onClick={() => handleVote(post.id, "down")}
-                    >
-                      👎
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        {/* Sort Options */}
+        <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "0.75rem" }}>
+          {(["top", "hot", "new", "random"] as SortOption[]).map((option) => (
+            <button
+              key={option}
+              onClick={() => {
+                setSortOption(option);
+                setShuffleTrigger((t) => t + 1);
+              }}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "1rem",
+                fontFamily: "'Cinzel', serif",
+                letterSpacing: "0.04em",
+                backgroundColor: sortOption === option ? "#b79b3d" : "transparent",
+                color: sortOption === option ? "#fdf8e6" : "#d1b97b",
+                border: sortOption === option ? "2px solid #d4af37" : "2px solid #555",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {option.charAt(0).toUpperCase() + option.slice(1)}
+            </button>
+          ))}
         </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #d1b97b" }}>
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              style={{
-                padding: "4px 12px",
-                borderRadius: "4px",
-                fontWeight: 600,
-                fontSize: "12px",
-                border: "none",
-                cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                backgroundColor: currentPage === 1 ? "#e5dcc8" : "#b79b3d",
-                color: currentPage === 1 ? "#9a8a6a" : "#fdf8e6",
-              }}
-            >
-              Previous
-            </button>
-            <span style={{ color: "#4b3a0d", fontSize: "12px" }}>
-              Page {currentPage} of {totalPages}
+        {/* Commandment Cards — Single Column, 4 at a time */}
+        {posts.length === 0 && (
+          <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+            <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 12px 0" }}>
+              The tablets are empty.
+            </p>
+            <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif" }}>
+              Be the first to inscribe a commandment and define the morals for humanity.
+            </p>
+            <p style={{ color: "#888", fontSize: "13px", margin: 0, fontStyle: "italic" }}>
+              Use the form above to submit your commandment.
+            </p>
+          </div>
+        )}
+        {visibleSlots.length === 0 && posts.length > 0 && (
+          <div style={{ textAlign: "center", padding: "2rem 0" }}>
+            <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
+              You've voted on all commandments!
+            </p>
+            <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+              Submit a new one or change the sort order.
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
+          {visibleSlots.map((slot) => {
+            const post = getPost(slot.postId);
+            if (!post) return null;
+            const userVote = userVotes[String(post.id)];
+            const isOwnPost = post.username === user;
+
+            return (
+              <div
+                key={slot.postId}
+                style={{
+                  border: "1px solid #555",
+                  padding: "24px",
+                  borderRadius: "12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  backgroundColor: "rgba(255,255,255,0.05)",
+                  overflow: "hidden",
+                  minHeight: "180px",
+                  transition: "all 0.25s ease",
+                  ...getAnimStyle(slot.animState),
+                }}
+              >
+                <div>
+                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: "1.15rem", margin: "0 0 8px 0", lineHeight: 1.4, wordBreak: "break-word", whiteSpace: "normal" }}>
+                    {post.title || post.content}
+                  </h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "15px", color: "#d1b97b", fontWeight: 600 }}>
+                      {post.votes ?? 0} votes
+                    </span>
+                    <span style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>
+                      {post.username || "unknown"}
+                    </span>
+                    <Link
+                      to={`/comments/${post.id}`}
+                      style={{ fontSize: "13px", color: "#888", textDecoration: "none" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#d4af37")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
+                    >
+                      💬 Comments ({commentCounts[String(post.id)] ?? 0})
+                    </Link>
+                  </div>
+                </div>
+                {isOwnPost ? (
+                  <div style={{ textAlign: "center", marginTop: "16px", color: "#888", fontSize: "0.85rem", fontStyle: "italic" }}>
+                    Your commandment
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: "10px 0",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        backgroundColor: userVote === "up" ? "#5a7a50" : "#7a9a6a",
+                        color: "#fdf8e6",
+                        fontSize: "20px",
+                      }}
+                      onClick={() => handleVote(post.id, "up")}
+                    >
+                      👍
+                    </button>
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: "10px 0",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        backgroundColor: userVote === "down" ? "#8a5a4a" : "#a87a6a",
+                        color: "#fdf8e6",
+                        fontSize: "20px",
+                      }}
+                      onClick={() => handleVote(post.id, "down")}
+                    >
+                      👎
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Progress indicator */}
+        {posts.length > 0 && (
+          <div style={{ textAlign: "center", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #555" }}>
+            <span style={{ color: "#d1b97b", fontSize: "12px" }}>
+              Voted on {votedCount} of {totalCount} commandments
             </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              style={{
-                padding: "4px 12px",
-                borderRadius: "4px",
-                fontWeight: 600,
-                fontSize: "12px",
-                border: "none",
-                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                backgroundColor: currentPage === totalPages ? "#e5dcc8" : "#b79b3d",
-                color: currentPage === totalPages ? "#9a8a6a" : "#fdf8e6",
-              }}
-            >
-              Next
-            </button>
           </div>
         )}
       </div>

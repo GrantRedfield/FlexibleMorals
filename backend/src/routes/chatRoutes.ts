@@ -2,21 +2,14 @@ import express from "express";
 import type { Request, Response } from "express";
 const { Router } = express;
 import {
-  DynamoDBClient,
   PutItemCommand,
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { nanoid } from "nanoid";
+import { client, TABLE_NAME } from "../lib/dynamodb.ts";
 
 const router = Router();
-
-const client = new DynamoDBClient({
-  region: "local",
-  endpoint: "http://localhost:8000",
-});
-
-const TABLE_NAME = "FlexibleTable";
 
 // Simple in-memory rate limiter: 1 message per second per user
 const lastMessageTime: Record<string, number> = {};
@@ -100,10 +93,17 @@ router.post("/messages", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Message too long (max 200 characters)" });
   }
 
-  // Rate limiting
+  // Block links
+  const urlPattern = /https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.co|\.xyz|\.dev/i;
+  if (urlPattern.test(message)) {
+    return res.status(400).json({ error: "Links are not allowed in chat" });
+  }
+
+  // Rate limiting (15 seconds between messages)
   const now = Date.now();
-  if (lastMessageTime[username] && now - lastMessageTime[username] < 1000) {
-    return res.status(429).json({ error: "Slow down! One message per second." });
+  if (lastMessageTime[username] && now - lastMessageTime[username] < 15000) {
+    const remaining = Math.ceil((15000 - (now - lastMessageTime[username])) / 1000);
+    return res.status(429).json({ error: `Slow down! Wait ${remaining} more seconds.` });
   }
   lastMessageTime[username] = now;
 

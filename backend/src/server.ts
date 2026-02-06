@@ -1,21 +1,35 @@
 // backend/src/server.ts
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import {
-  DynamoDBClient,
   ScanCommand,
   GetItemCommand,
   PutItemCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
+import { client, TABLE_NAME } from "./lib/dynamodb.ts";
 import { handlePayPalWebhook } from "./webhooks/paypal.ts";
 import donorRoutes from "./routes/donorRoutes.ts";
 import chatRoutes from "./routes/chatRoutes.ts";
+import commentRoutes from "./routes/commentRoutes.ts";
 
 const app = express();
-app.use(cors({ origin: "http://localhost:5173" }));
+
+// CORS: allow frontend origin (supports comma-separated origins for multiple environments)
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173").split(",").map(s => s.trim());
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+}));
 
 // PayPal webhook needs raw body for signature verification
 // Must be registered before bodyParser.json()
@@ -29,12 +43,10 @@ app.use("/api/donor", donorRoutes);
 // Chat API routes
 app.use("/api/chat", chatRoutes);
 
-const client = new DynamoDBClient({
-  region: "local",
-  endpoint: "http://localhost:8000",
-});
+// Comment API routes
+app.use("/api/comments", commentRoutes);
 
-const TABLE_NAME = "FlexibleTable";
+// DynamoDB client and table name imported from shared module above
 
 // === Helper: Fetch all posts ===
 const getAllPosts = async () => {
@@ -62,6 +74,7 @@ app.get("/posts", async (req, res) => {
       votes: Number(p.votes ?? p.score ?? 0),
       username: p.authorId ?? "unknown",
       createdAt: p.createdAt ?? null,
+      userVotes: p.userVotes ?? {},
     }));
     res.json(formatted);
   } catch (err) {
@@ -118,6 +131,7 @@ app.post("/posts", async (req, res) => {
       votes: { N: "1" },
       authorId: { S: authorId },
       createdAt: { S: new Date().toISOString() },
+      userVotes: { M: { [authorId]: { S: "up" } } },
     };
 
     await client.send(new PutItemCommand({ TableName: TABLE_NAME, Item: item }));
@@ -200,7 +214,7 @@ app.post("/posts/:id/vote", async (req, res) => {
 });
 
 // === Start Server ===
-const PORT = 3001;
+const PORT = parseInt(process.env.PORT || "3001", 10);
 app.listen(PORT, () => {
-  console.log(`✅ FlexibleMorals backend running on http://localhost:${PORT}`);
+  console.log(`✅ FlexibleMorals backend running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
 });
