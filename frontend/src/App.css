@@ -572,8 +572,12 @@
   border-radius: 10px;
   padding: 16px 28px;
   color: #d4af37;
-  font-weight: 600;
-  font-size: 1.4rem;
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0px #3a2e0b, 0 0 8px rgba(212, 175, 55, 0.2);
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(212, 175, 55, 0.3);
   transition: all 0.2s ease-in-out;
@@ -587,6 +591,116 @@
   border-color: #f0d060;
   color: #f0d060;
   transform: scale(1.05);
+}
+
+/* === Scroll Hand Shaking Animation === */
+.scroll-hand-container {
+  position: absolute;
+  top: -70px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: scrollHandFadeIn 0.3s ease-out forwards;
+}
+
+.scroll-hand {
+  width: 44px;
+  height: 68px;
+  position: relative;
+  animation: scrollShake 0.8s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Scroll (parchment roll) */
+.scroll-hand::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 40px;
+  background: linear-gradient(180deg, #d4c49a 0%, #c8b078 50%, #d4c49a 100%);
+  border: 2px solid #a08050;
+  border-radius: 6px 6px 2px 2px;
+  box-shadow: 0 0 6px rgba(160, 128, 80, 0.3), inset 0 0 8px rgba(255, 255, 255, 0.15);
+}
+
+/* Scroll roll top */
+.scroll-hand::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 8px;
+  background: linear-gradient(180deg, #b89860 0%, #a08050 100%);
+  border: 2px solid #8a6a3a;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Fist (gripping hand) — drawn as child div */
+.scroll-hand-fist {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 24px;
+  background: linear-gradient(180deg, #c8a06e 0%, #a8845a 100%);
+  border: 2px solid #8a6a3a;
+  border-radius: 6px 6px 8px 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Knuckle bumps */
+.scroll-hand-fist::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  right: 3px;
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.2) 0px,
+    rgba(255, 255, 255, 0.2) 4px,
+    transparent 4px,
+    transparent 7px
+  );
+  border-radius: 2px;
+}
+
+/* Thumb */
+.scroll-hand-fist::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: -4px;
+  width: 8px;
+  height: 14px;
+  background: linear-gradient(180deg, #c8a06e 0%, #a8845a 100%);
+  border: 2px solid #8a6a3a;
+  border-radius: 4px;
+  border-left: none;
+}
+
+@keyframes scrollShake {
+  0%   { transform: rotate(-8deg) translateY(0); }
+  12%  { transform: rotate(12deg) translateY(-3px); }
+  28%  { transform: rotate(-6deg) translateY(1px); }
+  42%  { transform: rotate(10deg) translateY(-2px); }
+  58%  { transform: rotate(-5deg) translateY(0); }
+  72%  { transform: rotate(9deg) translateY(-1px); }
+  85%  { transform: rotate(-7deg) translateY(1px); }
+  100% { transform: rotate(-8deg) translateY(0); }
+}
+
+@keyframes scrollHandFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* === Donor Badge Styles === */

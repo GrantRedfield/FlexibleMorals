@@ -26,7 +26,11 @@
       "Bash(zip:*)",
       "Bash(powershell:*)",
       "Bash(VITE_API_URL=https://api.flexiblemorals.org npm run build:*)",
-      "Bash(aws:*)"
+      "Bash(aws:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)",
+      "Bash(npm run seed:*)"
     ]
   }
 }
