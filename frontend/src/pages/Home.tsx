@@ -26,6 +26,7 @@ export default function Home() {
   const [daysLeft, setDaysLeft] = useState<number>(0);
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
+  const [showScrollFist, setShowScrollFist] = useState(false);
   const navigate = useNavigate();
   const { donorStatuses, loadDonorStatuses } = useDonor();
 
@@ -65,6 +66,21 @@ export default function Home() {
 
     // Then repeat every 60 seconds
     const interval = setInterval(dropCoins, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Scroll fist animation every 45 seconds
+  useEffect(() => {
+    const showFist = () => {
+      setShowScrollFist(true);
+      setTimeout(() => setShowScrollFist(false), 3000);
+    };
+
+    // Show after 1 second on load
+    setTimeout(showFist, 1000);
+
+    // Then repeat every 45 seconds
+    const interval = setInterval(showFist, 45000);
     return () => clearInterval(interval);
   }, []);
 
@@ -217,10 +233,17 @@ export default function Home() {
         </button>
       </div>
 
-      {/* ✅ "What in the world is this?!" link (now opens popup) */}
+      {/* ✅ "OUR CHARTER" link (opens popup) */}
       <div className="info-link-container">
+        {showScrollFist && (
+          <div className="scroll-hand-container">
+            <div className="scroll-hand">
+              <div className="scroll-hand-fist"></div>
+            </div>
+          </div>
+        )}
         <button onClick={() => setShowInfoPopup(true)} className="info-link">
-          What in the world is this?!
+          OUR CHARTER
         </button>
       </div>
 
@@ -278,8 +301,8 @@ export default function Home() {
               textAlign: "center",
             }}
           >
-            <h1 style={{ color: "#d4af37", marginBottom: "1rem" }}>
-              What in the world is this?!
+            <h1 style={{ color: "#d4af37", marginBottom: "1rem", fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
+              OUR CHARTER
             </h1>
             <p>
               I'd like to think of this as the first "democratic religion", where

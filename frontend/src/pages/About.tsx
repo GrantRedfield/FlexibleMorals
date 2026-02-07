@@ -13,8 +13,8 @@ export default function About() {
         textAlign: "center",
       }}
     >
-      <h1 style={{ fontSize: "2rem", marginBottom: "1rem", color: "#d4af37" }}>
-        What in the world is this?!
+      <h1 style={{ fontSize: "2rem", marginBottom: "1rem", color: "#d4af37", fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
+        OUR CHARTER
       </h1>
       <p style={{ maxWidth: "700px", lineHeight: "1.6" }}>
         I'd like to think of this as the first "democratic religion", where its only bounded

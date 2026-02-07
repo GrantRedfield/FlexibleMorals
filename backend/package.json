@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "start": "tsx src/server.ts",
-    "build": "echo 'No build step needed — tsx runs TypeScript directly'"
+    "build": "echo 'No build step needed — tsx runs TypeScript directly'",
+    "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.921.0",
