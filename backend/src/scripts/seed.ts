@@ -155,6 +155,22 @@ const RESERVE_USERNAMES = [
   "seasonal_affective_dad",
 ];
 
+// Random subset of authors get donor tiers
+const DONOR_SEEDS: { username: string; tier: "supporter" | "patron" | "benefactor"; totalDonated: number }[] = [
+  { username: AUTHORS[3],  tier: "benefactor", totalDonated: 15000 }, // rewindVHS
+  { username: AUTHORS[11], tier: "benefactor", totalDonated: 12500 }, // Y2K_anxiety_club
+  { username: AUTHORS[14], tier: "patron",     totalDonated: 5000 },  // floppy_disk_gospel
+  { username: AUTHORS[18], tier: "patron",     totalDonated: 3500 },  // sharepoint_shaman
+  { username: AUTHORS[22], tier: "patron",     totalDonated: 2500 },  // ask_jeeves_elder
+  { username: AUTHORS[0],  tier: "supporter",  totalDonated: 800 },   // dial_up_daniel
+  { username: AUTHORS[7],  tier: "supporter",  totalDonated: 500 },   // captain_planet_b
+  { username: AUTHORS[9],  tier: "supporter",  totalDonated: 300 },   // limewire_ghost
+  { username: AUTHORS[15], tier: "supporter",  totalDonated: 150 },   // geocities_monk
+  { username: AUTHORS[25], tier: "supporter",  totalDonated: 100 },   // real_player_requiem
+  { username: AUTHORS[29], tier: "patron",     totalDonated: 4200 },  // winamp_worship
+  { username: AUTHORS[5],  tier: "supporter",  totalDonated: 250 },   // oregano_trail_survivor
+];
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -296,7 +312,71 @@ async function deleteSubmissionItems(): Promise<number> {
 }
 
 // ============================================================
-// Phase 3: Insert new commandments
+// Phase 3: Delete existing DONOR# items
+// ============================================================
+
+async function deleteDonorItems(): Promise<number> {
+  let deleted = 0;
+  let lastKey: Record<string, any> | undefined;
+
+  do {
+    const result = await client.send(
+      new ScanCommand({
+        TableName: TABLE_NAME,
+        FilterExpression: "begins_with(PK, :prefix)",
+        ExpressionAttributeValues: {
+          ":prefix": { S: "DONOR#" },
+        },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of result.Items || []) {
+      await client.send(
+        new DeleteItemCommand({
+          TableName: TABLE_NAME,
+          Key: { PK: item.PK!, SK: item.SK! },
+        })
+      );
+      deleted++;
+    }
+
+    lastKey = result.LastEvaluatedKey;
+  } while (lastKey);
+
+  return deleted;
+}
+
+// ============================================================
+// Phase 4: Insert donor records
+// ============================================================
+
+async function insertDonors(): Promise<void> {
+  for (const donor of DONOR_SEEDS) {
+    const now = new Date().toISOString();
+
+    await client.send(
+      new PutItemCommand({
+        TableName: TABLE_NAME,
+        Item: {
+          PK: { S: `DONOR#${donor.username}` },
+          SK: { S: "STATUS" },
+          username: { S: donor.username },
+          totalDonated: { N: String(donor.totalDonated) },
+          tier: { S: donor.tier },
+          firstDonationAt: { S: now },
+          lastDonationAt: { S: now },
+          paypalEmail: { S: `${donor.username}@example.com` },
+        },
+      })
+    );
+
+    console.log(`  [${donor.tier}] ${donor.username} ($${(donor.totalDonated / 100).toFixed(2)})`);
+  }
+}
+
+// ============================================================
+// Phase 5: Insert new commandments
 // ============================================================
 
 async function insertCommandments(): Promise<void> {
@@ -340,12 +420,19 @@ async function main() {
   const deletedSubs = await deleteSubmissionItems();
   console.log(`Deleted ${deletedSubs} USER#/SUBMISSION# items`);
 
+  const deletedDonors = await deleteDonorItems();
+  console.log(`Deleted ${deletedDonors} DONOR# items`);
+
   console.log("");
   console.log("Inserting The Flexible Commandments:");
   await insertCommandments();
 
   console.log("");
-  console.log(`Done. ${COMMANDMENTS.length} commandments inscribed.`);
+  console.log("Inserting Donor Records:");
+  await insertDonors();
+
+  console.log("");
+  console.log(`Done. ${COMMANDMENTS.length} commandments and ${DONOR_SEEDS.length} donors inscribed.`);
 }
 
 main().catch((err) => {

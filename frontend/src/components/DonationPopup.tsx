@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 interface DonationPopupProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ const PAYPAL_URL = "https://www.paypal.com/donate/?business=E9ZG5U75GEYBQ&no_rec
 export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
   const [showCrypto, setShowCrypto] = useState(false);
   const [copied, setCopied] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   if (!isOpen) return null;
 
@@ -54,7 +56,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
       >
         {!showCrypto ? (
           <>
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: "1.8rem", fontFamily: "'Cinzel', serif" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.4rem" : "1.8rem", fontFamily: "'Cinzel', serif" }}>
               Make an Offering
             </h2>
 
@@ -220,7 +222,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
           </>
         ) : (
           <>
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: "1.8rem" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.4rem" : "1.8rem" }}>
               🪙 Crypto Donation
             </h2>
             <p style={{ color: "#aaa", marginBottom: "1rem", fontSize: "1rem" }}>
