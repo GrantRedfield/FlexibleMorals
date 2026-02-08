@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
-import { getChatMessages, sendChatMessage } from "../utils/api";
+import { getChatMessages, sendChatMessage, getPosts } from "../utils/api";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import DonorBadge from "./DonorBadge";
+import UserProfilePopup from "./UserProfilePopup";
 import "./ChatBox.css";
 
 interface ChatMessage {
@@ -15,10 +17,14 @@ interface ChatMessage {
 export default function ChatBox() {
   const { user, login } = useAuth();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [allPosts, setAllPosts] = useState<any[]>([]);
+  const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastTimestampRef = useRef<string | null>(null);
@@ -46,6 +52,20 @@ export default function ChatBox() {
       }
     },
     [loadDonorStatuses]
+  );
+
+  // Load posts for blessings calculation
+  useEffect(() => {
+    getPosts().then((data) => setAllPosts(data)).catch(() => {});
+  }, []);
+
+  const getBlessings = useCallback(
+    (username: string): number => {
+      return allPosts
+        .filter((p: any) => p.username === username)
+        .reduce((sum: number, p: any) => sum + (p.votes ?? 0), 0);
+    },
+    [allPosts]
   );
 
   // Initial load
@@ -115,7 +135,7 @@ export default function ChatBox() {
     if (cooldown > 0) return;
 
     if (!user) {
-      const name = prompt("Enter your username to chat:");
+      const name = prompt("Enter your username:");
       if (name && name.trim()) {
         login(name.trim());
       }
@@ -155,9 +175,25 @@ export default function ChatBox() {
   };
 
   return (
-    <div className="chat-box">
+    <div className={`chat-box${isMobile && mobileExpanded ? " chat-mobile-expanded" : ""}`}>
+      {/* Mobile FAB toggle */}
+      <button
+        className="chat-mobile-toggle"
+        onClick={() => setMobileExpanded(true)}
+        aria-label="Open chat"
+      >
+        💬
+      </button>
+
       <div className="chat-header">
         <h3>Sacred Discourse</h3>
+        <button
+          className="chat-mobile-close"
+          onClick={() => setMobileExpanded(false)}
+          aria-label="Close chat"
+        >
+          ✕
+        </button>
       </div>
       <div className="chat-messages" ref={messagesContainerRef}>
         {messages.length === 0 && (
@@ -167,7 +203,16 @@ export default function ChatBox() {
           const donorStatus = getDonorStatus(msg.username);
           return (
             <div className="chat-message" key={msg.id}>
-              <span className="chat-username">{msg.username}</span>
+              <span
+                className="chat-username"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProfilePopup({ username: msg.username, x: e.clientX, y: e.clientY });
+                }}
+                style={{ cursor: "pointer" }}
+              >
+                {msg.username}
+              </span>
               {donorStatus?.tier && (
                 <DonorBadge tier={donorStatus.tier} size="small" />
               )}
@@ -186,9 +231,10 @@ export default function ChatBox() {
           onKeyDown={handleKeyDown}
           placeholder={user ? "Speak thy mind..." : "Click here to chat..."}
           disabled={sending}
-          onFocus={() => {
+          onFocus={(e) => {
             if (!user) {
-              const name = prompt("Enter your username to chat:");
+              e.target.blur();
+              const name = prompt("Enter your username:");
               if (name && name.trim()) {
                 login(name.trim());
               }
@@ -204,6 +250,17 @@ export default function ChatBox() {
           {cooldown > 0 ? `${cooldown}s` : "Proclaim"}
         </button>
       </div>
+
+      {/* User Profile Popup */}
+      {profilePopup && (
+        <UserProfilePopup
+          username={profilePopup.username}
+          blessings={getBlessings(profilePopup.username)}
+          donorTier={getDonorStatus(profilePopup.username)?.tier}
+          position={{ x: profilePopup.x, y: profilePopup.y }}
+          onClose={() => setProfilePopup(null)}
+        />
+      )}
     </div>
   );
 }

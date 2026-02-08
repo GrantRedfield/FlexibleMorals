@@ -2,6 +2,11 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { getPosts, voteOnPost, createPost, getComments } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useDonor } from "../context/DonorContext";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import UserProfilePopup from "../components/UserProfilePopup";
+import DonorBadge from "../components/DonorBadge";
+import "./Vote.css";
 
 interface Post {
   id: string | number;
@@ -35,6 +40,9 @@ export default function Vote() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
+  const { getDonorStatus, loadDonorStatuses } = useDonor();
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
   const shownPostIds = useRef<Set<string>>(new Set());
@@ -71,26 +79,26 @@ export default function Vote() {
     }
   }, [posts, sortOption, shuffleTrigger]);
 
-  // Get the next unvoted post to show (in sort order), excluding currently visible ones
+  // Get the next post to show (in sort order), excluding currently visible ones
   const getNextPost = useCallback(
     (currentVisibleIds: Set<string>): Post | null => {
-      // First try unvoted posts not yet shown this cycle
+      // First try posts not yet shown this cycle
       for (const post of sortedPosts) {
         const pid = String(post.id);
-        if (!userVotes[pid] && !currentVisibleIds.has(pid) && !shownPostIds.current.has(pid)) {
+        if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid)) {
           return post;
         }
       }
-      // If all have been shown, allow re-showing unvoted ones not currently visible
+      // If all have been shown, reset and allow re-showing posts not currently visible
       for (const post of sortedPosts) {
         const pid = String(post.id);
-        if (!userVotes[pid] && !currentVisibleIds.has(pid)) {
+        if (!currentVisibleIds.has(pid)) {
           return post;
         }
       }
       return null;
     },
-    [sortedPosts, userVotes]
+    [sortedPosts]
   );
 
   // Ref to always access latest userVotes without re-triggering effects
@@ -103,10 +111,8 @@ export default function Vote() {
 
   // Initialize visible slots when posts load or sort changes
   const initializeSlots = useCallback(() => {
-    const votes = userVotesRef.current;
     const currentSorted = sortedPostsRef.current;
-    const unvoted = currentSorted.filter((p) => !votes[String(p.id)]);
-    const initial = unvoted.slice(0, VISIBLE_COUNT).map((p) => ({
+    const initial = currentSorted.slice(0, VISIBLE_COUNT).map((p) => ({
       postId: String(p.id),
       animState: "visible" as AnimState,
     }));
@@ -121,8 +127,9 @@ export default function Vote() {
         const data = await getPosts();
         setPosts(data);
 
-        // Merge server-side userVotes with localStorage
-        const savedVotes = localStorage.getItem("userVotes");
+        // Merge server-side userVotes with localStorage (scoped per user)
+        const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+        const savedVotes = localStorage.getItem(storageKey);
         const localVotes: Record<string, "up" | "down" | null> = savedVotes ? JSON.parse(savedVotes) : {};
         const merged = { ...localVotes };
         if (user) {
@@ -159,11 +166,33 @@ export default function Vote() {
     load();
   }, [user]);
 
-  // Re-merge server votes when user changes (e.g. login after page load)
+  // Load donor statuses for displayed posts
   useEffect(() => {
-    if (!user || posts.length === 0) return;
-    setUserVotes((prev) => {
-      const merged = { ...prev };
+    if (posts.length > 0) {
+      const usernames = posts
+        .map((p) => p.username)
+        .filter((u): u is string => !!u && u !== "unknown");
+      if (usernames.length > 0) loadDonorStatuses(usernames);
+    }
+  }, [posts, loadDonorStatuses]);
+
+  // Compute total blessings (votes) for a given username
+  const getBlessings = useCallback(
+    (username: string): number => {
+      return posts
+        .filter((p) => p.username === username)
+        .reduce((sum, p) => sum + (p.votes ?? 0), 0);
+    },
+    [posts]
+  );
+
+  // Re-load votes from localStorage + server when user changes (e.g. login after page load)
+  useEffect(() => {
+    if (posts.length === 0) return;
+    const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+    const saved = localStorage.getItem(storageKey);
+    const merged: Record<string, "up" | "down" | null> = saved ? JSON.parse(saved) : {};
+    if (user) {
       posts.forEach((p: any) => {
         const pid = String(p.id);
         const serverVote = p.userVotes?.[user];
@@ -171,8 +200,8 @@ export default function Vote() {
           merged[pid] = serverVote;
         }
       });
-      return merged;
-    });
+    }
+    setUserVotes(merged);
   }, [user, posts]);
 
   // Initialize slots when sort changes or posts first load
@@ -189,10 +218,11 @@ export default function Vote() {
     }
   }, [postsLoaded, sortOption, shuffleTrigger]);
 
-  // Persist userVotes locally
+  // Persist userVotes locally (scoped per user)
   useEffect(() => {
-    localStorage.setItem("userVotes", JSON.stringify(userVotes));
-  }, [userVotes]);
+    const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+    localStorage.setItem(storageKey, JSON.stringify(userVotes));
+  }, [userVotes, user]);
 
   // Voted count
   const votedCount = Object.keys(userVotes).filter((k) => userVotes[k]).length;
@@ -201,12 +231,11 @@ export default function Vote() {
   // === Require login ===
   const requireLogin = (): boolean => {
     if (user) return true;
-    const name = prompt("Please log in to continue.\nEnter your username:");
+    const name = prompt("Enter your username:");
     if (name && name.trim()) {
       login(name.trim());
       return true;
     }
-    alert("You must log in to perform this action.");
     return false;
   };
 
@@ -342,6 +371,48 @@ export default function Vote() {
     }, 450);
   };
 
+  // === Handle skip (for already-voted posts) ===
+  const handleSkip = (postId: string | number) => {
+    const pid = String(postId);
+
+    // Start fade-out
+    setVisibleSlots((prev) =>
+      prev.map((slot) =>
+        slot.postId === pid ? { ...slot, animState: "fadingOut" as AnimState } : slot
+      )
+    );
+
+    // After fade-out completes, replace with next card
+    setTimeout(() => {
+      setVisibleSlots((prev) => {
+        const currentVisibleIds = new Set(prev.map((s) => s.postId));
+        const nextPost = getNextPost(currentVisibleIds);
+
+        if (nextPost) {
+          const nextPid = String(nextPost.id);
+          shownPostIds.current.add(nextPid);
+          return prev.map((slot) =>
+            slot.postId === pid
+              ? { postId: nextPid, animState: "fadingIn" as AnimState }
+              : slot
+          );
+        } else {
+          return prev.filter((slot) => slot.postId !== pid);
+        }
+      });
+
+      setTimeout(() => {
+        setVisibleSlots((prev) =>
+          prev.map((slot) =>
+            slot.animState === "fadingIn"
+              ? { ...slot, animState: "visible" as AnimState }
+              : slot
+          )
+        );
+      }, 50);
+    }, 300);
+  };
+
   // Get animation styles for a slot
   const getAnimStyle = (animState: AnimState): React.CSSProperties => {
     switch (animState) {
@@ -391,10 +462,7 @@ export default function Vote() {
   return (
     <div
       style={{
-        backgroundImage: "url('/Voting_Background.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
+        background: "linear-gradient(180deg, #1a2a4a 0%, #2a4a7a 20%, #4a7ab5 40%, #7ab0e0 60%, #a8d4f0 80%, #d4ecfa 100%)",
         position: "fixed",
         top: 0,
         left: 0,
@@ -407,15 +475,23 @@ export default function Vote() {
         overflow: "auto",
       }}
     >
+      {/* Heavenly clouds filling the sky */}
+      {Array.from({ length: 32 }, (_, i) => (
+        <div key={i} className={`cloud cloud-${i + 1}`}></div>
+      ))}
+
       <div
         style={{
           backgroundColor: "rgba(20, 15, 5, 0.92)",
-          borderRadius: "10px",
-          padding: "0.75rem 1.5rem",
-          maxWidth: "1100px",
-          width: "95%",
+          borderRadius: isMobile ? "0" : "10px",
+          padding: isMobile ? "0.75rem 0.75rem" : "0.75rem 1.5rem",
+          maxWidth: isMobile ? "100%" : "1100px",
+          width: isMobile ? "100%" : "95%",
           boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
-          border: "2px solid #d4af37",
+          border: isMobile ? "none" : "2px solid #d4af37",
+          borderBottom: isMobile ? "2px solid #d4af37" : undefined,
+          position: "relative",
+          zIndex: 2,
         }}
       >
         {/* Home Button */}
@@ -428,7 +504,7 @@ export default function Vote() {
         <h1
           style={{
             fontFamily: "'Cinzel', serif",
-            fontSize: "2.5rem",
+            fontSize: isMobile ? "1.6rem" : "2.5rem",
             fontWeight: 900,
             textAlign: "center",
             color: "#c8b070",
@@ -530,7 +606,7 @@ export default function Vote() {
         )}
 
         {/* Sort Options */}
-        <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "0.75rem" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? "6px" : "10px", marginBottom: "0.75rem", flexWrap: "wrap" }}>
           {(["top", "hot", "new", "random"] as SortOption[]).map((option) => (
             <button
               key={option}
@@ -539,17 +615,18 @@ export default function Vote() {
                 setShuffleTrigger((t) => t + 1);
               }}
               style={{
-                padding: "10px 24px",
+                padding: isMobile ? "8px 16px" : "10px 24px",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontWeight: 700,
-                fontSize: "1rem",
+                fontSize: isMobile ? "0.9rem" : "1rem",
                 fontFamily: "'Cinzel', serif",
                 letterSpacing: "0.04em",
                 backgroundColor: sortOption === option ? "#b79b3d" : "transparent",
                 color: sortOption === option ? "#fdf8e6" : "#d1b97b",
                 border: sortOption === option ? "2px solid #d4af37" : "2px solid #555",
                 transition: "all 0.2s ease",
+                minHeight: "44px",
               }}
             >
               {option.charAt(0).toUpperCase() + option.slice(1)}
@@ -574,7 +651,7 @@ export default function Vote() {
         {visibleSlots.length === 0 && posts.length > 0 && (
           <div style={{ textAlign: "center", padding: "2rem 0" }}>
             <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
-              You've voted on all commandments!
+              You've seen all commandments!
             </p>
             <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
               Submit a new one or change the sort order.
@@ -582,7 +659,7 @@ export default function Vote() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "12px" : "16px", width: "100%" }}>
           {visibleSlots.map((slot) => {
             const post = getPost(slot.postId);
             if (!post) return null;
@@ -614,8 +691,19 @@ export default function Vote() {
                     <span style={{ fontSize: "15px", color: "#d1b97b", fontWeight: 600 }}>
                       {post.votes ?? 0} votes
                     </span>
-                    <span style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (post.username && post.username !== "unknown") {
+                          setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
+                        }
+                      }}
+                      style={{ fontSize: "13px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                    >
                       {post.username || "unknown"}
+                      {getDonorStatus(post.username || "")?.tier && (
+                        <DonorBadge tier={getDonorStatus(post.username || "")!.tier} size="small" />
+                      )}
                     </span>
                     <Link
                       to={`/comments/${post.id}`}
@@ -631,18 +719,43 @@ export default function Vote() {
                   <div style={{ textAlign: "center", marginTop: "16px", color: "#888", fontSize: "0.85rem", fontStyle: "italic" }}>
                     Your commandment
                   </div>
+                ) : userVote ? (
+                  <div style={{ marginTop: "16px" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: "0.8rem", fontStyle: "italic", margin: "0 0 8px 0" }}>
+                      You have already voted on this one
+                    </p>
+                    <button
+                      style={{
+                        width: "100%",
+                        padding: "10px 0",
+                        borderRadius: "8px",
+                        border: "1px solid #555",
+                        cursor: "pointer",
+                        backgroundColor: "rgba(255,255,255,0.08)",
+                        color: "#d1b97b",
+                        fontSize: "0.95rem",
+                        fontWeight: 600,
+                        fontFamily: "'Cinzel', serif",
+                        minHeight: "44px",
+                      }}
+                      onClick={() => handleSkip(post.id)}
+                    >
+                      Skip
+                    </button>
+                  </div>
                 ) : (
                   <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                     <button
                       style={{
                         flex: 1,
-                        padding: "10px 0",
+                        padding: "12px 0",
                         borderRadius: "8px",
                         border: "none",
                         cursor: "pointer",
-                        backgroundColor: userVote === "up" ? "#5a7a50" : "#7a9a6a",
+                        backgroundColor: "#7a9a6a",
                         color: "#fdf8e6",
                         fontSize: "20px",
+                        minHeight: "44px",
                       }}
                       onClick={() => handleVote(post.id, "up")}
                     >
@@ -651,13 +764,14 @@ export default function Vote() {
                     <button
                       style={{
                         flex: 1,
-                        padding: "10px 0",
+                        padding: "12px 0",
                         borderRadius: "8px",
                         border: "none",
                         cursor: "pointer",
-                        backgroundColor: userVote === "down" ? "#8a5a4a" : "#a87a6a",
+                        backgroundColor: "#a87a6a",
                         color: "#fdf8e6",
                         fontSize: "20px",
+                        minHeight: "44px",
                       }}
                       onClick={() => handleVote(post.id, "down")}
                     >
@@ -679,6 +793,17 @@ export default function Vote() {
           </div>
         )}
       </div>
+
+      {/* User Profile Popup */}
+      {profilePopup && (
+        <UserProfilePopup
+          username={profilePopup.username}
+          blessings={getBlessings(profilePopup.username)}
+          donorTier={getDonorStatus(profilePopup.username)?.tier}
+          position={{ x: profilePopup.x, y: profilePopup.y }}
+          onClose={() => setProfilePopup(null)}
+        />
+      )}
     </div>
   );
 }

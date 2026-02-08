@@ -14,3 +14,11 @@ html, body, #root {
   padding: 0;
   overflow: hidden;
 }
+
+@media (max-width: 768px) {
+  html, body, #root {
+    overflow: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+}

@@ -477,6 +477,12 @@
   width: 100%;
 }
 
+.commandment-number {
+  font-weight: 700;
+  color: #d4af37;
+  margin-right: 2px;
+}
+
 .commandment-border:hover {
   background-color: rgba(161, 132, 52, 0.7);
   transform: scale(1.03);
@@ -820,4 +826,297 @@
 .logout-btn:hover {
   border-color: #d4af37;
   color: #d4af37;
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE — max-width: 768px
+   ========================================================= */
+@media (max-width: 768px) {
+
+  /* --- Page root: allow scrolling on mobile --- */
+  .home-root {
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* --- Background: scrolls with content on mobile --- */
+  .home-background-balanced {
+    position: relative;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center top;
+    display: block;
+  }
+
+  /* --- Stone columns: stack vertically --- */
+  .overlay-stones {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 16px 40px;
+    min-height: auto;
+    height: auto;
+  }
+
+  .stone-column {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    width: 90% !important;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .stone-column:first-child,
+  .stone-column:last-child {
+    left: auto !important;
+    width: 90% !important;
+    top: auto !important;
+    bottom: auto !important;
+  }
+
+  .commandment-border {
+    font-size: 0.95rem;
+    padding: 10px 12px;
+    min-height: 44px;
+  }
+
+  /* --- Buttons: stack vertically below tablets --- */
+  .vote-button-container {
+    position: relative;
+    bottom: auto;
+    right: auto;
+    display: flex;
+    justify-content: center;
+    margin: 0.75rem auto;
+    width: 90%;
+    max-width: 400px;
+  }
+
+  .vote-button {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 1.3rem;
+    min-height: 44px;
+  }
+
+  .offering-link-container {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    margin: 0.5rem auto;
+    width: 90%;
+    max-width: 400px;
+  }
+
+  .offering-link {
+    width: 100%;
+    text-align: center;
+    padding: 14px 24px;
+    font-size: 1.2rem;
+    min-height: 44px;
+    display: block;
+  }
+
+  .merch-link-container {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    margin: 0.5rem auto;
+    width: 90%;
+    max-width: 400px;
+  }
+
+  .merch-link {
+    width: 100%;
+    text-align: center;
+    padding: 14px 24px;
+    font-size: 1.2rem;
+    min-height: 44px;
+  }
+
+  /* --- Info link container --- */
+  .info-link-container {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 90%;
+    max-width: 400px;
+    margin: 0.5rem auto;
+  }
+
+  .info-link {
+    font-size: 1.1rem;
+    padding: 14px 20px;
+    min-height: 44px;
+  }
+
+  /* --- Prayer hands & scroll hand: hide on mobile --- */
+  .prayer-hands {
+    display: none;
+  }
+
+  .scroll-hand-container {
+    display: none;
+  }
+
+  /* --- Coin animation: scale down --- */
+  .coin-animation {
+    width: 100px;
+    height: 250px;
+    top: -200px;
+  }
+
+  .coin {
+    width: 35px;
+    height: 35px;
+    font-size: 1.2rem;
+  }
+
+  /* --- Login button: small on mobile --- */
+  .login-button-container {
+    top: 0.3rem;
+    left: 0.3rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .login-btn {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+  }
+
+  .login-username {
+    font-size: 0.7rem;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .logout-btn {
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+  }
+
+  /* --- Popups: fit mobile screens --- */
+  .popup-overlay {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 10vh;
+  }
+
+  .popup-box {
+    max-width: 95vw !important;
+    width: 95% !important;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  /* --- GitHub link --- */
+  .github-link {
+    position: relative;
+    display: block;
+    text-align: center;
+    margin: 1rem auto;
+    bottom: auto;
+    left: auto;
+  }
+
+  /* --- Empty state on mobile --- */
+  .empty-state {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: 90% !important;
+    max-width: 400px;
+    margin: 2rem auto;
+    text-align: center;
+  }
+
+  /* --- Mobile tablet overlay: positioned over the tablet in the image --- */
+  .mobile-tablet-overlay {
+    position: absolute;
+    z-index: 10;
+    top: 13%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 55%;
+    max-width: 280px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .mobile-tablet-overlay .stone-column {
+    width: 100% !important;
+    max-width: none;
+    margin-bottom: 0;
+    gap: 2px;
+  }
+
+  .mobile-tablet-overlay .commandment-border {
+    background: rgba(0, 0, 0, 0.25);
+    border: none;
+    border-radius: 3px;
+    font-size: 0.58rem;
+    padding: 3px 6px;
+    min-height: 22px;
+    color: #fdf8e6;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+
+  .mobile-tablet-overlay .commandment-border:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-tablet-overlay .commandment-text {
+    font-size: 0.58rem;
+    line-height: 1.15;
+  }
+
+  .mobile-tablet-overlay .commandment-number {
+    color: #d4af37;
+    font-weight: 700;
+    font-size: 0.58rem;
+  }
+
+  .mobile-tablet-overlay .vote-count {
+    font-size: 0.45rem;
+    opacity: 0.7;
+  }
+
+  /* Hide username row on mobile tablet to save space */
+  .mobile-tablet-overlay .commandment-border > div:last-child {
+    display: none;
+  }
+
+  /* --- Coin animation overflow guard --- */
+  .coin-animation {
+    overflow: hidden;
+  }
 }

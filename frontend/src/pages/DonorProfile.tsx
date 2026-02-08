@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { linkPayPalEmail, getDonorTiers } from "../utils/api";
 import DonorBadge from "../components/DonorBadge";
 import "../App.css";
@@ -19,6 +20,7 @@ export default function DonorProfile() {
   const navigate = useNavigate();
   const { user, login } = useAuth();
   const { myDonorStatus, loadMyDonorStatus } = useDonor();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const [paypalEmail, setPaypalEmail] = useState("");
   const [linkStatus, setLinkStatus] = useState<{ success?: boolean; message?: string } | null>(null);
@@ -40,7 +42,7 @@ export default function DonorProfile() {
   // Require login
   const requireLogin = (): boolean => {
     if (user) return true;
-    const name = prompt("🔒 Please log in to view your donor profile.\nEnter your username:");
+    const name = prompt("Enter your username:");
     if (name && name.trim()) {
       login(name.trim());
       return true;
@@ -93,9 +95,9 @@ export default function DonorProfile() {
         style={{
           backgroundColor: "rgba(26, 26, 26, 0.95)",
           borderRadius: "12px",
-          padding: "2rem",
+          padding: isMobile ? "1rem" : "2rem",
           maxWidth: "600px",
-          width: "90%",
+          width: isMobile ? "95%" : "90%",
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
           border: "2px solid #d4af37",
           color: "#fdf8e6",
@@ -103,7 +105,7 @@ export default function DonorProfile() {
       >
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-          <h1 style={{ color: "#d4af37", margin: 0, fontSize: "1.8rem" }}>
+          <h1 style={{ color: "#d4af37", margin: 0, fontSize: isMobile ? "1.4rem" : "1.8rem" }}>
             Donor Profile
           </h1>
           <button onClick={() => navigate("/")} className="home-button">

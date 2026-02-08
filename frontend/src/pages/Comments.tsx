@@ -3,8 +3,10 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getPosts, getComments, createComment, voteOnComment } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
+import UserProfilePopup from "../components/UserProfilePopup";
 
 interface Comment {
   id: string;
@@ -32,6 +34,7 @@ export default function Comments() {
   const location = useLocation();
   const cameFrom = (location.state as any)?.from;
   const { user, login } = useAuth();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const { getDonorStatus, loadDonorStatuses } = useDonor();
 
   const [post, setPost] = useState<Post | null>(null);
@@ -45,6 +48,8 @@ export default function Comments() {
   const [submitting, setSubmitting] = useState(false);
   const [revealedComments, setRevealedComments] = useState<Set<string>>(new Set());
   const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
 
   // Load saved votes from localStorage
   useEffect(() => {
@@ -65,6 +70,7 @@ export default function Comments() {
           getPosts(),
           getComments(postId!),
         ]);
+        setAllPosts(postsData);
         const found = postsData.find(
           (p: any) => String(p.id) === String(postId)
         );
@@ -105,14 +111,22 @@ export default function Comments() {
 
   const requireLogin = useCallback((): boolean => {
     if (user) return true;
-    const name = prompt("Please log in to continue.\nEnter your username:");
+    const name = prompt("Enter your username:");
     if (name && name.trim()) {
       login(name.trim());
       return true;
     }
-    alert("You must log in to perform this action.");
     return false;
   }, [user, login]);
+
+  const getBlessings = useCallback(
+    (username: string): number => {
+      return allPosts
+        .filter((p) => p.username === username)
+        .reduce((sum, p) => sum + (p.votes ?? 0), 0);
+    },
+    [allPosts]
+  );
 
   // Build comment tree
   const buildTree = useCallback(
@@ -262,7 +276,7 @@ export default function Comments() {
 
     if (isHidden) {
       return (
-        <div key={comment.id} style={{ marginLeft: depth > 0 ? 24 : 0 }}>
+        <div key={comment.id} style={{ marginLeft: depth > 0 ? (isMobile ? 12 : 24) : 0 }}>
           <div
             style={{
               backgroundColor: "rgba(255,255,255,0.02)",
@@ -294,7 +308,7 @@ export default function Comments() {
     }
 
     return (
-      <div key={comment.id} style={{ marginLeft: depth > 0 ? 24 : 0 }}>
+      <div key={comment.id} style={{ marginLeft: depth > 0 ? (isMobile ? 12 : 24) : 0 }}>
         <div
           style={{
             backgroundColor: "rgba(255,255,255,0.05)",
@@ -331,11 +345,16 @@ export default function Comments() {
               {isCollapsed ? "[+]" : "[–]"}
             </button>
             <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setProfilePopup({ username: comment.username, x: e.clientX, y: e.clientY });
+              }}
               style={{
                 color: "#d4af37",
                 fontWeight: 600,
                 fontSize: "13px",
                 fontFamily: "'Cinzel', serif",
+                cursor: "pointer",
               }}
             >
               {comment.username}
@@ -384,8 +403,9 @@ export default function Comments() {
                 border: "none",
                 cursor: "pointer",
                 color: userVote === "up" ? "#5a7a50" : "#888",
-                fontSize: "14px",
-                padding: "2px 4px",
+                fontSize: isMobile ? "16px" : "14px",
+                padding: isMobile ? "8px 10px" : "2px 4px",
+                minHeight: isMobile ? "44px" : undefined,
               }}
               title="Upvote"
             >
@@ -408,8 +428,9 @@ export default function Comments() {
                 border: "none",
                 cursor: "pointer",
                 color: userVote === "down" ? "#8a5a4a" : "#888",
-                fontSize: "14px",
-                padding: "2px 4px",
+                fontSize: isMobile ? "16px" : "14px",
+                padding: isMobile ? "8px 10px" : "2px 4px",
+                minHeight: isMobile ? "44px" : undefined,
               }}
               title="Downvote"
             >
@@ -426,8 +447,9 @@ export default function Comments() {
                   border: "none",
                   cursor: "pointer",
                   color: "#888",
-                  fontSize: "12px",
-                  padding: "2px 6px",
+                  fontSize: isMobile ? "14px" : "12px",
+                  padding: isMobile ? "8px 10px" : "2px 6px",
+                  minHeight: isMobile ? "44px" : undefined,
                 }}
               >
                 {replyTo === comment.id ? "Cancel" : "Reply"}
@@ -439,9 +461,18 @@ export default function Comments() {
           {replyTo === comment.id && (
             <div style={{ marginTop: "8px" }}>
               <textarea
-                placeholder="Write a reply..."
+                placeholder={user ? "Write a reply..." : "Click here to reply..."}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
+                onFocus={(e) => {
+                  if (!user) {
+                    e.target.blur();
+                    const name = prompt("Enter your username:");
+                    if (name && name.trim()) {
+                      login(name.trim());
+                    }
+                  }
+                }}
                 maxLength={500}
                 style={{
                   width: "100%",
@@ -545,13 +576,14 @@ export default function Comments() {
       <div
         style={{
           backgroundColor: "rgba(20, 15, 5, 0.92)",
-          borderRadius: "10px",
-          padding: "1rem 1.5rem",
+          borderRadius: isMobile ? "0" : "10px",
+          padding: isMobile ? "0.75rem" : "1rem 1.5rem",
           maxWidth: "800px",
-          width: "95%",
+          width: isMobile ? "100%" : "95%",
           boxShadow:
             "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
-          border: "2px solid #d4af37",
+          border: isMobile ? "none" : "2px solid #d4af37",
+          borderBottom: isMobile ? "2px solid #d4af37" : undefined,
           marginBottom: "2rem",
         }}
       >
@@ -594,7 +626,7 @@ export default function Comments() {
             <h1
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: "1.4rem",
+                fontSize: isMobile ? "1.1rem" : "1.4rem",
                 fontWeight: 700,
                 color: "#c8b070",
                 textShadow:
@@ -608,7 +640,13 @@ export default function Comments() {
             <p style={{ color: "#d1b97b", fontSize: "13px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
               <span>{post.votes ?? 0} votes</span>
               {post.username && (
-                <span style={{ color: "#888", fontStyle: "italic" }}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProfilePopup({ username: post.username!, x: e.clientX, y: e.clientY });
+                  }}
+                  style={{ color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                >
                   {post.username}
                   {getDonorStatus(post.username)?.tier && (
                     <DonorBadge tier={getDonorStatus(post.username)!.tier as any} size="small" />
@@ -663,12 +701,20 @@ export default function Comments() {
             placeholder={
               user
                 ? "Share thy thoughts on this commandment..."
-                : "Log in to comment"
+                : "Click here to comment..."
             }
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
+            onFocus={(e) => {
+              if (!user) {
+                e.target.blur();
+                const name = prompt("Enter your username:");
+                if (name && name.trim()) {
+                  login(name.trim());
+                }
+              }
+            }}
             maxLength={500}
-            disabled={!user}
             style={{
               width: "100%",
               height: "70px",
@@ -680,7 +726,7 @@ export default function Comments() {
               boxSizing: "border-box",
               backgroundColor: "#1a1a1a",
               color: "#fdf8e6",
-              opacity: user ? 1 : 0.5,
+              cursor: user ? "text" : "pointer",
             }}
           />
           <div
@@ -736,6 +782,17 @@ export default function Comments() {
 
         <div>{topLevel.map((comment) => renderComment(comment, 0))}</div>
       </div>
+
+      {/* User Profile Popup */}
+      {profilePopup && (
+        <UserProfilePopup
+          username={profilePopup.username}
+          blessings={getBlessings(profilePopup.username)}
+          donorTier={getDonorStatus(profilePopup.username)?.tier}
+          position={{ x: profilePopup.x, y: profilePopup.y }}
+          onClose={() => setProfilePopup(null)}
+        />
+      )}
     </div>
   );
 }

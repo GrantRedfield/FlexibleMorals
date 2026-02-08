@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useNavigate } from "react-router-dom";
 import { getPosts } from "../utils/api";
 import DonationPopup from "../components/DonationPopup";
 import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import ChatBox from "../components/ChatBox";
+import UserProfilePopup from "../components/UserProfilePopup";
 import { useDonor } from "../context/DonorContext";
 import "../App.css";
 
@@ -26,9 +28,20 @@ export default function Home() {
   const [daysLeft, setDaysLeft] = useState<number>(0);
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
-  const [showScrollFist, setShowScrollFist] = useState(false);
+  const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
+
   const navigate = useNavigate();
-  const { donorStatuses, loadDonorStatuses } = useDonor();
+  const { donorStatuses, loadDonorStatuses, getDonorStatus } = useDonor();
+  const isMobile = useMediaQuery("(max-width: 768px)");
+
+  const getBlessings = useCallback(
+    (username: string): number => {
+      return posts
+        .filter((p) => p.username === username)
+        .reduce((sum, p) => sum + (p.votes ?? 0), 0);
+    },
+    [posts]
+  );
 
   // ✅ Countdown logic
   useEffect(() => {
@@ -69,20 +82,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Scroll fist animation every 45 seconds
-  useEffect(() => {
-    const showFist = () => {
-      setShowScrollFist(true);
-      setTimeout(() => setShowScrollFist(false), 3000);
-    };
-
-    // Show after 1 second on load
-    setTimeout(showFist, 1000);
-
-    // Then repeat every 45 seconds
-    const interval = setInterval(showFist, 45000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ✅ Fetch posts
   useEffect(() => {
@@ -116,6 +115,42 @@ export default function Home() {
   const sortedPosts = [...posts].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
   const leftPosts = sortedPosts.slice(0, 5);
   const rightPosts = sortedPosts.slice(5, 10);
+  const allPosts = sortedPosts.slice(0, 10);
+
+  // Shared renderer for a single commandment card
+  const renderCommandment = (post: Post, index: number, showNumber: boolean) => {
+    const donorStatus = post.username ? donorStatuses[post.username] : null;
+    return (
+      <div
+        key={post.id}
+        className="commandment-border"
+        onClick={() => navigate(`/comments/${post.id}`, { state: { from: "home" } })}
+        style={{ cursor: "pointer" }}
+      >
+        <div className="commandment-text">
+          {showNumber && <span className="commandment-number">{index + 1}. </span>}
+          {post.title || post.content}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "2px" }}>
+          {post.votes !== undefined && (
+            <span className="vote-count" style={{ margin: 0 }}>{post.votes} votes</span>
+          )}
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              if (post.username && post.username !== "unknown") {
+                setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
+              }
+            }}
+            style={{ fontSize: "0.7rem", color: "#c8b070", cursor: "pointer", fontStyle: "italic" }}
+          >
+            — {post.username || "unknown"}
+            {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -145,12 +180,97 @@ export default function Home() {
 
   return (
     <div className="home-root">
-      {/* ✅ Background */}
-      <img
-        src="/FlexibleMoralsPicture.png"
-        alt="Flexible Morals Background"
-        className="home-background-balanced"
-      />
+      {/* ✅ Background + overlays wrapper */}
+      {isMobile ? (
+        <div style={{ position: "relative", width: "100%" }}>
+          <img
+            src="/FlexibleMoralsMobile.png"
+            alt="Flexible Morals Background"
+            className="home-background-balanced"
+          />
+          {/* Countdown — top right, scrolls with image */}
+          <div
+            style={{
+              position: "absolute",
+              top: "0.3rem",
+              right: "0.3rem",
+              zIndex: 20,
+              textAlign: "right",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "0.55rem",
+                fontWeight: 900,
+                color: "#c8b070",
+                textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+                letterSpacing: "0.05em",
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {daysLeft} days until moral reset
+            </span>
+          </div>
+          {/* Commandments — overlaid on the tablet */}
+          <div className="mobile-tablet-overlay">
+            {!loading && !error && posts.length === 0 && (
+              <div className="empty-state" style={{ textAlign: "center", zIndex: 10 }}>
+                <p style={{ fontFamily: "'Cinzel', serif", fontSize: "1.1rem", fontWeight: 700, color: "#3a2e0b", textShadow: "0 0 4px rgba(200,176,112,0.3)", margin: "0 0 8px 0" }}>
+                  The tablet is empty.
+                </p>
+                <p style={{ fontFamily: "'Cinzel', serif", fontSize: "0.85rem", color: "#5a4a2a", margin: "0 0 12px 0" }}>
+                  Be the first to inscribe a commandment.
+                </p>
+                <button onClick={() => navigate("/vote")} style={{ fontFamily: "'Cinzel', serif", fontSize: "0.9rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "8px 20px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
+                  Inscribe a Commandment
+                </button>
+              </div>
+            )}
+            <div className="stone-column">
+              {loading && <div className="commandment-border">Loading...</div>}
+              {error && <div className="commandment-border">{error}</div>}
+              {!loading && !error && allPosts.map((post, index) => renderCommandment(post, index, true))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <img
+            src="/FlexibleMoralsPicture.png"
+            alt="Flexible Morals Background"
+            className="home-background-balanced"
+          />
+          {/* Desktop countdown — fixed position */}
+          <div
+            style={{
+              position: "fixed",
+              top: "8rem",
+              right: "1rem",
+              zIndex: 999,
+              textAlign: "center",
+              transform: "translateY(-120%)",
+              width: "380px",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "1.2rem",
+                fontWeight: 900,
+                color: "#c8b070",
+                textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+                letterSpacing: "0.08em",
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {daysLeft} days until moral reset
+            </span>
+          </div>
+        </>
+      )}
 
       {/* ✅ Login Button (Top Left) */}
       <LoginButton />
@@ -158,36 +278,9 @@ export default function Home() {
       {/* ✅ Chat Box (Right Side) */}
       <ChatBox />
 
-      {/* ✅ Countdown (aligned with info button) */}
-      <div
-        style={{
-          position: "fixed",
-          top: "8rem",
-          right: "1rem",
-          zIndex: 999,
-          textAlign: "center",
-          transform: "translateY(-120%)",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: "5rem",
-            fontWeight: 900,
-            color: "#c8b070",
-            textShadow:
-              "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
-            letterSpacing: "0.05em",
-            lineHeight: 1,
-          }}
-        >
-          {daysLeft}
-        </span>
-      </div>
-
       {/* ✅ Vote button */}
       <div className="vote-button-container">
-        {showPrayerHands && (
+        {showPrayerHands && !isMobile && (
           <>
             <span className="prayer-hands prayer-left">🙏</span>
             <span className="prayer-hands prayer-right">🙏</span>
@@ -235,13 +328,6 @@ export default function Home() {
 
       {/* ✅ "OUR CHARTER" link (opens popup) */}
       <div className="info-link-container">
-        {showScrollFist && (
-          <div className="scroll-hand-container">
-            <div className="scroll-hand">
-              <div className="scroll-hand-fist"></div>
-            </div>
-          </div>
-        )}
         <button onClick={() => setShowInfoPopup(true)} className="info-link">
           OUR CHARTER
         </button>
@@ -327,126 +413,45 @@ export default function Home() {
         </div>
       )}
 
-      {/* ✅ Commandments overlay */}
-      <div className="overlay-stones">
-        {/* Empty state when no commandments exist */}
-        {!loading && !error && posts.length === 0 && (
-          <div
-            style={{
-              position: "absolute",
-              top: "30%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              textAlign: "center",
-              zIndex: 10,
-              width: "60%",
-            }}
-          >
-            <p
+      {/* DESKTOP: Commandments AFTER buttons (original position) */}
+      {!isMobile && (
+        <div className="overlay-stones">
+          {!loading && !error && posts.length === 0 && (
+            <div
+              className="empty-state"
               style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: "1.3rem",
-                fontWeight: 700,
-                color: "#d4af37",
-                textShadow: "1px 1px 4px rgba(0,0,0,0.8)",
-                margin: "0 0 8px 0",
+                position: "absolute",
+                top: "30%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                zIndex: 10,
+                width: "60%",
               }}
             >
-              The tablets are empty.
-            </p>
-            <p
-              style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: "0.95rem",
-                color: "#c8b070",
-                textShadow: "1px 1px 3px rgba(0,0,0,0.8)",
-                margin: "0 0 12px 0",
-              }}
-            >
-              Be the first to create a commandment and define the morals for humanity.
-            </p>
-            <button
-              onClick={() => navigate("/vote")}
-              style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: "1rem",
-                fontWeight: 700,
-                color: "#fdf8e6",
-                backgroundColor: "#b79b3d",
-                border: "2px solid #d4af37",
-                borderRadius: "8px",
-                padding: "10px 24px",
-                cursor: "pointer",
-                textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
-              }}
-            >
-              Inscribe a Commandment
-            </button>
+              <p style={{ fontFamily: "'Cinzel', serif", fontSize: "1.3rem", fontWeight: 700, color: "#d4af37", textShadow: "1px 1px 4px rgba(0,0,0,0.8)", margin: "0 0 8px 0" }}>
+                The tablets are empty.
+              </p>
+              <p style={{ fontFamily: "'Cinzel', serif", fontSize: "0.95rem", color: "#c8b070", textShadow: "1px 1px 3px rgba(0,0,0,0.8)", margin: "0 0 12px 0" }}>
+                Be the first to create a commandment and define the morals for humanity.
+              </p>
+              <button onClick={() => navigate("/vote")} style={{ fontFamily: "'Cinzel', serif", fontSize: "1rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "10px 24px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
+                Inscribe a Commandment
+              </button>
+            </div>
+          )}
+          <div className="stone-column">
+            {loading && <div className="commandment-border">Loading...</div>}
+            {error && <div className="commandment-border">{error}</div>}
+            {!loading && !error && leftPosts.map((post, index) => renderCommandment(post, index, false))}
           </div>
-        )}
-
-        {/* Left Stone */}
-        <div className="stone-column">
-          {loading && <div className="commandment-border">Loading...</div>}
-          {error && <div className="commandment-border">{error}</div>}
-          {!loading &&
-            !error &&
-            leftPosts.map((post) => {
-              const donorStatus = post.username ? donorStatuses[post.username] : null;
-              return (
-                <div
-                  key={post.id}
-                  className="commandment-border tooltip-container"
-                  onClick={() => navigate(`/comments/${post.id}`, { state: { from: "home" } })}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="commandment-text">
-                    {post.title || post.content}
-                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
-                  </div>
-                  {post.votes !== undefined && (
-                    <div className="vote-count">{post.votes} votes</div>
-                  )}
-                  <span className="tooltip-text">
-                    username: {post.username ? post.username : "unknown"}
-                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="stone-column">
+            {loading && <div className="commandment-border">Loading...</div>}
+            {error && <div className="commandment-border">{error}</div>}
+            {!loading && !error && rightPosts.map((post, index) => renderCommandment(post, index + 5, false))}
+          </div>
         </div>
-
-        {/* Right Stone */}
-        <div className="stone-column">
-          {loading && <div className="commandment-border">Loading...</div>}
-          {error && <div className="commandment-border">{error}</div>}
-          {!loading &&
-            !error &&
-            rightPosts.map((post) => {
-              const donorStatus = post.username ? donorStatuses[post.username] : null;
-              return (
-                <div
-                  key={post.id}
-                  className="commandment-border tooltip-container"
-                  onClick={() => navigate(`/comments/${post.id}`, { state: { from: "home" } })}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="commandment-text">
-                    {post.title || post.content}
-                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
-                  </div>
-                  {post.votes !== undefined && (
-                    <div className="vote-count">{post.votes} votes</div>
-                  )}
-                  <span className="tooltip-text">
-                    username: {post.username ? post.username : "unknown"}
-                    {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
-                  </span>
-                </div>
-              );
-            })}
-        </div>
-      </div>
+      )}
 
       {/* GitHub open source link */}
       <a
@@ -458,6 +463,17 @@ export default function Home() {
       >
         ⛧ Open Source
       </a>
+
+      {/* User Profile Popup */}
+      {profilePopup && (
+        <UserProfilePopup
+          username={profilePopup.username}
+          blessings={getBlessings(profilePopup.username)}
+          donorTier={getDonorStatus(profilePopup.username)?.tier}
+          position={{ x: profilePopup.x, y: profilePopup.y }}
+          onClose={() => setProfilePopup(null)}
+        />
+      )}
     </div>
   );
 }
