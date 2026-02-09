@@ -8,6 +8,7 @@ import LoginButton from "../components/LoginButton";
 import ChatBox from "../components/ChatBox";
 import UserProfilePopup from "../components/UserProfilePopup";
 import { useDonor } from "../context/DonorContext";
+import { useAuth } from "../context/AuthContext";
 import "../App.css";
 
 interface Post {
@@ -46,9 +47,12 @@ export default function Home() {
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const [mobileCommandmentPage, setMobileCommandmentPage] = useState<0 | 1>(0);
   const [slideDirection, setSlideDirection] = useState<"" | "slide-up" | "slide-down">("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [pendingPage, setPendingPage] = useState<0 | 1 | null>(null);
 
   const navigate = useNavigate();
   const { donorStatuses, loadDonorStatuses, getDonorStatus } = useDonor();
+  const { user } = useAuth();
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   const getBlessings = useCallback(
@@ -134,13 +138,19 @@ export default function Home() {
   const rightPosts = sortedPosts.slice(5, 10);
   const allPosts = sortedPosts.slice(0, 10);
   const mobileVisiblePosts = mobileCommandmentPage === 0 ? allPosts.slice(0, 5) : allPosts.slice(5, 10);
+  const mobileIncomingPosts = pendingPage === 0 ? allPosts.slice(0, 5) : pendingPage === 1 ? allPosts.slice(5, 10) : [];
 
   const handlePageChange = (newPage: 0 | 1) => {
+    if (isTransitioning) return;
     const direction = newPage === 1 ? "slide-up" : "slide-down";
     setSlideDirection(direction);
+    setPendingPage(newPage);
+    setIsTransitioning(true);
     setTimeout(() => {
       setMobileCommandmentPage(newPage);
       setSlideDirection("");
+      setPendingPage(null);
+      setIsTransitioning(false);
     }, 300);
   };
 
@@ -242,15 +252,6 @@ export default function Home() {
           </div>
           {/* Commandments — overlaid on the tablet */}
           <div className="mobile-tablet-overlay">
-            {/* Up arrow — show when viewing second set (commandments 6-10) */}
-            {mobileCommandmentPage === 1 && (
-              <div
-                className="tablet-nav-arrow tablet-nav-arrow-up"
-                onClick={() => handlePageChange(0)}
-              >
-                ▲
-              </div>
-            )}
             {!loading && !error && posts.length === 0 && (
               <div className="empty-state" style={{ textAlign: "center", zIndex: 10 }}>
                 <p style={{ fontFamily: "'Cinzel', serif", fontSize: "1.1rem", fontWeight: 700, color: "#3a2e0b", textShadow: "0 0 4px rgba(200,176,112,0.3)", margin: "0 0 8px 0" }}>
@@ -264,18 +265,56 @@ export default function Home() {
                 </button>
               </div>
             )}
+            {/* Outgoing commandments (current page, animates out) — arrows inside so they slide together */}
             <div className={`stone-column ${slideDirection}`}>
+              {/* Up arrow at top — only when viewing page 1 (commandments 6-10) */}
+              {mobileCommandmentPage === 1 && (
+                <div
+                  className="tablet-nav-arrow tablet-nav-arrow-up"
+                  onClick={() => handlePageChange(0)}
+                >
+                  <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
+                  <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>I — V</span>
+                </div>
+              )}
               {loading && <div className="commandment-border">Loading...</div>}
               {error && <div className="commandment-border">{error}</div>}
               {!loading && !error && mobileVisiblePosts.map((post, index) => renderCommandment(post, index + (mobileCommandmentPage === 1 ? 5 : 0), true))}
+              {/* Down arrow at bottom — only when viewing page 0 (commandments 1-5) */}
+              {mobileCommandmentPage === 0 && allPosts.length > 5 && (
+                <div
+                  className="tablet-nav-arrow tablet-nav-arrow-down"
+                  onClick={() => handlePageChange(1)}
+                >
+                  <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>VI — X</span>
+                  <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
+                </div>
+              )}
             </div>
-            {/* Down arrow — show when viewing first set (commandments 1-5) */}
-            {mobileCommandmentPage === 0 && allPosts.length > 5 && (
-              <div
-                className="tablet-nav-arrow tablet-nav-arrow-down"
-                onClick={() => handlePageChange(1)}
-              >
-                ▼
+            {/* Incoming commandments (next page, animates in) — arrows inside so they slide in together */}
+            {isTransitioning && pendingPage !== null && (
+              <div className={`stone-column ${slideDirection === "slide-up" ? "slide-in-up" : "slide-in-down"}`}>
+                {/* Up arrow at top — incoming page 1 */}
+                {pendingPage === 1 && (
+                  <div
+                    className="tablet-nav-arrow tablet-nav-arrow-up"
+                    onClick={() => handlePageChange(0)}
+                  >
+                    <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
+                    <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>I — V</span>
+                  </div>
+                )}
+                {mobileIncomingPosts.map((post, index) => renderCommandment(post, index + (pendingPage === 1 ? 5 : 0), true))}
+                {/* Down arrow at bottom — incoming page 0 */}
+                {pendingPage === 0 && allPosts.length > 5 && (
+                  <div
+                    className="tablet-nav-arrow tablet-nav-arrow-down"
+                    onClick={() => handlePageChange(1)}
+                  >
+                    <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>VI — X</span>
+                    <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -290,7 +329,7 @@ export default function Home() {
             <button onClick={() => setShowMerchPopup(true)} className="merch-link mobile-btn">
               Merch
             </button>
-            <button onClick={() => setShowInfoPopup(true)} className="info-link mobile-btn">
+            <button onClick={() => setShowInfoPopup(true)} className={`info-link mobile-btn${!user ? " charter-glow" : ""}`}>
               OUR CHARTER
             </button>
           </div>
@@ -306,12 +345,11 @@ export default function Home() {
           <div
             style={{
               position: "fixed",
-              top: "8rem",
+              top: "7rem",
               right: "1rem",
               zIndex: 999,
               textAlign: "center",
-              transform: "translateY(-120%)",
-              width: "380px",
+              width: "340px",
             }}
           >
             <span
@@ -388,7 +426,7 @@ export default function Home() {
 
       {/* ✅ "OUR CHARTER" link (opens popup) */}
       <div className="info-link-container">
-        <button onClick={() => setShowInfoPopup(true)} className="info-link">
+        <button onClick={() => setShowInfoPopup(true)} className={`info-link${!user ? " charter-glow" : ""}`}>
           OUR CHARTER
         </button>
       </div>
@@ -445,8 +483,29 @@ export default function Home() {
               maxWidth: "700px",
               lineHeight: "1.6",
               textAlign: "center",
+              position: "relative",
             }}
           >
+            <button
+              onClick={() => setShowInfoPopup(false)}
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "16px",
+                background: "none",
+                border: "none",
+                color: "#d4af37",
+                fontSize: "1.5rem",
+                cursor: "pointer",
+                fontFamily: "'Cinzel', serif",
+                fontWeight: 700,
+                lineHeight: 1,
+                padding: "4px 8px",
+              }}
+              aria-label="Close"
+            >
+              ✕
+            </button>
             <h1 style={{ color: "#d4af37", marginBottom: "1rem", fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}>
               OUR CHARTER
             </h1>
@@ -454,7 +513,7 @@ export default function Home() {
               Flexible Morals was founded by two individuals looking for a framework of morality that would proactively evolve with the times. Our goal is to create an ad-free, bot-free space to serve as a forum for what the internet believes to be the present day ten commandments for living a moral life. Will the internet reinforce human principles like not murdering others, or will it reward timely meme-like reactions to inform our moral code?
             </p>
             <p style={{ marginTop: "1rem" }}>
-              You, dear reader and future disciple, can voice your opinion in the world's first democratic religion. Share the daily commandment guiding your life, and vote on the commandments of others. The collective will decide our top ten commandments, with voting resetting every month.
+              You, dear reader and future disciple, can voice your opinion in the <strong style={{ color: "#d4af37", backgroundColor: "rgba(0, 0, 0, 0.7)", padding: "2px 6px", borderRadius: "3px" }}>world's first democratic religion</strong>. Share the daily commandment guiding your life, and vote on the commandments of others. The collective will decide our top ten commandments, with voting resetting every month.
             </p>
             <p style={{ marginTop: "1rem" }}>
               If you are compelled by the mission of navigating morality through the flexible nature of culture and time, please consider making an offering to support keeping this website alive, ad-free, and bot-free.

@@ -556,7 +556,8 @@ export default function Comments() {
   return (
     <div
       style={{
-        backgroundImage: "url('/Voting_Background.png')",
+        backgroundImage: isMobile ? "none" : "url('/Voting_Background.png')",
+        backgroundColor: isMobile ? "#0a0804" : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -568,31 +569,36 @@ export default function Comments() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        paddingTop: "0.5rem",
+        paddingTop: isMobile ? "0" : "0.5rem",
         overflow: "auto",
+        overflowX: "hidden",
       }}
     >
-      <LoginButton />
+      {!isMobile && <LoginButton />}
       <div
         style={{
-          backgroundColor: "rgba(20, 15, 5, 0.92)",
+          backgroundColor: isMobile ? "#0a0804" : "rgba(20, 15, 5, 0.92)",
           borderRadius: isMobile ? "0" : "10px",
-          padding: isMobile ? "0.75rem" : "1rem 1.5rem",
+          padding: isMobile ? "0.75rem 0.75rem 2rem" : "1rem 1.5rem",
           maxWidth: "800px",
           width: isMobile ? "100%" : "95%",
-          boxShadow:
-            "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
+          boxShadow: isMobile
+            ? "none"
+            : "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
           border: isMobile ? "none" : "2px solid #d4af37",
-          borderBottom: isMobile ? "2px solid #d4af37" : undefined,
-          marginBottom: "2rem",
+          marginBottom: isMobile ? "0" : "2rem",
+          minHeight: isMobile ? "100vh" : undefined,
+          boxSizing: "border-box" as const,
         }}
       >
         {/* Back button */}
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-start",
-            marginBottom: "0.5rem",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "0.75rem",
+            paddingTop: isMobile ? "0.5rem" : 0,
           }}
         >
           <button
@@ -600,16 +606,21 @@ export default function Comments() {
             style={{
               backgroundColor: "transparent",
               color: "#d4af37",
-              padding: "4px 12px",
+              padding: isMobile ? "8px 14px" : "4px 12px",
               borderRadius: "4px",
               border: "1px solid #d4af37",
               cursor: "pointer",
-              fontSize: "12px",
+              fontSize: isMobile ? "13px" : "12px",
               fontWeight: 600,
             }}
           >
             {cameFrom === "home" ? "← Back to Home" : "← Back to Voting"}
           </button>
+          {isMobile && (
+            <div className="login-inline-wrapper">
+              <LoginButton />
+            </div>
+          )}
         </div>
 
         {/* Commandment header */}
@@ -618,21 +629,22 @@ export default function Comments() {
             style={{
               backgroundColor: "rgba(212, 175, 55, 0.08)",
               border: "1px solid #d4af37",
-              borderRadius: "8px",
-              padding: "16px 20px",
+              borderRadius: isMobile ? "6px" : "8px",
+              padding: isMobile ? "12px 14px" : "16px 20px",
               marginBottom: "1rem",
             }}
           >
             <h1
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: isMobile ? "1.1rem" : "1.4rem",
+                fontSize: isMobile ? "1rem" : "1.4rem",
                 fontWeight: 700,
                 color: "#c8b070",
                 textShadow:
                   "1px 1px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 0 0 10px rgba(200, 176, 112, 0.2)",
                 margin: "0 0 4px 0",
                 letterSpacing: "0.03em",
+                wordBreak: "break-word" as const,
               }}
             >
               {post.title || post.content}

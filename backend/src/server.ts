@@ -142,8 +142,10 @@ app.post("/posts", async (req, res) => {
     res.json({
       id: newId,
       title: content,
+      content,
       votes: 1,
       username: authorId,
+      createdAt: item.createdAt.S,
     });
   } catch (err) {
     console.error("❌ Failed to create post:", err);

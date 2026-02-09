@@ -11,8 +11,29 @@ import { client, TABLE_NAME } from "../lib/dynamodb.ts";
 
 const router = Router();
 
-// Simple in-memory rate limiter: 1 message per second per user
-const lastMessageTime: Record<string, number> = {};
+// Progressive spam prevention system
+// Tracks last message time, spam strike count, and last strike time per user
+interface UserRateState {
+  lastMessageTime: number;   // Timestamp of last sent message
+  strikes: number;           // How many times they've hit the rate limit
+  lastStrikeTime: number;    // When the last strike was recorded
+  mutedUntil: number;        // Timestamp when current mute expires
+}
+const userRateState: Record<string, UserRateState> = {};
+
+const BASE_COOLDOWN = 15000; // 15 seconds base cooldown
+const MAX_COOLDOWN = 600000; // 10 minutes max mute
+const STRIKE_RESET_MS = 24 * 60 * 60 * 1000; // 24 hours to reset strikes
+
+// TTL for chat messages — auto-delete after this many days (default: 0 = keep forever)
+// Set CHAT_TTL_DAYS env var to enable auto-cleanup (e.g. 7 for one week)
+const CHAT_TTL_DAYS = parseInt(process.env.CHAT_TTL_DAYS || "0", 10);
+const CHAT_TTL_SECONDS = CHAT_TTL_DAYS * 24 * 60 * 60;
+
+function getUserCooldown(strikes: number): number {
+  // Each strike doubles the cooldown: 15s, 30s, 60s, 120s, 240s, 480s, capped at 600s
+  return Math.min(BASE_COOLDOWN * Math.pow(2, strikes), MAX_COOLDOWN);
+}
 
 // GET /api/chat/messages?since=<ISO>
 router.get("/messages", async (req: Request, res: Response) => {
@@ -99,29 +120,73 @@ router.post("/messages", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Links are not allowed in chat" });
   }
 
-  // Rate limiting (15 seconds between messages)
+  // Progressive rate limiting with escalating mute for spammers
   const now = Date.now();
-  if (lastMessageTime[username] && now - lastMessageTime[username] < 15000) {
-    const remaining = Math.ceil((15000 - (now - lastMessageTime[username])) / 1000);
-    return res.status(429).json({ error: `Slow down! Wait ${remaining} more seconds.` });
+  const trimmedUser = username.trim();
+
+  // Initialize state for new users
+  if (!userRateState[trimmedUser]) {
+    userRateState[trimmedUser] = { lastMessageTime: 0, strikes: 0, lastStrikeTime: 0, mutedUntil: 0 };
   }
-  lastMessageTime[username] = now;
+  const state = userRateState[trimmedUser];
+
+  // Reset strikes if 24 hours have passed since last strike
+  if (state.strikes > 0 && now - state.lastStrikeTime > STRIKE_RESET_MS) {
+    state.strikes = 0;
+  }
+
+  // Check if user is currently muted (from previous spam)
+  if (state.mutedUntil > now) {
+    const remaining = Math.ceil((state.mutedUntil - now) / 1000);
+    return res.status(429).json({
+      error: `You're muted for spamming. Wait ${remaining} more seconds.`,
+      cooldown: remaining,
+      muted: true,
+    });
+  }
+
+  // Check normal cooldown since last message
+  const currentCooldown = getUserCooldown(state.strikes);
+  if (state.lastMessageTime && now - state.lastMessageTime < currentCooldown) {
+    // User is trying to send too fast — this is a spam strike
+    state.strikes += 1;
+    state.lastStrikeTime = now;
+    const newCooldown = getUserCooldown(state.strikes);
+    state.mutedUntil = now + newCooldown;
+    const remaining = Math.ceil(newCooldown / 1000);
+    console.log(`[SPAM] User "${trimmedUser}" strike #${state.strikes} — muted for ${remaining}s`);
+    return res.status(429).json({
+      error: `Slow down! You've been muted for ${remaining} seconds. Repeated spam increases mute time.`,
+      cooldown: remaining,
+      muted: true,
+      strikes: state.strikes,
+    });
+  }
+
+  state.lastMessageTime = now;
 
   const createdAt = new Date().toISOString();
   const messageId = nanoid(8);
 
   try {
+    const chatItem: Record<string, any> = {
+      PK: "CHAT#global",
+      SK: `MSG#${createdAt}#${messageId}`,
+      messageId,
+      username: username.trim(),
+      message: message.trim(),
+      createdAt,
+    };
+
+    // Add TTL for automatic cleanup in production (DynamoDB deletes expired items)
+    if (CHAT_TTL_DAYS > 0) {
+      chatItem.ttl = Math.floor(Date.now() / 1000) + CHAT_TTL_SECONDS;
+    }
+
     await client.send(
       new PutItemCommand({
         TableName: TABLE_NAME,
-        Item: marshall({
-          PK: "CHAT#global",
-          SK: `MSG#${createdAt}#${messageId}`,
-          messageId,
-          username: username.trim(),
-          message: message.trim(),
-          createdAt,
-        }),
+        Item: marshall(chatItem),
       })
     );
 

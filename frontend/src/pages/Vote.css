@@ -139,18 +139,9 @@ button:hover {
   }
 }
 
-/* --- Mobile: reduce clouds --- */
+/* --- Mobile: hide all clouds --- */
 @media (max-width: 768px) {
   .cloud {
-    display: none;
-  }
-
-  .cloud-1, .cloud-5,
-  .cloud-15, .cloud-16,
-  .cloud-27, .cloud-31 {
-    display: block;
-    width: 80px !important;
-    height: 35px !important;
-    opacity: 0.5;
+    display: none !important;
   }
 }

@@ -1,11 +1,11 @@
 .chat-box {
   position: fixed;
   right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 380px;
-  height: 450px;
-  background-color: rgba(0, 0, 0, 0.85);
+  top: 12.5rem;
+  transform: none;
+  width: 340px;
+  height: 420px;
+  background-color: rgba(0, 0, 0, 0.95);
   border: 2px solid #d4af37;
   border-radius: 12px;
   display: flex;
@@ -20,14 +20,18 @@
   padding: 0.6rem 1rem;
   border-bottom: 1px solid #d4af37;
   text-align: center;
-  background-color: rgba(212, 175, 55, 0.08);
+  background-color: rgba(26, 20, 8, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
 }
 
 .chat-header h3 {
   color: #d4af37;
   margin: 0;
   font-family: "Cinzel", serif;
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -70,20 +74,26 @@
   background-color: rgba(212, 175, 55, 0.08);
   border: 1px solid rgba(209, 185, 123, 0.2);
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
   line-height: 1.4;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chat-username {
-  color: #d4af37;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.8rem;
   margin-right: 4px;
+  word-break: break-all;
 }
 
 .chat-text {
   color: #fdf8e6;
   font-size: 0.85rem;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  word-break: break-word;
 }
 
 .chat-input-area {
@@ -93,6 +103,97 @@
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+  position: relative;
+}
+
+/* Emoji toggle button */
+.chat-emoji-toggle {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+  flex-shrink: 0;
+}
+
+.chat-emoji-toggle:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Emoji picker panel */
+.chat-emoji-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background-color: #1a1a1a;
+  border: 1px solid #d4af37;
+  border-radius: 8px 8px 0 0;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.chat-emoji-picker::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-emoji-picker::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.chat-emoji-picker::-webkit-scrollbar-thumb {
+  background: #d4af37;
+  border-radius: 3px;
+}
+
+.chat-emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+  line-height: 1;
+}
+
+.chat-emoji-btn:hover {
+  background-color: rgba(212, 175, 55, 0.2);
+}
+
+/* Custom Flexible Morals emotes — subtle gold border to distinguish */
+.chat-emoji-custom {
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background-color: rgba(212, 175, 55, 0.06);
+}
+
+.chat-emoji-custom:hover {
+  background-color: rgba(212, 175, 55, 0.3);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+/* Section labels inside emoji picker */
+.emoji-section-label {
+  grid-column: 1 / -1;
+  color: #d4af37;
+  font-size: 0.6rem;
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 2px 2px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  margin-bottom: 2px;
 }
 
 .chat-login-prompt {
@@ -170,13 +271,14 @@
   /* Collapsed state: circular FAB */
   .chat-box {
     position: fixed;
-    right: 1rem;
+    right: 0;
     bottom: 1rem;
     top: auto;
     transform: none;
     width: 56px;
     height: 56px;
     border-radius: 50%;
+    border-right: none;
     overflow: hidden;
     z-index: 1000;
     align-items: center;
@@ -222,11 +324,20 @@
     display: none;
   }
 
-  /* Show close button when expanded */
+  /* Header with room for close button */
+  .chat-box.chat-mobile-expanded .chat-header {
+    padding-right: 3rem;
+  }
+
+  /* Show close button when expanded — top right, no overlap */
   .chat-box.chat-mobile-expanded .chat-mobile-close {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: absolute;
+    right: 8px;
+    top: 4px;
+    transform: none;
     background: none;
     border: none;
     color: #d4af37;
@@ -235,14 +346,6 @@
     padding: 4px 8px;
     min-height: 44px;
     min-width: 44px;
-  }
-
-  /* Header layout when expanded */
-  .chat-box.chat-mobile-expanded .chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    text-align: left;
   }
 
   /* Input area touch targets */
@@ -256,5 +359,50 @@
     min-height: 44px;
     padding: 10px 18px;
     font-size: 0.9rem;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-emoji-toggle {
+    font-size: 1.4rem;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-emoji-picker {
+    grid-template-columns: repeat(8, 1fr);
+    max-height: 200px;
+    padding: 8px;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-emoji-btn {
+    font-size: 1.5rem;
+    padding: 6px;
+    min-height: 40px;
+  }
+
+  /* Messages area: ensure proper sizing in mobile expanded */
+  .chat-box.chat-mobile-expanded .chat-messages {
+    padding: 0.75rem;
+    gap: 8px;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-message {
+    padding: 8px 12px;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-username {
+    font-size: 0.9rem;
+    display: inline;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-text {
+    font-size: 0.95rem;
+    display: inline;
   }
 }

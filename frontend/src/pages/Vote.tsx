@@ -6,6 +6,8 @@ import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import UserProfilePopup from "../components/UserProfilePopup";
 import DonorBadge from "../components/DonorBadge";
+import LoginButton from "../components/LoginButton";
+import "../App.css";
 import "./Vote.css";
 
 interface Post {
@@ -33,11 +35,12 @@ export default function Vote() {
   const [error, setError] = useState<string | null>(null);
   const [newCommandment, setNewCommandment] = useState("");
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
-  const [sortOption, setSortOption] = useState<SortOption>("top");
+  const [sortOption, setSortOption] = useState<SortOption>("random");
   const [shuffleTrigger, setShuffleTrigger] = useState(0);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [visibleSlots, setVisibleSlots] = useState<VisibleSlot[]>([]);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [showLimitPopup, setShowLimitPopup] = useState(false);
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
@@ -256,24 +259,28 @@ export default function Vote() {
     if (!newCommandment.trim()) return;
 
     if (hasSubmittedToday()) {
-      alert("You can only submit one commandment per day. Come back tomorrow!");
+      setShowLimitPopup(true);
       return;
     }
 
     try {
       const newPost = await createPost(newCommandment.trim(), user);
+      // Ensure createdAt is set so "new" sort places it at the top
+      if (!newPost.createdAt) newPost.createdAt = new Date().toISOString();
       setPosts((prev) => [...prev, newPost]);
       setNewCommandment("");
       localStorage.setItem(`lastSubmission_${user}`, new Date().toISOString());
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 4000);
-      // Switch to "New" sort so user sees their submission
+      // Switch to "New" sort so user sees their submission at the top
       setSortOption("new");
+      // Reset shown tracking so the new post appears in the first batch
+      shownPostIds.current = new Set();
       setShuffleTrigger((t) => t + 1);
     } catch (err: any) {
       console.error("Failed to create post:", err);
       if (err.response?.status === 429) {
-        alert("You can only submit one commandment per day. Come back tomorrow!");
+        setShowLimitPopup(true);
       } else {
         alert("Could not create new commandment.");
       }
@@ -462,7 +469,7 @@ export default function Vote() {
   return (
     <div
       style={{
-        background: "linear-gradient(180deg, #1a2a4a 0%, #2a4a7a 20%, #4a7ab5 40%, #7ab0e0 60%, #a8d4f0 80%, #d4ecfa 100%)",
+        background: isMobile ? "#0a0804" : "linear-gradient(180deg, #1a2a4a 0%, #2a4a7a 20%, #4a7ab5 40%, #7ab0e0 60%, #a8d4f0 80%, #d4ecfa 100%)",
         position: "fixed",
         top: 0,
         left: 0,
@@ -471,8 +478,8 @@ export default function Vote() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        paddingTop: "0.5rem",
-        overflow: "auto",
+        paddingTop: isMobile ? "0" : "0.5rem",
+        overflow: isMobile ? "hidden" : "auto",
       }}
     >
       {/* Heavenly clouds filling the sky */}
@@ -482,21 +489,52 @@ export default function Vote() {
 
       <div
         style={{
-          backgroundColor: "rgba(20, 15, 5, 0.92)",
+          backgroundColor: isMobile ? "#0a0804" : "rgba(20, 15, 5, 0.92)",
           borderRadius: isMobile ? "0" : "10px",
-          padding: isMobile ? "0.75rem 0.75rem" : "0.75rem 1.5rem",
+          padding: isMobile ? "0.5rem 0.75rem 0.3rem" : "0.75rem 1.5rem",
           maxWidth: isMobile ? "100%" : "1100px",
           width: isMobile ? "100%" : "95%",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
+          height: isMobile ? "100%" : undefined,
+          boxShadow: isMobile ? "none" : "0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.15)",
           border: isMobile ? "none" : "2px solid #d4af37",
-          borderBottom: isMobile ? "2px solid #d4af37" : undefined,
           position: "relative",
           zIndex: 2,
+          display: isMobile ? "flex" : undefined,
+          flexDirection: isMobile ? "column" as const : undefined,
+          overflow: isMobile ? "hidden" : undefined,
+          boxSizing: "border-box" as const,
         }}
       >
-        {/* Home Button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
-          <button onClick={() => navigate("/")} className="home-button">
+        {/* Login Button — same style as home page (fixed top-left) */}
+        <LoginButton />
+
+        {/* Home Button — fixed top-right, matching home page corner style */}
+        <div
+          style={{
+            position: "fixed",
+            top: isMobile ? "0.2rem" : "1rem",
+            right: isMobile ? "0.2rem" : "1rem",
+            zIndex: 1000,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            border: isMobile ? "1px solid #d4af37" : "2px solid #d4af37",
+            borderRadius: isMobile ? "6px" : "12px",
+            padding: isMobile ? "0.1rem 0.3rem" : "0.5rem 1rem",
+            boxShadow: "0 0 12px rgba(212, 175, 55, 0.3)",
+          }}
+        >
+          <button
+            onClick={() => navigate("/")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#d4af37",
+              fontFamily: "'Cinzel', serif",
+              fontWeight: 700,
+              fontSize: isMobile ? "0.5rem" : "1rem",
+              cursor: "pointer",
+              letterSpacing: "0.1em",
+            }}
+          >
             🏠 Home
           </button>
         </div>
@@ -511,102 +549,81 @@ export default function Vote() {
             textShadow:
               "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 15px rgba(200, 176, 112, 0.25)",
             letterSpacing: "0.08em",
-            marginBottom: "0.4rem",
+            marginBottom: isMobile ? "0.5rem" : "0.4rem",
+            marginTop: isMobile ? "1.4rem" : undefined,
             textTransform: "uppercase",
           }}
         >
           Vote on Commandments
         </h1>
 
-        {/* Login Info */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "0.5rem" }}>
-          {user ? (
-            <button
-              onClick={logout}
-              style={{ backgroundColor: "transparent", color: "#aaa", padding: "2px 8px", borderRadius: "4px", border: "1px solid #888", cursor: "pointer", fontSize: "12px" }}
-            >
-              Log Out
-            </button>
-          ) : (
-            <button
-              onClick={() => requireLogin()}
-              style={{ backgroundColor: "transparent", color: "#d4af37", padding: "2px 8px", borderRadius: "4px", border: "1px solid #d4af37", cursor: "pointer", fontSize: "12px" }}
-            >
-              Log In
-            </button>
-          )}
-          {user ? (
-            <p style={{ color: "#d4af37", fontSize: "12px", margin: 0 }}>
-              Logged in as <span style={{ fontWeight: 600 }}>{user}</span>
-            </p>
-          ) : (
-            <p style={{ color: "#888", fontSize: "12px", fontStyle: "italic", margin: 0 }}>Not logged in</p>
-          )}
-        </div>
-
         {/* Create Post Form */}
-        <form onSubmit={handleSubmit} style={{ marginBottom: "0.5rem", width: "100%" }}>
-          <textarea
-            placeholder="Enter a new commandment..."
-            value={newCommandment}
-            onChange={(e) => setNewCommandment(e.target.value)}
-            maxLength={60}
-            style={{
-              width: "100%",
-              height: "50px",
-              border: "1px solid #d1b97b",
-              borderRadius: "6px",
-              padding: "8px 12px",
-              fontSize: "0.95rem",
-              resize: "none",
-              boxSizing: "border-box",
-              backgroundColor: "#1a1a1a",
-              color: "#fdf8e6",
-              borderColor: "#555",
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px", marginBottom: "4px" }}>
-            <span style={{ fontSize: "11px", color: newCommandment.length >= 50 ? "#e07050" : "#888" }}>
-              {newCommandment.length}/60
-            </span>
+        <form onSubmit={handleSubmit} style={{ marginBottom: isMobile ? "0.5rem" : "0.5rem", width: "100%" }}>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="Enter a new commandment..."
+              value={newCommandment}
+              onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
+              maxLength={60}
+              style={{
+                flex: 1,
+                border: "1px solid #555",
+                borderRadius: "6px",
+                padding: isMobile ? "8px 10px" : "8px 12px",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
+                boxSizing: "border-box",
+                backgroundColor: "#1a1a1a",
+                color: "#fdf8e6",
+                minWidth: 0,
+              }}
+            />
             <button
               type="submit"
               style={{
                 backgroundColor: "#b79b3d",
                 color: "#fdf8e6",
-                padding: "4px 16px",
+                padding: isMobile ? "8px 14px" : "4px 16px",
                 borderRadius: "4px",
-                fontSize: "0.9rem",
+                fontSize: isMobile ? "0.85rem" : "0.9rem",
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               Submit
             </button>
           </div>
+          {!isMobile && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px", marginBottom: "4px" }}>
+              <span style={{ fontSize: "11px", color: newCommandment.length >= 50 ? "#e07050" : "#888" }}>
+                {newCommandment.length}/60
+              </span>
+            </div>
+          )}
         </form>
 
         {/* Submission Success Message */}
         {submitSuccess && (
           <div style={{
             textAlign: "center",
-            padding: "8px 16px",
-            marginBottom: "0.5rem",
+            padding: isMobile ? "4px 8px" : "8px 16px",
+            marginBottom: isMobile ? "0.2rem" : "0.5rem",
             backgroundColor: "rgba(90, 122, 80, 0.3)",
             border: "1px solid #5a7a50",
             borderRadius: "8px",
             color: "#a8d89a",
-            fontSize: "0.95rem",
+            fontSize: isMobile ? "0.75rem" : "0.95rem",
             fontFamily: "'Cinzel', serif",
             animation: "fadeIn 0.3s ease",
           }}>
-            ✦ Your commandment has been submitted successfully! ✦
+            ✦ Commandment submitted! ✦
           </div>
         )}
 
         {/* Sort Options */}
-        <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? "6px" : "10px", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? "6px" : "10px", marginBottom: isMobile ? "0.5rem" : "0.75rem", flexWrap: "wrap" }}>
           {(["top", "hot", "new", "random"] as SortOption[]).map((option) => (
             <button
               key={option}
@@ -615,18 +632,18 @@ export default function Vote() {
                 setShuffleTrigger((t) => t + 1);
               }}
               style={{
-                padding: isMobile ? "8px 16px" : "10px 24px",
-                borderRadius: "8px",
+                padding: isMobile ? "6px 14px" : "10px 24px",
+                borderRadius: isMobile ? "6px" : "8px",
                 cursor: "pointer",
                 fontWeight: 700,
-                fontSize: isMobile ? "0.9rem" : "1rem",
+                fontSize: isMobile ? "0.85rem" : "1rem",
                 fontFamily: "'Cinzel', serif",
                 letterSpacing: "0.04em",
                 backgroundColor: sortOption === option ? "#b79b3d" : "transparent",
                 color: sortOption === option ? "#fdf8e6" : "#d1b97b",
                 border: sortOption === option ? "2px solid #d4af37" : "2px solid #555",
                 transition: "all 0.2s ease",
-                minHeight: "44px",
+                minHeight: isMobile ? "34px" : "44px",
               }}
             >
               {option.charAt(0).toUpperCase() + option.slice(1)}
@@ -659,7 +676,7 @@ export default function Vote() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "12px" : "16px", width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gridAutoRows: isMobile ? "1fr" : undefined, gap: isMobile ? "10px" : "16px", width: "100%", overflow: isMobile ? "hidden" : undefined, flex: isMobile ? 1 : undefined }}>
           {visibleSlots.map((slot) => {
             const post = getPost(slot.postId);
             if (!post) return null;
@@ -671,24 +688,24 @@ export default function Vote() {
                 key={slot.postId}
                 style={{
                   border: "1px solid #555",
-                  padding: "24px",
-                  borderRadius: "12px",
+                  padding: isMobile ? "14px 16px" : "24px",
+                  borderRadius: isMobile ? "8px" : "12px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
                   backgroundColor: "rgba(255,255,255,0.05)",
                   overflow: "hidden",
-                  minHeight: "180px",
+                  minHeight: isMobile ? 0 : "180px",
                   transition: "all 0.25s ease",
                   ...getAnimStyle(slot.animState),
                 }}
               >
                 <div>
-                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: "1.15rem", margin: "0 0 8px 0", lineHeight: 1.4, wordBreak: "break-word", whiteSpace: "normal" }}>
+                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "1.15rem" : "1.15rem", margin: isMobile ? "0 0 6px 0" : "0 0 4px 0", lineHeight: isMobile ? 1.3 : 1.3, wordBreak: "break-word", whiteSpace: "normal" }}>
                     {post.title || post.content}
                   </h2>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "15px", color: "#d1b97b", fontWeight: 600 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px", marginTop: isMobile ? "5px" : "4px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: isMobile ? "15px" : "15px", color: "#d1b97b", fontWeight: 600 }}>
                       {post.votes ?? 0} votes
                     </span>
                     <span
@@ -698,7 +715,7 @@ export default function Vote() {
                           setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
                         }
                       }}
-                      style={{ fontSize: "13px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                      style={{ fontSize: isMobile ? "14px" : "13px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
                     >
                       {post.username || "unknown"}
                       {getDonorStatus(post.username || "")?.tier && (
@@ -707,36 +724,56 @@ export default function Vote() {
                     </span>
                     <Link
                       to={`/comments/${post.id}`}
-                      style={{ fontSize: "13px", color: "#888", textDecoration: "none" }}
+                      style={{ fontSize: isMobile ? "14px" : "13px", color: "#888", textDecoration: "none" }}
                       onMouseEnter={(e) => (e.currentTarget.style.color = "#d4af37")}
                       onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
                     >
-                      💬 Comments ({commentCounts[String(post.id)] ?? 0})
+                      💬 ({commentCounts[String(post.id)] ?? 0})
                     </Link>
                   </div>
                 </div>
                 {isOwnPost ? (
-                  <div style={{ textAlign: "center", marginTop: "16px", color: "#888", fontSize: "0.85rem", fontStyle: "italic" }}>
-                    Your commandment
-                  </div>
-                ) : userVote ? (
-                  <div style={{ marginTop: "16px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: "0.8rem", fontStyle: "italic", margin: "0 0 8px 0" }}>
-                      You have already voted on this one
+                  <div style={{ marginTop: isMobile ? "8px" : "8px" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.85rem" : "0.8rem", fontStyle: "italic", margin: isMobile ? "0 0 5px 0" : "0 0 4px 0" }}>
+                      Your commandment
                     </p>
                     <button
                       style={{
                         width: "100%",
-                        padding: "10px 0",
-                        borderRadius: "8px",
+                        padding: isMobile ? "10px 0" : "10px 0",
+                        borderRadius: isMobile ? "6px" : "8px",
                         border: "1px solid #555",
                         cursor: "pointer",
                         backgroundColor: "rgba(255,255,255,0.08)",
                         color: "#d1b97b",
-                        fontSize: "0.95rem",
+                        fontSize: isMobile ? "1rem" : "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Cinzel', serif",
-                        minHeight: "44px",
+                        minHeight: isMobile ? "42px" : "44px",
+                      }}
+                      onClick={() => handleSkip(post.id)}
+                    >
+                      Skip
+                    </button>
+                  </div>
+                ) : userVote ? (
+                  <div style={{ marginTop: isMobile ? "8px" : "8px" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.85rem" : "0.8rem", fontStyle: "italic", margin: isMobile ? "0 0 5px 0" : "0 0 4px 0" }}>
+                      Already voted
+                    </p>
+                    <button
+                      style={{
+                        width: "100%",
+                        padding: isMobile ? "10px 0" : "10px 0",
+                        borderRadius: isMobile ? "6px" : "8px",
+                        border: "1px solid #555",
+                        cursor: "pointer",
+                        backgroundColor: "rgba(255,255,255,0.08)",
+                        color: "#d1b97b",
+                        fontSize: isMobile ? "1rem" : "0.95rem",
+                        fontWeight: 600,
+                        fontFamily: "'Cinzel', serif",
+                        minHeight: isMobile ? "42px" : "44px",
                       }}
                       onClick={() => handleSkip(post.id)}
                     >
@@ -744,18 +781,18 @@ export default function Vote() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                  <div style={{ display: "flex", gap: isMobile ? "10px" : "10px", marginTop: isMobile ? "8px" : "8px" }}>
                     <button
                       style={{
                         flex: 1,
-                        padding: "12px 0",
-                        borderRadius: "8px",
+                        padding: isMobile ? "12px 0" : "12px 0",
+                        borderRadius: isMobile ? "6px" : "8px",
                         border: "none",
                         cursor: "pointer",
                         backgroundColor: "#7a9a6a",
                         color: "#fdf8e6",
-                        fontSize: "20px",
-                        minHeight: "44px",
+                        fontSize: isMobile ? "22px" : "20px",
+                        minHeight: isMobile ? "46px" : "44px",
                       }}
                       onClick={() => handleVote(post.id, "up")}
                     >
@@ -764,14 +801,14 @@ export default function Vote() {
                     <button
                       style={{
                         flex: 1,
-                        padding: "12px 0",
-                        borderRadius: "8px",
+                        padding: isMobile ? "12px 0" : "12px 0",
+                        borderRadius: isMobile ? "6px" : "8px",
                         border: "none",
                         cursor: "pointer",
                         backgroundColor: "#a87a6a",
                         color: "#fdf8e6",
-                        fontSize: "20px",
-                        minHeight: "44px",
+                        fontSize: isMobile ? "22px" : "20px",
+                        minHeight: isMobile ? "46px" : "44px",
                       }}
                       onClick={() => handleVote(post.id, "down")}
                     >
@@ -786,8 +823,8 @@ export default function Vote() {
 
         {/* Progress indicator */}
         {posts.length > 0 && (
-          <div style={{ textAlign: "center", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #555" }}>
-            <span style={{ color: "#d1b97b", fontSize: "12px" }}>
+          <div style={{ textAlign: "center", marginTop: isMobile ? "4px" : "10px", paddingTop: isMobile ? "3px" : "8px", borderTop: "1px solid #555" }}>
+            <span style={{ color: "#d1b97b", fontSize: isMobile ? "10px" : "12px" }}>
               Voted on {votedCount} of {totalCount} commandments
             </span>
           </div>
@@ -803,6 +840,78 @@ export default function Vote() {
           position={{ x: profilePopup.x, y: profilePopup.y }}
           onClose={() => setProfilePopup(null)}
         />
+      )}
+
+      {/* Daily Submission Limit Popup */}
+      {showLimitPopup && (
+        <div
+          onClick={() => setShowLimitPopup(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: "#1a1408",
+              border: "2px solid #d4af37",
+              borderRadius: "12px",
+              padding: isMobile ? "1.5rem 1.25rem" : "2rem 2.5rem",
+              maxWidth: isMobile ? "90%" : "420px",
+              width: "100%",
+              textAlign: "center",
+              boxShadow: "0 0 30px rgba(212, 175, 55, 0.3)",
+              fontFamily: "'Cinzel', serif",
+            }}
+          >
+            <div style={{ fontSize: isMobile ? "2rem" : "2.5rem", marginBottom: "0.75rem" }}>
+              ⏳
+            </div>
+            <h2 style={{
+              color: "#d4af37",
+              fontSize: isMobile ? "1.1rem" : "1.3rem",
+              fontWeight: 700,
+              margin: "0 0 0.75rem 0",
+              letterSpacing: "0.08em",
+            }}>
+              Daily Limit Reached
+            </h2>
+            <p style={{
+              color: "#c8b070",
+              fontSize: isMobile ? "0.85rem" : "0.95rem",
+              lineHeight: 1.6,
+              margin: "0 0 1.25rem 0",
+            }}>
+              You may only inscribe one commandment per day. Return tomorrow to share new wisdom with the collective.
+            </p>
+            <button
+              onClick={() => setShowLimitPopup(false)}
+              style={{
+                backgroundColor: "#b79b3d",
+                color: "#fdf8e6",
+                border: "none",
+                borderRadius: "8px",
+                padding: isMobile ? "10px 28px" : "10px 32px",
+                fontSize: isMobile ? "0.9rem" : "1rem",
+                fontWeight: 700,
+                fontFamily: "'Cinzel', serif",
+                cursor: "pointer",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Understood
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

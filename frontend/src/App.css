@@ -358,7 +358,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 50;
+  z-index: 1100;
 }
 
 .popup-box {
@@ -572,10 +572,10 @@
 /* === Info Link ("What in the world is this?!") === */
 .info-link-container {
   position: fixed;
-  top: 8rem;
+  top: 8.5rem;
   right: 1rem;
   z-index: 1000;
-  width: 380px;
+  width: 340px;
 }
 
 .info-link {
@@ -603,6 +603,59 @@
   border-color: #f0d060;
   color: #f0d060;
   transform: scale(1.05);
+}
+
+/* === Charter glow animation (when user is not logged in) === */
+@keyframes charterGlow {
+  0%, 100% {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.5),
+      0 0 8px rgba(212, 175, 55, 0.3);
+    border-color: #d4af37;
+    transform: scale(1);
+    color: #d4af37;
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(212, 175, 55, 0.7),
+      0 0 28px rgba(212, 175, 55, 0.5),
+      0 0 50px rgba(212, 175, 55, 0.3),
+      0 0 80px rgba(212, 175, 55, 0.15),
+      inset 0 0 18px rgba(212, 175, 55, 0.15);
+    border-color: #ffd866;
+    transform: scale(1.05);
+    color: #ffd866;
+  }
+}
+
+.charter-glow {
+  animation: charterGlow 2s ease-in-out infinite;
+  position: relative;
+}
+
+/* Outer ring pulse for extra attention */
+.charter-glow::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 12px;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  animation: charterRingPulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes charterRingPulse {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
 }
 
 /* === Scroll Hand Shaking Animation === */
@@ -791,6 +844,14 @@
   font-family: "Cinzel", serif;
 }
 
+/* Inline login button override (e.g. inside comments page header) */
+.login-inline-wrapper .login-button-container {
+  position: static;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+  box-shadow: none;
+}
+
 .login-btn {
   background: none;
   border: 2px solid #d4af37;
@@ -917,7 +978,7 @@
   /* --- Mobile buttons: on the red floor, right below the tablet --- */
   .mobile-buttons-overlay {
     position: absolute;
-    top: 68%;
+    top: 73%;
     left: 0;
     right: 0;
     bottom: 0;
@@ -925,16 +986,14 @@
     display: flex !important;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    gap: 4px;
-    padding: 4px 16px 0;
+    justify-content: space-evenly;
+    padding: 4px 16px;
   }
 
   .mobile-buttons-overlay .mobile-btn {
-    width: 70%;
-    max-width: 260px;
+    width: 75%;
+    max-width: 280px;
     text-align: center;
-    min-height: 28px;
     font-family: "Cinzel", serif;
     cursor: pointer;
     background-color: rgba(20, 15, 5, 0.9);
@@ -942,8 +1001,8 @@
     border-radius: 8px;
     color: #d4af37;
     font-weight: 600;
-    font-size: 0.85rem;
-    padding: 6px 14px;
+    font-size: 0.95rem;
+    padding: 10px 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 4px rgba(212, 175, 55, 0.3);
   }
 
@@ -973,47 +1032,49 @@
   .login-button-container {
     top: 0.2rem;
     left: 0.2rem;
-    padding: 0.1rem 0.3rem;
-    font-size: 0.55rem;
-    max-width: calc(100vw - 1rem);
+    padding: 0.1rem 0.25rem;
+    font-size: 0.5rem;
+    max-width: 130px;
+    gap: 2px;
+    border-radius: 6px;
+    border-width: 1px;
   }
 
   .login-btn {
     padding: 2px 6px;
-    font-size: 0.55rem;
-    min-height: 22px;
+    font-size: 0.5rem;
+    min-height: 18px;
     display: flex;
     align-items: center;
     border-width: 1px;
   }
 
   .login-username {
-    font-size: 0.55rem;
-    max-width: 60px;
+    font-size: 0.45rem;
+    max-width: 45px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .logout-btn {
-    min-height: 32px;
+    min-height: 18px;
     display: flex;
     align-items: center;
-    padding: 2px 8px;
-    font-size: 0.7rem;
+    padding: 1px 5px;
+    font-size: 0.45rem;
   }
 
   /* --- Popups: fit mobile screens --- */
   .popup-overlay {
-    padding: 16px;
-    align-items: flex-start;
-    padding-top: 10vh;
+    padding: 4px;
+    align-items: center;
   }
 
   .popup-box {
     max-width: 95vw !important;
     width: 95% !important;
-    max-height: 80vh;
+    max-height: 96vh;
     overflow-y: auto;
   }
 
@@ -1043,15 +1104,15 @@
   .mobile-tablet-overlay {
     position: absolute;
     z-index: 10;
-    top: 20%;
-    bottom: 35%;
-    left: 22%;
-    right: 22%;
-    padding: 2px 0;
+    top: 18.5%;
+    bottom: 29.5%;
+    left: 5%;
+    right: 5%;
+    padding: 4px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     overflow: hidden;
   }
 
@@ -1063,7 +1124,7 @@
     width: 100% !important;
     max-width: none;
     margin-bottom: 0;
-    gap: 4px;
+    gap: 2px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1074,8 +1135,8 @@
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(212, 175, 55, 0.4);
     border-radius: 3px;
-    font-size: 1rem;
-    padding: 6px 8px;
+    font-size: 1.05rem;
+    padding: 4px 8px;
     min-height: 0;
     color: #fff;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
@@ -1087,45 +1148,69 @@
   }
 
   .mobile-tablet-overlay .commandment-text {
-    font-size: 1rem;
-    line-height: 1.3;
+    font-size: 1.1rem;
+    line-height: 1.2;
   }
 
   .mobile-tablet-overlay .commandment-number {
     color: #ffd700;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 1.1rem;
+  }
+
+  /* Show vote count on mobile, hide username */
+  .mobile-tablet-overlay .commandment-border > div:last-child {
+    display: flex !important;
+    margin-top: 0px;
+    gap: 4px;
   }
 
   .mobile-tablet-overlay .vote-count {
-    font-size: 0.4rem;
-    opacity: 0.8;
+    font-size: 0.55rem;
+    opacity: 0.7;
+    color: #c8b070;
+    font-family: "Cinzel", serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
-  /* Hide vote/username row on mobile tablet to save space */
-  .mobile-tablet-overlay .commandment-border > div:last-child {
+  /* Hide username on mobile tablet to save space */
+  .mobile-tablet-overlay .commandment-border > div:last-child > span:last-child {
     display: none !important;
   }
 
   /* --- Tablet navigation arrows --- */
   .tablet-nav-arrow {
-    color: #ffd700;
+    font-family: "Cinzel", serif;
     font-size: 1.4rem;
+    font-weight: 900;
     text-align: center;
     cursor: pointer;
     z-index: 15;
-    text-shadow: 0 0 8px rgba(255, 215, 0, 0.8), 0 0 16px rgba(255, 215, 0, 0.4);
-    padding: 4px 0;
+    color: #d4af37;
+    text-shadow:
+      0 0 8px rgba(212, 175, 55, 0.7),
+      0 0 18px rgba(212, 175, 55, 0.4),
+      1px 1px 0px #3a2e0b,
+      -1px -1px 0px #3a2e0b;
+    padding: 2px 0;
     flex-shrink: 0;
-    animation: blinkArrow 1.2s ease-in-out infinite;
+    animation: blinkArrow 1.8s ease-in-out infinite;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: 100%;
   }
 
   .tablet-nav-arrow-up {
-    margin-bottom: 2px;
+    margin-bottom: 0;
   }
 
   .tablet-nav-arrow-down {
-    margin-top: 2px;
+    margin-top: 0;
   }
 
   /* --- Coin animation overflow guard --- */
@@ -1134,27 +1219,76 @@
   }
 }
 
-/* Blinking arrow animation */
+/* Blinking arrow animation — golden pulse */
 @keyframes blinkArrow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
+  0%, 100% {
+    opacity: 1;
+    color: #d4af37;
+    text-shadow:
+      0 0 6px rgba(212, 175, 55, 0.6),
+      0 0 14px rgba(212, 175, 55, 0.3),
+      1px 1px 0px #3a2e0b,
+      -1px -1px 0px #3a2e0b;
+  }
+  50% {
+    opacity: 0.4;
+    color: #c8b070;
+    text-shadow:
+      0 0 2px rgba(200, 176, 112, 0.3),
+      1px 1px 0px #3a2e0b,
+      -1px -1px 0px #3a2e0b;
+  }
 }
 
 /* Slide animations for commandment page transitions */
-@keyframes slideUp {
+@keyframes slideOutUp {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(-100%); opacity: 0; }
 }
 
-@keyframes slideDown {
+@keyframes slideOutDown {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(100%); opacity: 0; }
 }
 
-.mobile-tablet-overlay .stone-column.slide-up {
-  animation: slideUp 0.3s ease-in forwards;
+@keyframes slideInFromBottom {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes slideInFromTop {
+  0% { transform: translateY(-100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Outgoing: slide-up means navigating down (to 6-10), old set exits upward */
+.mobile-tablet-overlay .stone-column.slide-up {
+  animation: slideOutUp 0.3s ease-in forwards;
+}
+
+/* Outgoing: slide-down means navigating up (to 1-5), old set exits downward */
 .mobile-tablet-overlay .stone-column.slide-down {
-  animation: slideDown 0.3s ease-in forwards;
+  animation: slideOutDown 0.3s ease-in forwards;
+}
+
+/* Incoming: when navigating down, new set enters from bottom */
+.mobile-tablet-overlay .stone-column.slide-in-up {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+/* Incoming: when navigating up, new set enters from top */
+.mobile-tablet-overlay .stone-column.slide-in-down {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  animation: slideInFromTop 0.3s ease-out forwards;
 }

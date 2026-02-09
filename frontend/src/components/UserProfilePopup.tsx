@@ -87,6 +87,28 @@ export default function UserProfilePopup({
 
   return createPortal(
     <div ref={popupRef} style={style}>
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          top: "6px",
+          right: "8px",
+          background: "none",
+          border: "none",
+          color: "#d4af37",
+          fontSize: "1.1rem",
+          cursor: "pointer",
+          fontFamily: "'Cinzel', serif",
+          fontWeight: 700,
+          lineHeight: 1,
+          padding: "2px 6px",
+          opacity: 0.8,
+        }}
+        aria-label="Close"
+      >
+        ✕
+      </button>
       {/* Username */}
       <div
         style={{

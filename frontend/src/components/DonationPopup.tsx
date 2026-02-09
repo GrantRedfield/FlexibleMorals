@@ -47,7 +47,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: "520px",
-          padding: "2rem",
+          padding: isMobile ? "1.2rem 1.2rem 1rem" : "2rem",
           backgroundColor: "#1a1a1a",
           border: "2px solid #d4af37",
           maxHeight: "90vh",
@@ -56,65 +56,65 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
       >
         {!showCrypto ? (
           <>
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.4rem" : "1.8rem", fontFamily: "'Cinzel', serif" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: isMobile ? "0.5rem" : "0.5rem", fontSize: isMobile ? "1.5rem" : "1.8rem", fontFamily: "'Cinzel', serif" }}>
               Make an Offering
             </h2>
 
             <div style={{
               backgroundColor: "rgba(212, 175, 55, 0.06)",
               border: "1px solid rgba(212, 175, 55, 0.2)",
-              borderRadius: "10px",
-              padding: "14px 16px",
-              marginBottom: "1rem",
+              borderRadius: isMobile ? "8px" : "10px",
+              padding: isMobile ? "10px 12px" : "14px 16px",
+              marginBottom: isMobile ? "0.6rem" : "1rem",
             }}>
-              <p style={{ color: "#ccc", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 8px 0" }}>
+              <p style={{ color: "#ccc", fontSize: isMobile ? "0.85rem" : "0.9rem", lineHeight: isMobile ? 1.5 : 1.6, margin: isMobile ? "0 0 5px 0" : "0 0 8px 0" }}>
                 Flexible Morals is built and maintained by a <span style={{ color: "#d4af37", fontWeight: 600 }}>single developer</span> with
                 a dream of building the world's first crowd-sourced religion. Your offering helps keep the servers running and
                 funds new features for our growing congregation.
               </p>
-              <p style={{ color: "#999", fontSize: "0.8rem", margin: 0, fontStyle: "italic" }}>
+              <p style={{ color: "#999", fontSize: isMobile ? "0.78rem" : "0.8rem", margin: 0, fontStyle: "italic" }}>
                 Every dollar makes a difference. Thank you for believing.
               </p>
             </div>
 
             {/* Donor Tier Flair Preview */}
             <div style={{
-              marginBottom: "1.2rem",
-              padding: "12px 16px",
+              marginBottom: isMobile ? "0.6rem" : "1.2rem",
+              padding: isMobile ? "8px 12px" : "12px 16px",
               backgroundColor: "rgba(0,0,0,0.3)",
-              borderRadius: "10px",
+              borderRadius: isMobile ? "8px" : "10px",
               border: "1px solid #333",
             }}>
-              <p style={{ color: "#aaa", fontSize: "0.8rem", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+              <p style={{ color: "#aaa", fontSize: isMobile ? "0.75rem" : "0.8rem", marginBottom: isMobile ? "6px" : "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
                 Donor Flair Tiers
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(205, 127, 50, 0.6)" }}>⭐</span>
-                  <span style={{ color: "#cd7f32", fontWeight: 600, fontSize: "0.95rem" }}>Supporter</span>
-                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$1+</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "5px" : "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "10px" }}>
+                  <span style={{ fontSize: isMobile ? "1.1rem" : "1.3rem", textShadow: "0 0 6px rgba(205, 127, 50, 0.6)" }}>⭐</span>
+                  <span style={{ color: "#cd7f32", fontWeight: 600, fontSize: isMobile ? "0.85rem" : "0.95rem" }}>Supporter</span>
+                  <span style={{ color: "#777", fontSize: isMobile ? "0.75rem" : "0.8rem", marginLeft: "auto" }}>$1+</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(192, 192, 192, 0.6)" }}>🙏</span>
-                  <span style={{ color: "#c0c0c0", fontWeight: 600, fontSize: "0.95rem" }}>Patron</span>
-                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$25+</span>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "10px" }}>
+                  <span style={{ fontSize: isMobile ? "1.1rem" : "1.3rem", textShadow: "0 0 6px rgba(192, 192, 192, 0.6)" }}>🙏</span>
+                  <span style={{ color: "#c0c0c0", fontWeight: 600, fontSize: isMobile ? "0.85rem" : "0.95rem" }}>Patron</span>
+                  <span style={{ color: "#777", fontSize: isMobile ? "0.75rem" : "0.8rem", marginLeft: "auto" }}>$25+</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "1.3rem", textShadow: "0 0 6px rgba(212, 175, 55, 0.8)" }}>👑</span>
-                  <span style={{ color: "#d4af37", fontWeight: 600, fontSize: "0.95rem" }}>Benefactor</span>
-                  <span style={{ color: "#777", fontSize: "0.8rem", marginLeft: "auto" }}>$100+</span>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "10px" }}>
+                  <span style={{ fontSize: isMobile ? "1.1rem" : "1.3rem", textShadow: "0 0 6px rgba(212, 175, 55, 0.8)" }}>👑</span>
+                  <span style={{ color: "#d4af37", fontWeight: 600, fontSize: isMobile ? "0.85rem" : "0.95rem" }}>Benefactor</span>
+                  <span style={{ color: "#777", fontSize: isMobile ? "0.75rem" : "0.8rem", marginLeft: "auto" }}>$100+</span>
                 </div>
               </div>
-              <p style={{ color: "#666", fontSize: "0.75rem", margin: "10px 0 0 0", fontStyle: "italic" }}>
+              <p style={{ color: "#666", fontSize: isMobile ? "0.7rem" : "0.75rem", margin: isMobile ? "6px 0 0 0" : "10px 0 0 0", fontStyle: "italic" }}>
                 Your flair appears next to your name across the site
               </p>
             </div>
 
-            <p style={{ color: "#aaa", marginBottom: "0.75rem", fontSize: "0.95rem" }}>
+            <p style={{ color: "#aaa", marginBottom: isMobile ? "0.5rem" : "0.75rem", fontSize: isMobile ? "0.9rem" : "0.95rem" }}>
               Choose your preferred method
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "12px" }}>
               {/* Credit Card - Coming Soon */}
               <button
                 disabled
@@ -122,28 +122,28 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "12px",
-                  padding: "16px 24px",
-                  borderRadius: "10px",
+                  gap: isMobile ? "10px" : "12px",
+                  padding: isMobile ? "14px 18px" : "16px 24px",
+                  borderRadius: isMobile ? "8px" : "10px",
                   border: "2px solid #555",
                   backgroundColor: "#2a2a2a",
                   color: "#666",
-                  fontSize: "1.2rem",
+                  fontSize: isMobile ? "1.05rem" : "1.2rem",
                   cursor: "not-allowed",
                   position: "relative",
                 }}
               >
-                <span style={{ fontSize: "1.5rem" }}>💳</span>
+                <span style={{ fontSize: isMobile ? "1.3rem" : "1.5rem" }}>💳</span>
                 <span>Credit Card</span>
                 <span
                   style={{
                     position: "absolute",
-                    right: "12px",
+                    right: isMobile ? "10px" : "12px",
                     backgroundColor: "#444",
                     color: "#888",
-                    padding: "4px 8px",
+                    padding: isMobile ? "3px 7px" : "4px 8px",
                     borderRadius: "4px",
-                    fontSize: "0.75rem",
+                    fontSize: isMobile ? "0.65rem" : "0.75rem",
                     fontWeight: 600,
                   }}
                 >
@@ -158,13 +158,13 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "12px",
-                  padding: "16px 24px",
-                  borderRadius: "10px",
+                  gap: isMobile ? "10px" : "12px",
+                  padding: isMobile ? "14px 18px" : "16px 24px",
+                  borderRadius: isMobile ? "8px" : "10px",
                   border: "2px solid #d4af37",
                   backgroundColor: "rgba(212, 175, 55, 0.1)",
                   color: "#d4af37",
-                  fontSize: "1.2rem",
+                  fontSize: isMobile ? "1.05rem" : "1.2rem",
                   cursor: "pointer",
                   transition: "all 0.2s ease-in-out",
                 }}
@@ -177,7 +177,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                   e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <span style={{ fontSize: "1.5rem" }}>🪙</span>
+                <span style={{ fontSize: isMobile ? "1.3rem" : "1.5rem" }}>🪙</span>
                 <span>Crypto (ETH)</span>
               </button>
 
@@ -188,13 +188,13 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "12px",
-                  padding: "16px 24px",
-                  borderRadius: "10px",
+                  gap: isMobile ? "10px" : "12px",
+                  padding: isMobile ? "14px 18px" : "16px 24px",
+                  borderRadius: isMobile ? "8px" : "10px",
                   border: "2px solid #0070ba",
                   backgroundColor: "rgba(0, 112, 186, 0.1)",
                   color: "#0070ba",
-                  fontSize: "1.2rem",
+                  fontSize: isMobile ? "1.05rem" : "1.2rem",
                   cursor: "pointer",
                   transition: "all 0.2s ease-in-out",
                 }}
@@ -207,7 +207,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                   e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <span style={{ fontSize: "1.5rem" }}>🅿️</span>
+                <span style={{ fontSize: isMobile ? "1.3rem" : "1.5rem" }}>🅿️</span>
                 <span>PayPal</span>
               </button>
             </div>
@@ -215,17 +215,17 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
             <button
               onClick={handleClose}
               className="popup-close"
-              style={{ marginTop: "1.5rem" }}
+              style={{ marginTop: isMobile ? "1rem" : "1.5rem" }}
             >
               Close
             </button>
           </>
         ) : (
           <>
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.4rem" : "1.8rem" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: isMobile ? "0.4rem" : "0.5rem", fontSize: isMobile ? "1.4rem" : "1.8rem" }}>
               🪙 Crypto Donation
             </h2>
-            <p style={{ color: "#aaa", marginBottom: "1rem", fontSize: "1rem" }}>
+            <p style={{ color: "#aaa", marginBottom: isMobile ? "0.6rem" : "1rem", fontSize: isMobile ? "0.9rem" : "1rem" }}>
               Send ETH to the address below
             </p>
 
@@ -234,25 +234,25 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
               style={{
                 backgroundColor: "#2a2a2a",
                 border: "2px solid #627eea",
-                borderRadius: "10px",
-                padding: "16px",
-                marginBottom: "1rem",
+                borderRadius: isMobile ? "8px" : "10px",
+                padding: isMobile ? "12px" : "16px",
+                marginBottom: isMobile ? "0.6rem" : "1rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "1.2rem" }}>⟠</span>
-                <span style={{ color: "#627eea", fontWeight: 600 }}>Ethereum (ETH)</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: isMobile ? "8px" : "8px" }}>
+                <span style={{ fontSize: isMobile ? "1.1rem" : "1.2rem" }}>⟠</span>
+                <span style={{ color: "#627eea", fontWeight: 600, fontSize: isMobile ? "0.9rem" : undefined }}>Ethereum (ETH)</span>
               </div>
               <div
                 style={{
                   backgroundColor: "#1a1a1a",
                   borderRadius: "6px",
-                  padding: "12px",
+                  padding: isMobile ? "10px" : "12px",
                   fontFamily: "monospace",
-                  fontSize: "0.85rem",
+                  fontSize: isMobile ? "0.75rem" : "0.85rem",
                   color: "#fdf8e6",
                   wordBreak: "break-all",
-                  marginBottom: "10px",
+                  marginBottom: isMobile ? "10px" : "10px",
                 }}
               >
                 {ETH_ADDRESS}
@@ -261,12 +261,12 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                 onClick={handleCopyAddress}
                 style={{
                   width: "100%",
-                  padding: "10px",
+                  padding: isMobile ? "10px" : "10px",
                   borderRadius: "6px",
                   border: "none",
                   backgroundColor: copied ? "#4caf50" : "#627eea",
                   color: "white",
-                  fontSize: "1rem",
+                  fontSize: isMobile ? "0.9rem" : "1rem",
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.2s ease-in-out",
@@ -276,7 +276,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
               </button>
             </div>
 
-            <p style={{ color: "#888", fontSize: "0.85rem", marginBottom: "1rem" }}>
+            <p style={{ color: "#888", fontSize: isMobile ? "0.8rem" : "0.85rem", marginBottom: isMobile ? "0.6rem" : "1rem" }}>
               After donating, visit your Donor Profile to link your wallet and receive your flair!
             </p>
 
@@ -285,12 +285,12 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                 onClick={handleBack}
                 style={{
                   flex: 1,
-                  padding: "10px 16px",
+                  padding: isMobile ? "10px 14px" : "10px 16px",
                   borderRadius: "6px",
                   border: "2px solid #555",
                   backgroundColor: "transparent",
                   color: "#aaa",
-                  fontSize: "1rem",
+                  fontSize: isMobile ? "0.9rem" : "1rem",
                   cursor: "pointer",
                 }}
               >

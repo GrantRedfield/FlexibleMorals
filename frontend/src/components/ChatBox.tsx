@@ -7,6 +7,100 @@ import DonorBadge from "./DonorBadge";
 import UserProfilePopup from "./UserProfilePopup";
 import "./ChatBox.css";
 
+// Twitch-style username colors — 15 bright, readable colors on dark backgrounds
+const TWITCH_COLORS = [
+  "#FF0000", // Red
+  "#0000FF", // Blue
+  "#00FF00", // Green
+  "#B22222", // FireBrick
+  "#FF7F50", // Coral
+  "#9ACD32", // YellowGreen
+  "#FF4500", // OrangeRed
+  "#2E8B57", // SeaGreen
+  "#DAA520", // GoldenRod
+  "#D2691E", // Chocolate
+  "#5F9EA0", // CadetBlue
+  "#1E90FF", // DodgerBlue
+  "#FF69B4", // HotPink
+  "#8A2BE2", // BlueViolet
+  "#00FF7F", // SpringGreen
+];
+
+// Deterministic hash so the same username always gets the same color
+function getUsernameColor(username: string): string {
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash; // Convert to 32-bit int
+  }
+  return TWITCH_COLORS[Math.abs(hash) % TWITCH_COLORS.length];
+}
+
+// Emoticon-to-emoji auto-replace (triggered after typing a space or at end of input)
+const EMOTICON_MAP: Record<string, string> = {
+  ":)": "😊",
+  ":D": "😃",
+  ":d": "😃",
+  ":(": "😞",
+  ":P": "😛",
+  ":p": "😛",
+  ";)": "😉",
+  ":O": "😮",
+  ":o": "😮",
+  "XD": "😆",
+  "xD": "😆",
+  "xd": "😆",
+  "<3": "❤️",
+  ":*": "😘",
+  "B)": "😎",
+  ":/": "😕",
+  ":|": "😐",
+  ">:(": "😡",
+  ":'(": "😢",
+  ":')": "🥲",
+  "O:)": "😇",
+  "o:)": "😇",
+  ">:)": "😈",
+  ":fire:": "🔥",
+  ":skull:": "💀",
+  ":100:": "💯",
+  ":pray:": "🙏",
+  ":clap:": "👏",
+  ":thumbsup:": "👍",
+  ":thumbsdown:": "👎",
+  ":heart:": "❤️",
+  ":star:": "⭐",
+  ":crown:": "👑",
+  ":trophy:": "🏆",
+  ":eyes:": "👀",
+  ":muscle:": "💪",
+  ":party:": "🎉",
+  ":poop:": "💩",
+  ":brain:": "🧠",
+  ":diamond:": "💎",
+  // Flexible Morals custom emotes
+  ":offer:": "🙏",
+  ":tablet:": "🪨",
+  ":amend:": "🔄",
+  ":witness:": "👁️",
+  ":heresy:": "🔥",
+  ":vote:": "🗳️",
+  ":moralgray:": "🧠",
+  ":repent:": "🧎",
+  ":canon:": "✨",
+  ":goodword:": "🕊️",
+};
+
+function replaceEmoticons(text: string): string {
+  let result = text;
+  for (const [emoticon, emoji] of Object.entries(EMOTICON_MAP)) {
+    // Only replace if the emoticon is followed by a space or is at the end
+    const escaped = emoticon.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(escaped + "(?=\\s|$)", "g"), emoji);
+  }
+  return result;
+}
+
 interface ChatMessage {
   id: string;
   username: string;
@@ -24,6 +118,9 @@ export default function ChatBox() {
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [allPosts, setAllPosts] = useState<any[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +222,24 @@ export default function ChatBox() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showEmojiPicker]);
+
+  const insertEmoji = (emoji: string) => {
+    setInputValue((prev) => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
   const containsLink = (text: string): boolean => {
     const urlPattern = /https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.co|\.xyz|\.dev/i;
     return urlPattern.test(text);
@@ -160,7 +275,26 @@ export default function ChatBox() {
       setCooldown(15);
       setTimeout(scrollToBottom, 50);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || "Failed to send message";
+      const data = err?.response?.data;
+      const msg = data?.error || "Failed to send message";
+
+      // If server returned a cooldown (progressive mute), use that instead of default
+      if (data?.cooldown) {
+        setCooldown(data.cooldown);
+      }
+
+      if (data?.muted) {
+        // Show mute warning as a system message in chat
+        const muteMsg: ChatMessage = {
+          id: `mute-${Date.now()}`,
+          username: "⚠️ System",
+          message: msg,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, muteMsg]);
+        setTimeout(scrollToBottom, 50);
+      }
+
       console.error("Chat send error:", msg);
     } finally {
       setSending(false);
@@ -209,7 +343,7 @@ export default function ChatBox() {
                   e.stopPropagation();
                   setProfilePopup({ username: msg.username, x: e.clientX, y: e.clientY });
                 }}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", color: getUsernameColor(msg.username) }}
               >
                 {msg.username}
               </span>
@@ -222,12 +356,63 @@ export default function ChatBox() {
         })}
         <div ref={messagesEndRef} />
       </div>
-      <div className="chat-input-area">
+      <div className="chat-input-area" style={{ position: "relative" }}>
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="chat-emoji-picker" ref={emojiPickerRef}>
+            {/* Flexible Morals custom emotes */}
+            <div className="emoji-section-label">Flexible Morals</div>
+            {[
+              { emoji: "🙏", label: ":offer:" },
+              { emoji: "🪨", label: ":tablet:" },
+              { emoji: "🔄", label: ":amend:" },
+              { emoji: "👁️", label: ":witness:" },
+              { emoji: "🔥", label: ":heresy:" },
+              { emoji: "🗳️", label: ":vote:" },
+              { emoji: "🧠", label: ":moralgray:" },
+              { emoji: "🧎", label: ":repent:" },
+              { emoji: "✨", label: ":canon:" },
+              { emoji: "🕊️", label: ":goodword:" },
+            ].map((item) => (
+              <button
+                key={item.label}
+                className="chat-emoji-btn chat-emoji-custom"
+                onClick={() => insertEmoji(item.emoji)}
+                title={item.label}
+              >
+                {item.emoji}
+              </button>
+            ))}
+            {/* Standard emojis */}
+            <div className="emoji-section-label">Standard</div>
+            {["😀","😂","🤣","😍","🥰","😎","🤔","😱","😡","🥺",
+              "👍","👎","👏","🙏","🔥","❤️","💀","💯","✨","⭐",
+              "🎉","🎊","😈","👀","🤡","💪","🫡","😤","🥳","😇",
+              "⚡","🌟","💎","🏆","👑","🗡️","⚖️","📜","🛡️","✝️"
+            ].map((emoji) => (
+              <button
+                key={`std-${emoji}`}
+                className="chat-emoji-btn"
+                onClick={() => insertEmoji(emoji)}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          className="chat-emoji-toggle"
+          onClick={() => setShowEmojiPicker((prev) => !prev)}
+          type="button"
+        >
+          😀
+        </button>
         <input
+          ref={inputRef}
           className="chat-input"
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => setInputValue(replaceEmoticons(e.target.value))}
           onKeyDown={handleKeyDown}
           placeholder={user ? "Speak thy mind..." : "Click here to chat..."}
           disabled={sending}
