@@ -18,6 +18,21 @@ interface Post {
   username?: string;
 }
 
+const toRoman = (num: number): string => {
+  const romanNumerals: [number, string][] = [
+    [10, "X"], [9, "IX"], [8, "VIII"], [7, "VII"], [6, "VI"],
+    [5, "V"], [4, "IV"], [3, "III"], [2, "II"], [1, "I"],
+  ];
+  let result = "";
+  for (const [value, symbol] of romanNumerals) {
+    while (num >= value) {
+      result += symbol;
+      num -= value;
+    }
+  }
+  return result;
+};
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +44,8 @@ export default function Home() {
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
+  const [mobileCommandmentPage, setMobileCommandmentPage] = useState<0 | 1>(0);
+  const [slideDirection, setSlideDirection] = useState<"" | "slide-up" | "slide-down">("");
 
   const navigate = useNavigate();
   const { donorStatuses, loadDonorStatuses, getDonorStatus } = useDonor();
@@ -116,6 +133,16 @@ export default function Home() {
   const leftPosts = sortedPosts.slice(0, 5);
   const rightPosts = sortedPosts.slice(5, 10);
   const allPosts = sortedPosts.slice(0, 10);
+  const mobileVisiblePosts = mobileCommandmentPage === 0 ? allPosts.slice(0, 5) : allPosts.slice(5, 10);
+
+  const handlePageChange = (newPage: 0 | 1) => {
+    const direction = newPage === 1 ? "slide-up" : "slide-down";
+    setSlideDirection(direction);
+    setTimeout(() => {
+      setMobileCommandmentPage(newPage);
+      setSlideDirection("");
+    }, 300);
+  };
 
   // Shared renderer for a single commandment card
   const renderCommandment = (post: Post, index: number, showNumber: boolean) => {
@@ -128,7 +155,7 @@ export default function Home() {
         style={{ cursor: "pointer" }}
       >
         <div className="commandment-text">
-          {showNumber && <span className="commandment-number">{index + 1}. </span>}
+          {showNumber && <span className="commandment-number">{toRoman(index + 1)}. </span>}
           {post.title || post.content}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "2px" }}>
@@ -182,13 +209,13 @@ export default function Home() {
     <div className="home-root">
       {/* ✅ Background + overlays wrapper */}
       {isMobile ? (
-        <div style={{ position: "relative", width: "100%" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
           <img
             src="/FlexibleMoralsMobile.png"
             alt="Flexible Morals Background"
             className="home-background-balanced"
           />
-          {/* Countdown — top right, scrolls with image */}
+          {/* Countdown — top right */}
           <div
             style={{
               position: "absolute",
@@ -215,6 +242,15 @@ export default function Home() {
           </div>
           {/* Commandments — overlaid on the tablet */}
           <div className="mobile-tablet-overlay">
+            {/* Up arrow — show when viewing second set (commandments 6-10) */}
+            {mobileCommandmentPage === 1 && (
+              <div
+                className="tablet-nav-arrow tablet-nav-arrow-up"
+                onClick={() => handlePageChange(0)}
+              >
+                ▲
+              </div>
+            )}
             {!loading && !error && posts.length === 0 && (
               <div className="empty-state" style={{ textAlign: "center", zIndex: 10 }}>
                 <p style={{ fontFamily: "'Cinzel', serif", fontSize: "1.1rem", fontWeight: 700, color: "#3a2e0b", textShadow: "0 0 4px rgba(200,176,112,0.3)", margin: "0 0 8px 0" }}>
@@ -228,11 +264,35 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="stone-column">
+            <div className={`stone-column ${slideDirection}`}>
               {loading && <div className="commandment-border">Loading...</div>}
               {error && <div className="commandment-border">{error}</div>}
-              {!loading && !error && allPosts.map((post, index) => renderCommandment(post, index, true))}
+              {!loading && !error && mobileVisiblePosts.map((post, index) => renderCommandment(post, index + (mobileCommandmentPage === 1 ? 5 : 0), true))}
             </div>
+            {/* Down arrow — show when viewing first set (commandments 1-5) */}
+            {mobileCommandmentPage === 0 && allPosts.length > 5 && (
+              <div
+                className="tablet-nav-arrow tablet-nav-arrow-down"
+                onClick={() => handlePageChange(1)}
+              >
+                ▼
+              </div>
+            )}
+          </div>
+          {/* Mobile buttons — on the red floor, right below the tablet */}
+          <div className="mobile-buttons-overlay">
+            <button onClick={() => navigate("/vote")} className="vote-button mobile-btn">
+              Vote
+            </button>
+            <button onClick={() => setShowDonationPopup(true)} className="vote-button mobile-btn">
+              Offering
+            </button>
+            <button onClick={() => setShowMerchPopup(true)} className="merch-link mobile-btn">
+              Merch
+            </button>
+            <button onClick={() => setShowInfoPopup(true)} className="info-link mobile-btn">
+              OUR CHARTER
+            </button>
           </div>
         </div>
       ) : (
@@ -391,17 +451,19 @@ export default function Home() {
               OUR CHARTER
             </h1>
             <p>
-              I'd like to think of this as the first "democratic religion", where
-              it's only bounded by users' imagination on what morals to follow.
-              All commandments reset at the beginning of every month, giving everyone
-              a fresh start to shape the new moral code. It's a social experiment in
-              crowd-sourced ethics. Users write and vote on commandments — some
-              serious, some absurd — creating a living reflection of our
-              collective values, humor, and contradictions.
+              Flexible Morals was founded by two individuals looking for a framework of morality that would proactively evolve with the times. Our goal is to create an ad-free, bot-free space to serve as a forum for what the internet believes to be the present day ten commandments for living a moral life. Will the internet reinforce human principles like not murdering others, or will it reward timely meme-like reactions to inform our moral code?
             </p>
-            <p style={{ marginTop: "1rem", opacity: 0.8 }}>
-              Whether divine wisdom or chaos, every vote shapes the moral
-              mosaic.
+            <p style={{ marginTop: "1rem" }}>
+              You, dear reader and future disciple, can voice your opinion in the world's first democratic religion. Share the daily commandment guiding your life, and vote on the commandments of others. The collective will decide our top ten commandments, with voting resetting every month.
+            </p>
+            <p style={{ marginTop: "1rem" }}>
+              If you are compelled by the mission of navigating morality through the flexible nature of culture and time, please consider making an offering to support keeping this website alive, ad-free, and bot-free.
+            </p>
+            <p style={{ marginTop: "1rem" }}>
+              If you would like to spread the word, share the website with your friends or consider buying our merchandise to represent the good word.
+            </p>
+            <p style={{ marginTop: "1rem" }}>
+              Our objective is not to make a profit, but to facilitate a movement. One inflexible principle of our founding is that we will donate to Save the Children, in support of those providing hope and care for humanity's future.
             </p>
             <button
               onClick={() => setShowInfoPopup(false)}
@@ -452,17 +514,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* GitHub open source link */}
-      <a
-        href="https://github.com/GrantRedfield/FlexibleMorals"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="github-link"
-        title="View source on GitHub"
-      >
-        ⛧ Open Source
-      </a>
 
       {/* User Profile Popup */}
       {profilePopup && (
