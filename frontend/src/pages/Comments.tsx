@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getPosts, getComments, createComment, voteOnComment } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { replaceEmoticons, CUSTOM_EMOJIS, STANDARD_EMOJIS } from "../utils/emoji";
 import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import UserProfilePopup from "../components/UserProfilePopup";
@@ -50,6 +51,12 @@ export default function Comments() {
   const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
+  const [showCommentEmoji, setShowCommentEmoji] = useState(false);
+  const [showReplyEmoji, setShowReplyEmoji] = useState(false);
+  const commentEmojiRef = useRef<HTMLDivElement>(null);
+  const replyEmojiRef = useRef<HTMLDivElement>(null);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load saved votes from localStorage
   useEffect(() => {
@@ -108,6 +115,33 @@ export default function Comments() {
     });
     if (usernames.length > 0) loadDonorStatuses(usernames);
   }, [post, comments, loadDonorStatuses]);
+
+  // Close emoji pickers when clicking outside
+  useEffect(() => {
+    if (!showCommentEmoji && !showReplyEmoji) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showCommentEmoji && commentEmojiRef.current && !commentEmojiRef.current.contains(e.target as Node)) {
+        setShowCommentEmoji(false);
+      }
+      if (showReplyEmoji && replyEmojiRef.current && !replyEmojiRef.current.contains(e.target as Node)) {
+        setShowReplyEmoji(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showCommentEmoji, showReplyEmoji]);
+
+  const insertCommentEmoji = (emoji: string) => {
+    setNewComment((prev) => prev + emoji);
+    setShowCommentEmoji(false);
+    commentTextareaRef.current?.focus();
+  };
+
+  const insertReplyEmoji = (emoji: string) => {
+    setReplyText((prev) => prev + emoji);
+    setShowReplyEmoji(false);
+    replyTextareaRef.current?.focus();
+  };
 
   const requireLogin = useCallback((): boolean => {
     if (user) return true;
@@ -460,40 +494,98 @@ export default function Comments() {
           {/* Inline reply form */}
           {replyTo === comment.id && (
             <div style={{ marginTop: "8px" }}>
-              <textarea
-                placeholder={user ? "Write a reply..." : "Click here to reply..."}
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onFocus={(e) => {
-                  if (!user) {
-                    e.target.blur();
-                    const name = prompt("Enter your username:");
-                    if (name && name.trim()) {
-                      login(name.trim());
+              <div style={{ position: "relative" }}>
+                <textarea
+                  ref={replyTextareaRef}
+                  placeholder={user ? "Write a reply..." : "Click here to reply..."}
+                  value={replyText}
+                  onChange={(e) => setReplyText(replaceEmoticons(e.target.value))}
+                  onFocus={(e) => {
+                    if (!user) {
+                      e.target.blur();
+                      const name = prompt("Enter your username:");
+                      if (name && name.trim()) {
+                        login(name.trim());
+                      }
                     }
-                  }
-                }}
-                maxLength={500}
-                style={{
-                  width: "100%",
-                  height: "60px",
-                  border: "1px solid #555",
-                  borderRadius: "6px",
-                  padding: "8px",
-                  fontSize: "13px",
-                  resize: "none",
-                  boxSizing: "border-box",
-                  backgroundColor: "#1a1a1a",
-                  color: "#fdf8e6",
-                }}
-              />
+                  }}
+                  maxLength={500}
+                  style={{
+                    width: "100%",
+                    height: "60px",
+                    border: "1px solid #555",
+                    borderRadius: "6px",
+                    padding: "8px",
+                    fontSize: "13px",
+                    resize: "none",
+                    boxSizing: "border-box",
+                    backgroundColor: "#1a1a1a",
+                    color: "#fdf8e6",
+                  }}
+                />
+                {/* Emoji picker for replies */}
+                {showReplyEmoji && (
+                  <div
+                    ref={replyEmojiRef}
+                    style={{
+                      position: "absolute",
+                      bottom: "100%",
+                      left: 0,
+                      right: 0,
+                      backgroundColor: "#1a1a1a",
+                      border: "1px solid #d4af37",
+                      borderRadius: "8px 8px 0 0",
+                      padding: "6px",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(8, 1fr)",
+                      gap: "2px",
+                      maxHeight: "160px",
+                      overflowY: "auto",
+                      zIndex: 10,
+                      boxShadow: "0 -4px 12px rgba(0, 0, 0, 0.5)",
+                    }}
+                  >
+                    <div style={{ gridColumn: "1 / -1", color: "#d4af37", fontSize: "0.6rem", fontFamily: "'Cinzel', serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, padding: "4px 2px 2px", borderBottom: "1px solid rgba(212, 175, 55, 0.2)", marginBottom: "2px" }}>Flexible Morals</div>
+                    {CUSTOM_EMOJIS.map((item) => (
+                      <button
+                        key={item.label}
+                        onClick={() => insertReplyEmoji(item.emoji)}
+                        title={item.label}
+                        type="button"
+                        style={{ background: "none", border: "1px solid rgba(212, 175, 55, 0.25)", backgroundColor: "rgba(212, 175, 55, 0.06)", fontSize: "1.2rem", cursor: "pointer", padding: "4px", borderRadius: "4px", lineHeight: 1 }}
+                      >
+                        {item.emoji}
+                      </button>
+                    ))}
+                    <div style={{ gridColumn: "1 / -1", color: "#d4af37", fontSize: "0.6rem", fontFamily: "'Cinzel', serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, padding: "4px 2px 2px", borderBottom: "1px solid rgba(212, 175, 55, 0.2)", marginBottom: "2px" }}>Standard</div>
+                    {STANDARD_EMOJIS.map((emoji) => (
+                      <button
+                        key={`std-${emoji}`}
+                        onClick={() => insertReplyEmoji(emoji)}
+                        type="button"
+                        style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", padding: "4px", borderRadius: "4px", lineHeight: 1 }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "flex-end",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                   marginTop: "4px",
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => setShowReplyEmoji((prev) => !prev)}
+                  style={{ background: "none", border: "none", fontSize: "1.1rem", cursor: "pointer", opacity: 0.7, padding: "2px 4px", lineHeight: 1 }}
+                >
+                  😀
+                </button>
                 <button
                   onClick={() => handleSubmitReply(comment.id)}
                   disabled={!replyText.trim() || submitting}
@@ -709,38 +801,88 @@ export default function Comments() {
 
         {/* New comment form */}
         <form onSubmit={handleSubmitComment} style={{ marginBottom: "1rem" }}>
-          <textarea
-            placeholder={
-              user
-                ? "Share thy thoughts on this commandment..."
-                : "Click here to comment..."
-            }
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onFocus={(e) => {
-              if (!user) {
-                e.target.blur();
-                const name = prompt("Enter your username:");
-                if (name && name.trim()) {
-                  login(name.trim());
-                }
+          <div style={{ position: "relative" }}>
+            <textarea
+              ref={commentTextareaRef}
+              placeholder={
+                user
+                  ? "Share thy thoughts on this commandment..."
+                  : "Click here to comment..."
               }
-            }}
-            maxLength={500}
-            style={{
-              width: "100%",
-              height: "70px",
-              border: "1px solid #555",
-              borderRadius: "6px",
-              padding: "10px 12px",
-              fontSize: "14px",
-              resize: "none",
-              boxSizing: "border-box",
-              backgroundColor: "#1a1a1a",
-              color: "#fdf8e6",
-              cursor: user ? "text" : "pointer",
-            }}
-          />
+              value={newComment}
+              onChange={(e) => setNewComment(replaceEmoticons(e.target.value))}
+              onFocus={(e) => {
+                if (!user) {
+                  e.target.blur();
+                  const name = prompt("Enter your username:");
+                  if (name && name.trim()) {
+                    login(name.trim());
+                  }
+                }
+              }}
+              maxLength={500}
+              style={{
+                width: "100%",
+                height: "70px",
+                border: "1px solid #555",
+                borderRadius: "6px",
+                padding: "10px 12px",
+                fontSize: "14px",
+                resize: "none",
+                boxSizing: "border-box",
+                backgroundColor: "#1a1a1a",
+                color: "#fdf8e6",
+                cursor: user ? "text" : "pointer",
+              }}
+            />
+            {/* Emoji picker for comments */}
+            {showCommentEmoji && (
+              <div
+                ref={commentEmojiRef}
+                style={{
+                  position: "absolute",
+                  bottom: "100%",
+                  left: 0,
+                  right: 0,
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #d4af37",
+                  borderRadius: "8px 8px 0 0",
+                  padding: "6px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(8, 1fr)",
+                  gap: "2px",
+                  maxHeight: "180px",
+                  overflowY: "auto",
+                  zIndex: 10,
+                  boxShadow: "0 -4px 12px rgba(0, 0, 0, 0.5)",
+                }}
+              >
+                <div style={{ gridColumn: "1 / -1", color: "#d4af37", fontSize: "0.6rem", fontFamily: "'Cinzel', serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, padding: "4px 2px 2px", borderBottom: "1px solid rgba(212, 175, 55, 0.2)", marginBottom: "2px" }}>Flexible Morals</div>
+                {CUSTOM_EMOJIS.map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => insertCommentEmoji(item.emoji)}
+                    title={item.label}
+                    type="button"
+                    style={{ background: "none", border: "1px solid rgba(212, 175, 55, 0.25)", backgroundColor: "rgba(212, 175, 55, 0.06)", fontSize: "1.2rem", cursor: "pointer", padding: "4px", borderRadius: "4px", lineHeight: 1 }}
+                  >
+                    {item.emoji}
+                  </button>
+                ))}
+                <div style={{ gridColumn: "1 / -1", color: "#d4af37", fontSize: "0.6rem", fontFamily: "'Cinzel', serif", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, padding: "4px 2px 2px", borderBottom: "1px solid rgba(212, 175, 55, 0.2)", marginBottom: "2px" }}>Standard</div>
+                {STANDARD_EMOJIS.map((emoji) => (
+                  <button
+                    key={`std-${emoji}`}
+                    onClick={() => insertCommentEmoji(emoji)}
+                    type="button"
+                    style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", padding: "4px", borderRadius: "4px", lineHeight: 1 }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div
             style={{
               display: "flex",
@@ -749,14 +891,23 @@ export default function Comments() {
               marginTop: "4px",
             }}
           >
-            <span
-              style={{
-                fontSize: "11px",
-                color: newComment.length >= 450 ? "#e07050" : "#888",
-              }}
-            >
-              {newComment.length}/500
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setShowCommentEmoji((prev) => !prev)}
+                style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", opacity: 0.7, padding: "2px 4px", lineHeight: 1 }}
+              >
+                😀
+              </button>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: newComment.length >= 450 ? "#e07050" : "#888",
+                }}
+              >
+                {newComment.length}/500
+              </span>
+            </div>
             <button
               type="submit"
               disabled={!newComment.trim() || submitting}

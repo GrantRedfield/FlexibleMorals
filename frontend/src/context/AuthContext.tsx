@@ -9,10 +9,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<string | null>(null);
+  const [user, setUser] = useState<string | null>(() => {
+    return localStorage.getItem("fm_username");
+  });
 
-  const login = (username: string) => setUser(username);
-  const logout = () => setUser(null);
+  const login = (username: string) => {
+    setUser(username);
+    localStorage.setItem("fm_username", username);
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("fm_username");
+  };
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>

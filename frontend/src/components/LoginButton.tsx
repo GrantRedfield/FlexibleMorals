@@ -19,11 +19,14 @@ export default function LoginButton() {
   const donorStatus = user ? getDonorStatus(user) : null;
 
   return (
-    <div className="login-button-container">
+    <div className={`login-button-container${user ? " logged-in" : ""}`}>
       {user ? (
         <>
-          <span className="login-username">{user}</span>
-          {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+          <span className="login-welcome">
+            Welcome disciple{" "}
+            <span className="login-username">{user}</span>
+            {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
+          </span>
           <button onClick={logout} className="logout-btn">
             Logout
           </button>

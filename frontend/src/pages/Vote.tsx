@@ -276,7 +276,8 @@ export default function Vote() {
       setSortOption("new");
       // Reset shown tracking so the new post appears in the first batch
       shownPostIds.current = new Set();
-      setShuffleTrigger((t) => t + 1);
+      // Defer shuffle trigger to next tick so sortedPostsRef has the new post
+      setTimeout(() => setShuffleTrigger((t) => t + 1), 0);
     } catch (err: any) {
       console.error("Failed to create post:", err);
       if (err.response?.status === 429) {

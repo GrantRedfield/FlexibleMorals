@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { getChatMessages, sendChatMessage, getPosts } from "../utils/api";
+import { replaceEmoticons, CUSTOM_EMOJIS, STANDARD_EMOJIS } from "../utils/emoji";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import DonorBadge from "./DonorBadge";
 import UserProfilePopup from "./UserProfilePopup";
@@ -36,70 +37,7 @@ function getUsernameColor(username: string): string {
   return TWITCH_COLORS[Math.abs(hash) % TWITCH_COLORS.length];
 }
 
-// Emoticon-to-emoji auto-replace (triggered after typing a space or at end of input)
-const EMOTICON_MAP: Record<string, string> = {
-  ":)": "😊",
-  ":D": "😃",
-  ":d": "😃",
-  ":(": "😞",
-  ":P": "😛",
-  ":p": "😛",
-  ";)": "😉",
-  ":O": "😮",
-  ":o": "😮",
-  "XD": "😆",
-  "xD": "😆",
-  "xd": "😆",
-  "<3": "❤️",
-  ":*": "😘",
-  "B)": "😎",
-  ":/": "😕",
-  ":|": "😐",
-  ">:(": "😡",
-  ":'(": "😢",
-  ":')": "🥲",
-  "O:)": "😇",
-  "o:)": "😇",
-  ">:)": "😈",
-  ":fire:": "🔥",
-  ":skull:": "💀",
-  ":100:": "💯",
-  ":pray:": "🙏",
-  ":clap:": "👏",
-  ":thumbsup:": "👍",
-  ":thumbsdown:": "👎",
-  ":heart:": "❤️",
-  ":star:": "⭐",
-  ":crown:": "👑",
-  ":trophy:": "🏆",
-  ":eyes:": "👀",
-  ":muscle:": "💪",
-  ":party:": "🎉",
-  ":poop:": "💩",
-  ":brain:": "🧠",
-  ":diamond:": "💎",
-  // Flexible Morals custom emotes
-  ":offer:": "🙏",
-  ":tablet:": "🪨",
-  ":amend:": "🔄",
-  ":witness:": "👁️",
-  ":heresy:": "🔥",
-  ":vote:": "🗳️",
-  ":moralgray:": "🧠",
-  ":repent:": "🧎",
-  ":canon:": "✨",
-  ":goodword:": "🕊️",
-};
-
-function replaceEmoticons(text: string): string {
-  let result = text;
-  for (const [emoticon, emoji] of Object.entries(EMOTICON_MAP)) {
-    // Only replace if the emoticon is followed by a space or is at the end
-    const escaped = emoticon.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    result = result.replace(new RegExp(escaped + "(?=\\s|$)", "g"), emoji);
-  }
-  return result;
-}
+// Emoticon map and replaceEmoticons imported from ../utils/emoji
 
 interface ChatMessage {
   id: string;
@@ -221,6 +159,13 @@ export default function ChatBox() {
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldown]);
+
+  // Scroll to bottom when mobile chat is expanded
+  useEffect(() => {
+    if (mobileExpanded) {
+      setTimeout(scrollToBottom, 150);
+    }
+  }, [mobileExpanded, scrollToBottom]);
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -362,18 +307,7 @@ export default function ChatBox() {
           <div className="chat-emoji-picker" ref={emojiPickerRef}>
             {/* Flexible Morals custom emotes */}
             <div className="emoji-section-label">Flexible Morals</div>
-            {[
-              { emoji: "🙏", label: ":offer:" },
-              { emoji: "🪨", label: ":tablet:" },
-              { emoji: "🔄", label: ":amend:" },
-              { emoji: "👁️", label: ":witness:" },
-              { emoji: "🔥", label: ":heresy:" },
-              { emoji: "🗳️", label: ":vote:" },
-              { emoji: "🧠", label: ":moralgray:" },
-              { emoji: "🧎", label: ":repent:" },
-              { emoji: "✨", label: ":canon:" },
-              { emoji: "🕊️", label: ":goodword:" },
-            ].map((item) => (
+            {CUSTOM_EMOJIS.map((item) => (
               <button
                 key={item.label}
                 className="chat-emoji-btn chat-emoji-custom"
@@ -385,11 +319,7 @@ export default function ChatBox() {
             ))}
             {/* Standard emojis */}
             <div className="emoji-section-label">Standard</div>
-            {["😀","😂","🤣","😍","🥰","😎","🤔","😱","😡","🥺",
-              "👍","👎","👏","🙏","🔥","❤️","💀","💯","✨","⭐",
-              "🎉","🎊","😈","👀","🤡","💪","🫡","😤","🥳","😇",
-              "⚡","🌟","💎","🏆","👑","🗡️","⚖️","📜","🛡️","✝️"
-            ].map((emoji) => (
+            {STANDARD_EMOJIS.map((emoji) => (
               <button
                 key={`std-${emoji}`}
                 className="chat-emoji-btn"

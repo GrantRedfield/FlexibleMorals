@@ -168,7 +168,7 @@ export default function Home() {
           {showNumber && <span className="commandment-number">{toRoman(index + 1)}. </span>}
           {post.title || post.content}
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "2px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "6px", marginTop: "2px" }}>
           {post.votes !== undefined && (
             <span className="vote-count" style={{ margin: 0 }}>{post.votes} votes</span>
           )}
@@ -179,7 +179,7 @@ export default function Home() {
                 setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
               }
             }}
-            style={{ fontSize: "0.7rem", color: "#c8b070", cursor: "pointer", fontStyle: "italic" }}
+            style={{ fontSize: "0.8rem", color: "#c8b070", cursor: "pointer", fontStyle: "italic" }}
           >
             — {post.username || "unknown"}
             {donorStatus?.tier && <DonorBadge tier={donorStatus.tier} size="small" />}
@@ -345,8 +345,8 @@ export default function Home() {
           <div
             style={{
               position: "fixed",
-              top: "7rem",
-              right: "1rem",
+              top: "1rem",
+              right: "0.5rem",
               zIndex: 999,
               textAlign: "center",
               width: "340px",
@@ -355,16 +355,33 @@ export default function Home() {
             <span
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: "1.2rem",
+                fontSize: "3rem",
                 fontWeight: 900,
                 color: "#c8b070",
                 textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
                 letterSpacing: "0.08em",
                 lineHeight: 1,
-                whiteSpace: "nowrap",
+                display: "block",
               }}
             >
-              {daysLeft} days until moral reset
+              {daysLeft}
+            </span>
+            <span
+              style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                color: "#c8b070",
+                textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+                letterSpacing: "0.22em",
+                lineHeight: 1,
+                textTransform: "uppercase" as const,
+                marginTop: "0.3rem",
+                display: "block",
+                width: "100%",
+              }}
+            >
+              days until moral reset
             </span>
           </div>
         </>
@@ -380,7 +397,6 @@ export default function Home() {
       <div className="vote-button-container">
         {showPrayerHands && !isMobile && (
           <>
-            <span className="prayer-hands prayer-left">🙏</span>
             <span className="prayer-hands prayer-right">🙏</span>
             <span className="prayer-hands prayer-top">🙏</span>
             <span className="prayer-hands prayer-bottom">🙏</span>
@@ -397,15 +413,12 @@ export default function Home() {
           <div className="coin-animation">
             <div className="coin coin-1">$</div>
             <div className="coin coin-2">$</div>
-            <div className="coin coin-3">$</div>
-            <div className="coin coin-4">$</div>
-            <div className="coin coin-5">$</div>
           </div>
         )}
         <button
           onClick={() => setShowDonationPopup(true)}
           className="offering-link"
-          style={{ border: "none", fontFamily: "inherit" }}
+          style={{ fontFamily: "inherit" }}
         >
           Offering
         </button>
@@ -564,12 +577,12 @@ export default function Home() {
           <div className="stone-column">
             {loading && <div className="commandment-border">Loading...</div>}
             {error && <div className="commandment-border">{error}</div>}
-            {!loading && !error && leftPosts.map((post, index) => renderCommandment(post, index, false))}
+            {!loading && !error && leftPosts.map((post, index) => renderCommandment(post, index, true))}
           </div>
           <div className="stone-column">
             {loading && <div className="commandment-border">Loading...</div>}
             {error && <div className="commandment-border">{error}</div>}
-            {!loading && !error && rightPosts.map((post, index) => renderCommandment(post, index + 5, false))}
+            {!loading && !error && rightPosts.map((post, index) => renderCommandment(post, index + 5, true))}
           </div>
         </div>
       )}
