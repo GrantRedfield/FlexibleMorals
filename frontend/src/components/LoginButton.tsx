@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import DonorBadge from "./DonorBadge";
-import LoginModal from "./LoginModal";
 
 export default function LoginButton() {
-  const { user, logout } = useAuth();
+  const { user, logout, openLoginModal } = useAuth();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
-  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     if (user) loadDonorStatuses([user]);
@@ -29,11 +27,10 @@ export default function LoginButton() {
           </button>
         </>
       ) : (
-        <button onClick={() => setShowModal(true)} className="login-btn">
+        <button onClick={openLoginModal} className="login-btn">
           Login
         </button>
       )}
-      {showModal && <LoginModal onClose={() => setShowModal(false)} />}
     </div>
   );
 }

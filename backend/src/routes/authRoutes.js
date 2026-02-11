@@ -98,8 +98,13 @@ router.post("/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username) return res.status(400).json({ error: "Username required" });
 
+  // Password is required
+  if (!password) {
+    return res.status(400).json({ error: "Password is required" });
+  }
+
   // Cognito path: real authentication with password
-  if (COGNITO_ENABLED && password) {
+  if (COGNITO_ENABLED) {
     try {
       const result = await signIn(username, password);
       const auth = result.AuthenticationResult;
@@ -107,13 +112,22 @@ router.post("/login", async (req, res) => {
         return res.status(401).json({ error: "Authentication failed" });
       }
 
-      console.log("Cognito login:", username);
+      // Fetch the actual Cognito username (in case user logged in with email alias)
+      let actualUsername = username;
+      try {
+        const userInfo = await getUser(auth.AccessToken);
+        actualUsername = userInfo.Username || username;
+      } catch (e) {
+        console.log("Could not fetch user info, using provided username:", e.message);
+      }
+
+      console.log("Cognito login:", actualUsername);
       return res.json({
         accessToken: auth.AccessToken,
         idToken: auth.IdToken,
         refreshToken: auth.RefreshToken,
         expiresIn: auth.ExpiresIn,
-        username,
+        username: actualUsername,
         authProvider: "cognito",
       });
     } catch (err) {
@@ -122,7 +136,7 @@ router.post("/login", async (req, res) => {
     }
   }
 
-  // Legacy path: simple username-only login (no Cognito)
+  // Legacy path: username + password login (no Cognito configured)
   const accessToken = jwt.sign({ username }, JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
   });

@@ -10,7 +10,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ onClose }: LoginModalProps) {
-  const { login, quickLogin } = useAuth();
+  const { login } = useAuth();
   const [view, setView] = useState<View>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -22,17 +22,12 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 
   const handleLogin = async () => {
     if (!username.trim()) return setError("Username required");
+    if (!password) return setError("Password required");
     setError("");
     setLoading(true);
 
     try {
-      if (password) {
-        // Cognito login with password
-        await login(username.trim(), password);
-      } else {
-        // Legacy quick login
-        quickLogin(username.trim());
-      }
+      await login(username.trim(), password);
       onClose();
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Login failed";
@@ -134,7 +129,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
             />
             <input
               type="password"
-              placeholder="Password (optional for quick login)"
+              placeholder="Password"
               className="login-modal-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -149,7 +144,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
               onClick={handleLogin}
               disabled={loading}
             >
-              {loading ? "..." : password ? "Sign In" : "Quick Login"}
+              {loading ? "..." : "Sign In"}
             </button>
 
             <p className="login-modal-switch">

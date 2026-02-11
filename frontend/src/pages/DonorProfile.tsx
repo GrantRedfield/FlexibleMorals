@@ -18,7 +18,7 @@ interface TierInfo {
 
 export default function DonorProfile() {
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user, openLoginModal } = useAuth();
   const { myDonorStatus, loadMyDonorStatus } = useDonor();
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -42,11 +42,7 @@ export default function DonorProfile() {
   // Require login
   const requireLogin = (): boolean => {
     if (user) return true;
-    const name = prompt("Enter your username:");
-    if (name && name.trim()) {
-      login(name.trim());
-      return true;
-    }
+    openLoginModal();
     return false;
   };
 

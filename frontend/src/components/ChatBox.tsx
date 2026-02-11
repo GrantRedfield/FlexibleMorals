@@ -47,7 +47,7 @@ interface ChatMessage {
 }
 
 export default function ChatBox() {
-  const { user, login } = useAuth();
+  const { user, openLoginModal } = useAuth();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [mobileExpanded, setMobileExpanded] = useState(false);
@@ -195,10 +195,7 @@ export default function ChatBox() {
     if (cooldown > 0) return;
 
     if (!user) {
-      const name = prompt("Enter your username:");
-      if (name && name.trim()) {
-        login(name.trim());
-      }
+      openLoginModal();
       return;
     }
 
@@ -349,10 +346,7 @@ export default function ChatBox() {
           onFocus={(e) => {
             if (!user) {
               e.target.blur();
-              const name = prompt("Enter your username:");
-              if (name && name.trim()) {
-                login(name.trim());
-              }
+              openLoginModal();
             }
           }}
           maxLength={200}

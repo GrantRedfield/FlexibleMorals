@@ -72,7 +72,7 @@ export async function resendCode(
  */
 export async function login(
   username: string,
-  password?: string
+  password: string
 ): Promise<AuthTokens> {
   const res = await axios.post(`${API_BASE}/auth/login`, {
     username,

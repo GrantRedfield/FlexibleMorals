@@ -5,14 +5,17 @@ import {
   getStoredUsername,
   getAuthProvider,
 } from "../utils/auth";
+import LoginModal from "../components/LoginModal";
 
 interface AuthContextType {
   user: string | null;
   authProvider: "cognito" | "legacy" | null;
-  login: (username: string, password?: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  /** Legacy quick-login (username only, no password) */
-  quickLogin: (username: string) => void;
+  /** Open the login modal from any component */
+  showLoginModal: boolean;
+  openLoginModal: () => void;
+  closeLoginModal: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,19 +25,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authProv, setAuthProv] = useState<"cognito" | "legacy" | null>(
     () => getAuthProvider()
   );
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const login = useCallback(async (username: string, password?: string) => {
+  const openLoginModal = useCallback(() => setShowLoginModal(true), []);
+  const closeLoginModal = useCallback(() => setShowLoginModal(false), []);
+
+  const login = useCallback(async (username: string, password: string) => {
     const result = await authLogin(username, password);
     setUser(result.username);
     setAuthProv(result.authProvider);
-  }, []);
-
-  const quickLogin = useCallback((username: string) => {
-    // Legacy path — just set username in localStorage (no server call)
-    setUser(username);
-    localStorage.setItem("fm_username", username);
-    localStorage.setItem("fm_authProvider", "legacy");
-    setAuthProv("legacy");
   }, []);
 
   const logout = useCallback(() => {
@@ -44,8 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, authProvider: authProv, login, logout, quickLogin }}>
+    <AuthContext.Provider value={{ user, authProvider: authProv, login, logout, showLoginModal, openLoginModal, closeLoginModal }}>
       {children}
+      {showLoginModal && <LoginModal onClose={closeLoginModal} />}
     </AuthContext.Provider>
   );
 }

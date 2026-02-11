@@ -34,7 +34,7 @@ export default function Comments() {
   const navigate = useNavigate();
   const location = useLocation();
   const cameFrom = (location.state as any)?.from;
-  const { user, login } = useAuth();
+  const { user, openLoginModal } = useAuth();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const { getDonorStatus, loadDonorStatuses } = useDonor();
 
@@ -145,13 +145,9 @@ export default function Comments() {
 
   const requireLogin = useCallback((): boolean => {
     if (user) return true;
-    const name = prompt("Enter your username:");
-    if (name && name.trim()) {
-      login(name.trim());
-      return true;
-    }
+    openLoginModal();
     return false;
-  }, [user, login]);
+  }, [user, openLoginModal]);
 
   const getBlessings = useCallback(
     (username: string): number => {
@@ -503,10 +499,7 @@ export default function Comments() {
                   onFocus={(e) => {
                     if (!user) {
                       e.target.blur();
-                      const name = prompt("Enter your username:");
-                      if (name && name.trim()) {
-                        login(name.trim());
-                      }
+                      openLoginModal();
                     }
                   }}
                   maxLength={500}
@@ -671,7 +664,7 @@ export default function Comments() {
         style={{
           backgroundColor: isMobile ? "#0a0804" : "rgba(20, 15, 5, 0.92)",
           borderRadius: isMobile ? "0" : "10px",
-          padding: isMobile ? "0.75rem 0.75rem 2rem" : "1rem 1.5rem",
+          padding: isMobile ? "0.75rem 1rem 2rem" : "1rem 1.5rem",
           maxWidth: "800px",
           width: isMobile ? "100%" : "95%",
           boxShadow: isMobile
@@ -814,10 +807,7 @@ export default function Comments() {
               onFocus={(e) => {
                 if (!user) {
                   e.target.blur();
-                  const name = prompt("Enter your username:");
-                  if (name && name.trim()) {
-                    login(name.trim());
-                  }
+                  openLoginModal();
                 }
               }}
               maxLength={500}
