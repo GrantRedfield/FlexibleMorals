@@ -15,6 +15,7 @@ import { handlePayPalWebhook } from "./webhooks/paypal.ts";
 import donorRoutes from "./routes/donorRoutes.ts";
 import chatRoutes from "./routes/chatRoutes.ts";
 import commentRoutes from "./routes/commentRoutes.ts";
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
@@ -45,6 +46,9 @@ app.use("/api/chat", chatRoutes);
 
 // Comment API routes
 app.use("/api/comments", commentRoutes);
+
+// Auth API routes (Cognito + legacy fallback)
+app.use("/auth", authRoutes);
 
 // DynamoDB client and table name imported from shared module above
 
@@ -218,5 +222,7 @@ app.post("/posts/:id/vote", async (req, res) => {
 // === Start Server ===
 const PORT = parseInt(process.env.PORT || "3001", 10);
 app.listen(PORT, () => {
+  const cognitoEnabled = !!process.env.COGNITO_USER_POOL_ID && !!process.env.COGNITO_CLIENT_ID;
   console.log(`✅ FlexibleMorals backend running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
+  console.log(`   Auth: ${cognitoEnabled ? "Amazon Cognito" : "Legacy JWT"}`);
 });

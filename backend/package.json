@@ -21,6 +21,7 @@
     "express-session": "^1.17.3",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.7",
+    "jwks-rsa": "^3.2.2",
     "nanoid": "^5.0.7",
     "node-fetch": "^3.3.2",
     "tsx": "^4.21.0",
