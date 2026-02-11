@@ -39,7 +39,8 @@
       "Bash(echo:*)",
       "Bash(powershell.exe -Command \"Compress-Archive -Path ''/tmp/eb-deploy/*'' -DestinationPath ''/tmp/eb-deploy.zip'' -Force\")",
       "Bash(jar -tf:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
