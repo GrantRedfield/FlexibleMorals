@@ -30,7 +30,16 @@
       "Bash(git pull:*)",
       "Bash(git merge:*)",
       "Bash(git stash:*)",
-      "Bash(npm run seed:*)"
+      "Bash(npm run seed:*)",
+      "Bash(npm --workspace frontend install amazon-cognito-identity-js)",
+      "Bash(npm --workspace backend install jwks-rsa)",
+      "Bash(npm --workspace frontend run build)",
+      "Bash(npx tsc:*)",
+      "Bash(eb:*)",
+      "Bash(echo:*)",
+      "Bash(powershell.exe -Command \"Compress-Archive -Path ''/tmp/eb-deploy/*'' -DestinationPath ''/tmp/eb-deploy.zip'' -Force\")",
+      "Bash(jar -tf:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
