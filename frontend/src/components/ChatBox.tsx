@@ -196,24 +196,23 @@ export default function ChatBox() {
   };
 
   // Must match backend's isAllowedGifUrl in chatRoutes.ts
+  // These are dedicated media CDNs — domain match alone is sufficient
   const ALLOWED_GIF_DOMAINS = [
-    /^https:\/\/media[0-9]?\.giphy\.com\//,
+    /^https:\/\/media[0-9]*\.giphy\.com\//,
     /^https:\/\/i\.giphy\.com\//,
+    /^https:\/\/giphy\.com\/gifs\//,
     /^https:\/\/media\.tenor\.com\//,
     /^https:\/\/c\.tenor\.com\//,
+    /^https:\/\/tenor\.com\/view\//,
     /^https:\/\/i\.imgur\.com\//,
     /^https:\/\/media\.discordapp\.net\//,
   ];
-
-  const GIF_EXTENSIONS = /\.(gif|gifv|webp)(\?.*)?$/i;
 
   const isAllowedGifUrl = (text: string): boolean => {
     const trimmed = text.trim();
     if (trimmed.includes(" ") || trimmed.includes("\n")) return false;
     if (!trimmed.startsWith("https://")) return false;
     if (!ALLOWED_GIF_DOMAINS.some((pattern) => pattern.test(trimmed))) return false;
-    const urlPath = trimmed.split("?")[0];
-    if (!GIF_EXTENSIONS.test(urlPath)) return false;
     return true;
   };
 
