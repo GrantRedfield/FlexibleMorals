@@ -182,8 +182,12 @@ export default function ChatBox() {
 
   const insertEmoji = (emoji: string) => {
     setInputValue((prev) => prev + emoji);
-    setShowEmojiPicker(false);
-    inputRef.current?.focus();
+    // On mobile, keep picker open so users can tap multiple emojis
+    // On desktop, close picker and refocus input
+    if (!isMobile) {
+      setShowEmojiPicker(false);
+      inputRef.current?.focus();
+    }
   };
 
   const containsLink = (text: string): boolean => {
@@ -286,6 +290,32 @@ export default function ChatBox() {
       }
       return prev;
     });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const clipboardData = e.clipboardData;
+
+    // Check HTML content first — when you "Copy Image" from a browser,
+    // the clipboard often contains an <img src="..."> in the HTML flavor
+    const html = clipboardData.getData("text/html");
+    if (html) {
+      const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (match && match[1] && isAllowedGifUrl(match[1])) {
+        e.preventDefault();
+        setInputValue(match[1]);
+        return;
+      }
+    }
+
+    // Check plain text — sometimes the URL comes through as plain text
+    const text = clipboardData.getData("text/plain");
+    if (text && isAllowedGifUrl(text.trim())) {
+      e.preventDefault();
+      setInputValue(text.trim());
+      return;
+    }
+
+    // Otherwise let the default paste behavior happen (normal text)
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -446,6 +476,7 @@ export default function ChatBox() {
           value={inputValue}
           onChange={(e) => setInputValue(replaceEmoticons(e.target.value))}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={user ? "Speak thy mind..." : "Click here to chat..."}
           disabled={sending}
           onFocus={(e) => {
