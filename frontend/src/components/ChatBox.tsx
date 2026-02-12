@@ -60,6 +60,7 @@ export default function ChatBox() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
+  const [replyTarget, setReplyTarget] = useState<{ username: string; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastTimestampRef = useRef<string | null>(null);
@@ -190,6 +191,28 @@ export default function ChatBox() {
     return urlPattern.test(text);
   };
 
+  // Must match backend's isAllowedGifUrl in chatRoutes.ts
+  const ALLOWED_GIF_DOMAINS = [
+    /^https:\/\/media[0-9]?\.giphy\.com\//,
+    /^https:\/\/i\.giphy\.com\//,
+    /^https:\/\/media\.tenor\.com\//,
+    /^https:\/\/c\.tenor\.com\//,
+    /^https:\/\/i\.imgur\.com\//,
+    /^https:\/\/media\.discordapp\.net\//,
+  ];
+
+  const GIF_EXTENSIONS = /\.(gif|gifv|webp)(\?.*)?$/i;
+
+  const isAllowedGifUrl = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (trimmed.includes(" ") || trimmed.includes("\n")) return false;
+    if (!trimmed.startsWith("https://")) return false;
+    if (!ALLOWED_GIF_DOMAINS.some((pattern) => pattern.test(trimmed))) return false;
+    const urlPath = trimmed.split("?")[0];
+    if (!GIF_EXTENSIONS.test(urlPath)) return false;
+    return true;
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
     if (cooldown > 0) return;
@@ -199,8 +222,8 @@ export default function ChatBox() {
       return;
     }
 
-    if (containsLink(inputValue)) {
-      alert("Links are not allowed in chat.");
+    if (containsLink(inputValue) && !isAllowedGifUrl(inputValue)) {
+      alert("Links are not allowed in chat. (GIFs from Giphy, Tenor, and Imgur are allowed)");
       return;
     }
 
@@ -214,6 +237,7 @@ export default function ChatBox() {
       });
       lastTimestampRef.current = sent.createdAt;
       setInputValue("");
+      setReplyTarget(null);
       setCooldown(15);
       setTimeout(scrollToBottom, 50);
     } catch (err: any) {
@@ -243,11 +267,76 @@ export default function ChatBox() {
     }
   };
 
+  const handleReply = (msg: ChatMessage) => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    setReplyTarget({ username: msg.username, message: msg.message });
+    setInputValue(`@${msg.username} `);
+    inputRef.current?.focus();
+  };
+
+  const cancelReply = () => {
+    setReplyTarget(null);
+    // Remove the @username prefix if it's still at the start
+    setInputValue((prev) => {
+      if (replyTarget && prev.startsWith(`@${replyTarget.username} `)) {
+        return prev.slice(`@${replyTarget.username} `.length);
+      }
+      return prev;
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+    if (e.key === "Escape" && replyTarget) {
+      cancelReply();
+    }
+  };
+
+  const renderMessageContent = (message: string) => {
+    if (isAllowedGifUrl(message)) {
+      return (
+        <div className="chat-gif-container">
+          <img
+            src={message.trim()}
+            alt="GIF"
+            className="chat-gif"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+              if (e.currentTarget.parentElement) {
+                const fallback = document.createElement("span");
+                fallback.className = "chat-text";
+                fallback.textContent = "[GIF failed to load]";
+                e.currentTarget.parentElement.appendChild(fallback);
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Detect @username reply prefix
+    const replyMatch = message.match(/^@(\S+)\s(.*)/s);
+    if (replyMatch) {
+      const replyTo = replyMatch[1];
+      const rest = replyMatch[2];
+      return (
+        <>
+          <span className="chat-reply-tag" style={{ color: getUsernameColor(replyTo) }}>
+            ↩ @{replyTo}
+          </span>
+          <span className="chat-text">{rest}</span>
+        </>
+      );
+    }
+
+    return <span className="chat-text">{message}</span>;
   };
 
   return (
@@ -278,7 +367,12 @@ export default function ChatBox() {
         {messages.map((msg) => {
           const donorStatus = getDonorStatus(msg.username);
           return (
-            <div className="chat-message" key={msg.id}>
+            <div
+              className="chat-message"
+              key={msg.id}
+              onClick={() => handleReply(msg)}
+              style={{ cursor: "pointer" }}
+            >
               <span
                 className="chat-username"
                 onClick={(e) => {
@@ -292,12 +386,23 @@ export default function ChatBox() {
               {donorStatus?.tier && (
                 <DonorBadge tier={donorStatus.tier} size="small" />
               )}
-              <span className="chat-text">{msg.message}</span>
+              {renderMessageContent(msg.message)}
             </div>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
+      {/* Reply banner */}
+      {replyTarget && (
+        <div className="chat-reply-banner">
+          <span className="chat-reply-banner-text">
+            Replying to <strong style={{ color: getUsernameColor(replyTarget.username) }}>@{replyTarget.username}</strong>
+          </span>
+          <button className="chat-reply-cancel" onClick={cancelReply} aria-label="Cancel reply">
+            ✕
+          </button>
+        </div>
+      )}
       <div className="chat-input-area" style={{ position: "relative" }}>
         {/* Emoji Picker */}
         {showEmojiPicker && (
@@ -349,7 +454,7 @@ export default function ChatBox() {
               openLoginModal();
             }
           }}
-          maxLength={200}
+          maxLength={500}
         />
         <button
           className="chat-send-btn"

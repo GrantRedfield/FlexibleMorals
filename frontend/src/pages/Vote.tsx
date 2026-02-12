@@ -17,6 +17,7 @@ interface Post {
   votes?: number;
   createdAt?: string;
   username?: string;
+  userVotes?: Record<string, "up" | "down">;
 }
 
 type SortOption = "top" | "hot" | "new" | "random";
@@ -194,17 +195,24 @@ export default function Vote() {
     if (posts.length === 0) return;
     const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
     const saved = localStorage.getItem(storageKey);
-    const merged: Record<string, "up" | "down" | null> = saved ? JSON.parse(saved) : {};
+    const fromStorage: Record<string, "up" | "down" | null> = saved ? JSON.parse(saved) : {};
+    const fromServer: Record<string, "up" | "down" | null> = {};
     if (user) {
       posts.forEach((p: any) => {
         const pid = String(p.id);
         const serverVote = p.userVotes?.[user];
         if (serverVote) {
-          merged[pid] = serverVote;
+          fromServer[pid] = serverVote;
         }
       });
     }
-    setUserVotes(merged);
+    // Merge with current state to preserve optimistic votes
+    // Priority: server > localStorage > existing React state
+    setUserVotes((current) => ({
+      ...current,
+      ...fromStorage,
+      ...fromServer,
+    }));
   }, [user, posts]);
 
   // Initialize slots when sort changes or posts first load
@@ -320,7 +328,9 @@ export default function Vote() {
       .then((updated) => {
         setPosts((prev) =>
           prev.map((p) =>
-            String(p.id) === String(updated.id) ? { ...p, votes: updated.votes } : p
+            String(p.id) === String(updated.id)
+              ? { ...p, votes: updated.votes, userVotes: updated.userVotes }
+              : p
           )
         );
       })
@@ -793,7 +803,7 @@ export default function Vote() {
                       }}
                       onClick={() => handleVote(post.id, "up")}
                     >
-                      👍
+                      😇
                     </button>
                     <button
                       style={{
@@ -809,7 +819,7 @@ export default function Vote() {
                       }}
                       onClick={() => handleVote(post.id, "down")}
                     >
-                      👎
+                      🔥
                     </button>
                   </div>
                 )}

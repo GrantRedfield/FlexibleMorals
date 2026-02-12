@@ -186,7 +186,7 @@ app.post("/posts/:id/vote", async (req, res) => {
 
     if (previousVote === direction) {
       console.log(`User ${userId} repeated same vote on post ${id}`);
-      return res.json({ id, votes });
+      return res.json({ id, votes, userVotes });
     }
 
     if (!previousVote) {
@@ -212,7 +212,7 @@ app.post("/posts/:id/vote", async (req, res) => {
     );
 
     console.log(`✅ Post ${id} new total votes: ${votes}`);
-    res.json({ id, votes });
+    res.json({ id, votes, userVotes });
   } catch (err) {
     console.error("❌ Vote update failed:", err);
     res.status(500).json({ error: "Vote update failed" });

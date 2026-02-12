@@ -30,6 +30,28 @@ const STRIKE_RESET_MS = 24 * 60 * 60 * 1000; // 24 hours to reset strikes
 const CHAT_TTL_DAYS = parseInt(process.env.CHAT_TTL_DAYS || "0", 10);
 const CHAT_TTL_SECONDS = CHAT_TTL_DAYS * 24 * 60 * 60;
 
+// Whitelist of allowed GIF hosting domains (must match frontend isAllowedGifUrl)
+const ALLOWED_GIF_DOMAINS = [
+  /^https:\/\/media[0-9]?\.giphy\.com\//,
+  /^https:\/\/i\.giphy\.com\//,
+  /^https:\/\/media\.tenor\.com\//,
+  /^https:\/\/c\.tenor\.com\//,
+  /^https:\/\/i\.imgur\.com\//,
+  /^https:\/\/media\.discordapp\.net\//,
+];
+
+const GIF_EXTENSIONS = /\.(gif|gifv|webp)(\?.*)?$/i;
+
+function isAllowedGifUrl(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.includes(" ") || trimmed.includes("\n")) return false;
+  if (!trimmed.startsWith("https://")) return false;
+  if (!ALLOWED_GIF_DOMAINS.some((pattern) => pattern.test(trimmed))) return false;
+  const urlPath = trimmed.split("?")[0];
+  if (!GIF_EXTENSIONS.test(urlPath)) return false;
+  return true;
+}
+
 function getUserCooldown(strikes: number): number {
   // Each strike doubles the cooldown: 15s, 30s, 60s, 120s, 240s, 480s, capped at 600s
   return Math.min(BASE_COOLDOWN * Math.pow(2, strikes), MAX_COOLDOWN);
@@ -110,14 +132,16 @@ router.post("/messages", async (req: Request, res: Response) => {
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "Message is required" });
   }
-  if (message.length > 200) {
-    return res.status(400).json({ error: "Message too long (max 200 characters)" });
+  const isGif = isAllowedGifUrl(message.trim());
+  const maxLength = isGif ? 500 : 200;
+  if (message.length > maxLength) {
+    return res.status(400).json({ error: `Message too long (max ${maxLength} characters)` });
   }
 
-  // Block links
+  // Block links (except whitelisted GIF URLs)
   const urlPattern = /https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.co|\.xyz|\.dev/i;
-  if (urlPattern.test(message)) {
-    return res.status(400).json({ error: "Links are not allowed in chat" });
+  if (urlPattern.test(message) && !isGif) {
+    return res.status(400).json({ error: "Links are not allowed in chat (GIFs from Giphy, Tenor, and Imgur are allowed)" });
   }
 
   // Progressive rate limiting with escalating mute for spammers
