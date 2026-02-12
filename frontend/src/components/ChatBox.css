@@ -158,6 +158,136 @@
   display: block;
 }
 
+/* GIF toggle button */
+.chat-gif-toggle {
+  background: none;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  font-size: 0.6rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 2px 5px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+  flex-shrink: 0;
+  border-radius: 4px;
+  color: #d4af37;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.chat-gif-toggle:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  border-color: #d4af37;
+}
+
+/* GIF search picker panel */
+.chat-gif-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background-color: #1a1a1a;
+  border: 1px solid #d4af37;
+  border-radius: 8px 8px 0 0;
+  z-index: 10;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+}
+
+.gif-picker-header {
+  padding: 8px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  flex-shrink: 0;
+}
+
+.gif-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  background-color: #2a2a2a;
+  color: #fdf8e6;
+  font-size: 0.85rem;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-sizing: border-box;
+}
+
+.gif-search-input:focus {
+  border-color: #d4af37;
+}
+
+.gif-picker-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 6px;
+  min-height: 80px;
+}
+
+.gif-picker-grid::-webkit-scrollbar {
+  width: 5px;
+}
+
+.gif-picker-grid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.gif-picker-grid::-webkit-scrollbar-thumb {
+  background: #d4af37;
+  border-radius: 3px;
+}
+
+.gif-picker-item {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s;
+  aspect-ratio: auto;
+}
+
+.gif-picker-item:hover {
+  border-color: #d4af37;
+  transform: scale(1.03);
+}
+
+.gif-picker-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 5px;
+}
+
+.gif-picker-loading,
+.gif-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #888;
+  font-size: 0.8rem;
+  padding: 1.5rem 0;
+  font-style: italic;
+}
+
+.gif-picker-attribution {
+  padding: 3px 8px;
+  text-align: right;
+  font-size: 0.55rem;
+  color: #666;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  border-top: 1px solid rgba(212, 175, 55, 0.15);
+  flex-shrink: 0;
+}
+
 .chat-input-area {
   display: flex;
   padding: 0.5rem;
@@ -483,5 +613,36 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /* GIF picker mobile styles */
+  .chat-box.chat-mobile-expanded .chat-gif-toggle {
+    font-size: 0.7rem;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+  }
+
+  .chat-box.chat-mobile-expanded .chat-gif-picker {
+    max-height: 50vh;
+  }
+
+  .chat-box.chat-mobile-expanded .gif-search-input {
+    font-size: 1rem;
+    padding: 10px 12px;
+    min-height: 44px;
+  }
+
+  .chat-box.chat-mobile-expanded .gif-picker-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .chat-box.chat-mobile-expanded .gif-picker-item img {
+    min-height: 80px;
   }
 }

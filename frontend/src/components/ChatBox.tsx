@@ -8,6 +8,18 @@ import DonorBadge from "./DonorBadge";
 import UserProfilePopup from "./UserProfilePopup";
 import "./ChatBox.css";
 
+const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || "";
+
+interface GiphyGif {
+  id: string;
+  images: {
+    fixed_height_small: { url: string; width: string; height: string };
+    fixed_height: { url: string; width: string; height: string };
+    original: { url: string };
+  };
+  title: string;
+}
+
 // Twitch-style username colors — 15 bright, readable colors on dark backgrounds
 const TWITCH_COLORS = [
   "#FF0000", // Red
@@ -61,6 +73,12 @@ export default function ChatBox() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ username: string; message: string } | null>(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearch, setGifSearch] = useState("");
+  const [gifResults, setGifResults] = useState<GiphyGif[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const gifPickerRef = useRef<HTMLDivElement>(null);
+  const gifSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastTimestampRef = useRef<string | null>(null);
@@ -75,6 +93,94 @@ export default function ChatBox() {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Giphy search — debounced
+  const searchGiphy = useCallback(async (query: string) => {
+    if (!GIPHY_API_KEY) return;
+    setGifLoading(true);
+    try {
+      const endpoint = query.trim()
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query.trim())}&limit=20&rating=pg-13`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=pg-13`;
+      const res = await fetch(endpoint);
+      const json = await res.json();
+      setGifResults(json.data || []);
+    } catch (err) {
+      console.error("Giphy search failed:", err);
+      setGifResults([]);
+    } finally {
+      setGifLoading(false);
+    }
+  }, []);
+
+  // Load trending GIFs when picker opens
+  useEffect(() => {
+    if (showGifPicker && gifResults.length === 0 && GIPHY_API_KEY) {
+      searchGiphy("");
+    }
+  }, [showGifPicker, gifResults.length, searchGiphy]);
+
+  // Close GIF picker when clicking outside
+  useEffect(() => {
+    if (!showGifPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (gifPickerRef.current && !gifPickerRef.current.contains(e.target as Node)) {
+        setShowGifPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showGifPicker]);
+
+  const handleGifSearchChange = (value: string) => {
+    setGifSearch(value);
+    if (gifSearchTimeoutRef.current) clearTimeout(gifSearchTimeoutRef.current);
+    gifSearchTimeoutRef.current = setTimeout(() => {
+      searchGiphy(value);
+    }, 400);
+  };
+
+  const sendGif = async (gif: GiphyGif) => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    if (cooldown > 0) return;
+
+    const gifUrl = gif.images.original.url;
+    setShowGifPicker(false);
+    setGifSearch("");
+    setSending(true);
+
+    try {
+      const sent = await sendChatMessage(user, gifUrl);
+      setMessages((prev) => {
+        const combined = [...prev, sent];
+        return combined.length > 100 ? combined.slice(-100) : combined;
+      });
+      lastTimestampRef.current = sent.createdAt;
+      setReplyTarget(null);
+      setCooldown(15);
+      setTimeout(scrollToBottom, 50);
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const msg = data?.error || "Failed to send GIF";
+      if (data?.cooldown) setCooldown(data.cooldown);
+      if (data?.muted) {
+        const muteMsg: ChatMessage = {
+          id: `mute-${Date.now()}`,
+          username: "⚠️ System",
+          message: msg,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, muteMsg]);
+        setTimeout(scrollToBottom, 50);
+      }
+      console.error("GIF send error:", msg);
+    } finally {
+      setSending(false);
+    }
+  };
 
   // Load donor statuses for new usernames
   const loadNewDonorStatuses = useCallback(
@@ -461,13 +567,72 @@ export default function ChatBox() {
             ))}
           </div>
         )}
+        {/* GIF Search Picker */}
+        {showGifPicker && (
+          <div className="chat-gif-picker" ref={gifPickerRef}>
+            <div className="gif-picker-header">
+              <input
+                className="gif-search-input"
+                type="text"
+                value={gifSearch}
+                onChange={(e) => handleGifSearchChange(e.target.value)}
+                placeholder="Search GIFs..."
+                autoFocus
+              />
+            </div>
+            <div className="gif-picker-grid">
+              {gifLoading && (
+                <div className="gif-picker-loading">Searching...</div>
+              )}
+              {!gifLoading && gifResults.length === 0 && !GIPHY_API_KEY && (
+                <div className="gif-picker-empty">Giphy API key not configured</div>
+              )}
+              {!gifLoading && gifResults.length === 0 && GIPHY_API_KEY && (
+                <div className="gif-picker-empty">No GIFs found</div>
+              )}
+              {gifResults.map((gif) => (
+                <button
+                  key={gif.id}
+                  className="gif-picker-item"
+                  onClick={() => sendGif(gif)}
+                  title={gif.title}
+                >
+                  <img
+                    src={gif.images.fixed_height_small.url}
+                    alt={gif.title}
+                    loading="lazy"
+                  />
+                </button>
+              ))}
+            </div>
+            <div className="gif-picker-attribution">
+              Powered by GIPHY
+            </div>
+          </div>
+        )}
         <button
           className="chat-emoji-toggle"
-          onClick={() => setShowEmojiPicker((prev) => !prev)}
+          onClick={() => {
+            setShowEmojiPicker((prev) => !prev);
+            setShowGifPicker(false);
+          }}
           type="button"
         >
           😀
         </button>
+        {GIPHY_API_KEY && (
+          <button
+            className="chat-gif-toggle"
+            onClick={() => {
+              setShowGifPicker((prev) => !prev);
+              setShowEmojiPicker(false);
+            }}
+            type="button"
+            title="Search GIFs"
+          >
+            GIF
+          </button>
+        )}
         <input
           ref={inputRef}
           className="chat-input"
