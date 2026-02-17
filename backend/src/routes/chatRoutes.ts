@@ -97,7 +97,7 @@ router.get("/messages", async (req: Request, res: Response) => {
             ":prefix": "MSG#",
           }),
           ScanIndexForward: false,
-          Limit: 50,
+          Limit: 150,
         })
       );
 

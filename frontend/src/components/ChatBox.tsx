@@ -87,12 +87,51 @@ export default function ChatBox() {
   const isAtBottom = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container) return true;
-    return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < 80;
   }, []);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Reliable scroll-to-bottom: directly sets scrollTop, with a RAF + double-check
+  // to handle any pending layout shifts or image loads
+  const scrollToBottom = useCallback((smooth = true) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const doScroll = () => {
+      container.scrollTop = container.scrollHeight;
+    };
+
+    if (!smooth) {
+      doScroll();
+      // Double-check after a frame in case layout shifted
+      requestAnimationFrame(doScroll);
+      return;
+    }
+
+    // Use smooth scrollTo for nice UX, then force-snap after to guarantee position
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    // After the smooth scroll would have finished, force-snap to absolute bottom
+    setTimeout(() => {
+      if (container) container.scrollTop = container.scrollHeight;
+    }, 350);
   }, []);
+
+  // Observe the messages container for any DOM mutations (new messages, image loads,
+  // layout shifts) and re-snap to bottom if user was already near the bottom
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const observer = new MutationObserver(() => {
+      if (isAtBottom()) {
+        requestAnimationFrame(() => {
+          if (container) container.scrollTop = container.scrollHeight;
+        });
+      }
+    });
+
+    observer.observe(container, { childList: true, subtree: true, attributes: true });
+    return () => observer.disconnect();
+  }, [isAtBottom]);
 
   // Giphy search — debounced
   const searchGiphy = useCallback(async (query: string) => {
@@ -156,12 +195,12 @@ export default function ChatBox() {
       const sent = await sendChatMessage(user, gifUrl);
       setMessages((prev) => {
         const combined = [...prev, sent];
-        return combined.length > 100 ? combined.slice(-100) : combined;
+        return combined.length > 200 ? combined.slice(-200) : combined;
       });
       lastTimestampRef.current = sent.createdAt;
       setReplyTarget(null);
       setCooldown(15);
-      setTimeout(scrollToBottom, 50);
+      requestAnimationFrame(() => scrollToBottom());
     } catch (err: any) {
       const data = err?.response?.data;
       const msg = data?.error || "Failed to send GIF";
@@ -174,7 +213,7 @@ export default function ChatBox() {
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, muteMsg]);
-        setTimeout(scrollToBottom, 50);
+        requestAnimationFrame(() => scrollToBottom());
       }
       console.error("GIF send error:", msg);
     } finally {
@@ -221,7 +260,8 @@ export default function ChatBox() {
           lastTimestampRef.current = msgs[msgs.length - 1].createdAt;
         }
         loadNewDonorStatuses(msgs);
-        setTimeout(scrollToBottom, 100);
+        // Instant scroll on initial load — no animation needed
+        requestAnimationFrame(() => scrollToBottom(false));
       } catch (err) {
         console.error("Failed to load chat:", err);
       }
@@ -243,12 +283,12 @@ export default function ChatBox() {
             const filtered = newMsgs.filter((m) => !existingIds.has(m.id));
             if (filtered.length === 0) return prev;
             const combined = [...prev, ...filtered];
-            // Keep max 100 messages
-            return combined.length > 100 ? combined.slice(-100) : combined;
+            // Keep max 200 messages
+            return combined.length > 200 ? combined.slice(-200) : combined;
           });
           lastTimestampRef.current = newMsgs[newMsgs.length - 1].createdAt;
           loadNewDonorStatuses(newMsgs);
-          if (wasAtBottom) setTimeout(scrollToBottom, 50);
+          if (wasAtBottom) requestAnimationFrame(() => scrollToBottom());
         }
       } catch (err) {
         // Silent fail on poll
@@ -270,7 +310,8 @@ export default function ChatBox() {
   // Scroll to bottom when mobile chat is expanded
   useEffect(() => {
     if (mobileExpanded) {
-      setTimeout(scrollToBottom, 150);
+      // Wait a frame for the layout to settle, then instant-scroll
+      requestAnimationFrame(() => scrollToBottom(false));
     }
   }, [mobileExpanded, scrollToBottom]);
 
@@ -342,13 +383,13 @@ export default function ChatBox() {
       // Optimistically add
       setMessages((prev) => {
         const combined = [...prev, sent];
-        return combined.length > 100 ? combined.slice(-100) : combined;
+        return combined.length > 200 ? combined.slice(-200) : combined;
       });
       lastTimestampRef.current = sent.createdAt;
       setInputValue("");
       setReplyTarget(null);
       setCooldown(15);
-      setTimeout(scrollToBottom, 50);
+      requestAnimationFrame(() => scrollToBottom());
     } catch (err: any) {
       const data = err?.response?.data;
       const msg = data?.error || "Failed to send message";
@@ -367,7 +408,7 @@ export default function ChatBox() {
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, muteMsg]);
-        setTimeout(scrollToBottom, 50);
+        requestAnimationFrame(() => scrollToBottom());
       }
 
       console.error("Chat send error:", msg);
@@ -442,6 +483,13 @@ export default function ChatBox() {
             alt="GIF"
             className="chat-gif"
             loading="lazy"
+            onLoad={() => {
+              // Re-snap to bottom when a GIF image loads and changes scroll height
+              if (isAtBottom()) {
+                const container = messagesContainerRef.current;
+                if (container) container.scrollTop = container.scrollHeight;
+              }
+            }}
             onError={(e) => {
               e.currentTarget.style.display = "none";
               if (e.currentTarget.parentElement) {
