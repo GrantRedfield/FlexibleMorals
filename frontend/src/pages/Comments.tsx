@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { getPosts, getComments, createComment, voteOnComment } from "../utils/api";
+import { getPosts, getComments, createComment, voteOnComment, editComment, deleteComment } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -17,6 +17,8 @@ interface Comment {
   userVotes: Record<string, string>;
   parentId: string | null;
   createdAt: string;
+  editedAt?: string | null;
+  deleted?: boolean;
 }
 
 interface Post {
@@ -53,6 +55,8 @@ export default function Comments() {
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const [showCommentEmoji, setShowCommentEmoji] = useState(false);
   const [showReplyEmoji, setShowReplyEmoji] = useState(false);
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const commentEmojiRef = useRef<HTMLDivElement>(null);
   const replyEmojiRef = useRef<HTMLDivElement>(null);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -272,6 +276,43 @@ export default function Comments() {
     }
   };
 
+  // Edit a comment
+  const handleEditComment = async (commentId: string) => {
+    if (!editText.trim()) return;
+    setSubmitting(true);
+    try {
+      const updated = await editComment(postId!, commentId, user!, editText.trim());
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId ? { ...c, text: updated.text, editedAt: updated.editedAt } : c
+        )
+      );
+      setEditingComment(null);
+      setEditText("");
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to edit comment";
+      alert(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete a comment (soft delete, Reddit-style)
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm("Are you sure you want to delete this comment? This cannot be undone.")) return;
+    try {
+      await deleteComment(postId!, commentId, user!);
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId ? { ...c, text: "[deleted]", username: "[deleted]", deleted: true } : c
+        )
+      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to delete comment";
+      alert(msg);
+    }
+  };
+
   // Count all descendants recursively
   const countDescendants = useCallback(
     (commentId: string): number => {
@@ -374,27 +415,48 @@ export default function Comments() {
             >
               {isCollapsed ? "[+]" : "[–]"}
             </button>
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                setProfilePopup({ username: comment.username, x: e.clientX, y: e.clientY });
-              }}
-              style={{
-                color: "#d4af37",
-                fontWeight: 600,
-                fontSize: "13px",
-                fontFamily: "'Cinzel', serif",
-                cursor: "pointer",
-              }}
-            >
-              {comment.username}
-              {getDonorStatus(comment.username)?.tier && (
-                <DonorBadge tier={getDonorStatus(comment.username)!.tier as any} size="small" />
-              )}
-            </span>
+            {comment.deleted ? (
+              <span
+                style={{
+                  color: "#666",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  fontStyle: "italic",
+                }}
+              >
+                [deleted]
+              </span>
+            ) : (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProfilePopup({ username: comment.username, x: e.clientX, y: e.clientY });
+                }}
+                style={{
+                  color: "#d4af37",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  fontFamily: "'Cinzel', serif",
+                  cursor: "pointer",
+                }}
+              >
+                {comment.username}
+                {getDonorStatus(comment.username)?.tier && (
+                  <DonorBadge tier={getDonorStatus(comment.username)!.tier as any} size="small" />
+                )}
+              </span>
+            )}
             <span style={{ color: "#666", fontSize: "11px" }}>
               {new Date(comment.createdAt).toLocaleString()}
             </span>
+            {comment.editedAt && !comment.deleted && (
+              <span
+                style={{ color: "#666", fontSize: "10px", fontStyle: "italic" }}
+                title={`Edited ${new Date(comment.editedAt).toLocaleString()}`}
+              >
+                (edited)
+              </span>
+            )}
             {isCollapsed && (
               <span style={{ color: "#555", fontSize: "11px", fontStyle: "italic" }}>
                 ({countDescendants(comment.id) + 1} comment{countDescendants(comment.id) + 1 !== 1 ? "s" : ""})
@@ -404,20 +466,88 @@ export default function Comments() {
 
           {!isCollapsed && (
             <>
-          {/* Comment text */}
-          <p
-            style={{
-              color: "#fdf8e6",
-              fontSize: "14px",
-              margin: "0 0 8px 0",
-              lineHeight: 1.5,
-              wordBreak: "break-word",
-            }}
-          >
-            {comment.text}
-          </p>
+          {/* Comment text — deleted, editing, or normal */}
+          {comment.deleted ? (
+            <p
+              style={{
+                color: "#666",
+                fontSize: "14px",
+                margin: "0 0 8px 0",
+                lineHeight: 1.5,
+                fontStyle: "italic",
+              }}
+            >
+              [deleted]
+            </p>
+          ) : editingComment === comment.id ? (
+            <div style={{ margin: "0 0 8px 0" }}>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(replaceEmoticons(e.target.value))}
+                maxLength={500}
+                style={{
+                  width: "100%",
+                  height: "70px",
+                  border: "1px solid #d4af37",
+                  borderRadius: "6px",
+                  padding: "8px",
+                  fontSize: "13px",
+                  resize: "none",
+                  boxSizing: "border-box",
+                  backgroundColor: "#1a1a1a",
+                  color: "#fdf8e6",
+                }}
+                autoFocus
+              />
+              <div style={{ display: "flex", gap: "8px", marginTop: "4px", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => { setEditingComment(null); setEditText(""); }}
+                  style={{
+                    background: "none",
+                    border: "1px solid #555",
+                    cursor: "pointer",
+                    color: "#888",
+                    fontSize: "12px",
+                    padding: "4px 12px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleEditComment(comment.id)}
+                  disabled={!editText.trim() || submitting}
+                  style={{
+                    backgroundColor: !editText.trim() || submitting ? "#555" : "#b79b3d",
+                    color: "#fdf8e6",
+                    padding: "4px 14px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: !editText.trim() || submitting ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {submitting ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p
+              style={{
+                color: "#fdf8e6",
+                fontSize: "14px",
+                margin: "0 0 8px 0",
+                lineHeight: 1.5,
+                wordBreak: "break-word",
+              }}
+            >
+              {comment.text}
+            </p>
+          )}
 
-          {/* Actions row */}
+          {/* Actions row — hidden for deleted comments */}
+          {!comment.deleted && editingComment !== comment.id && (
           <div
             style={{
               display: "flex",
@@ -485,7 +615,44 @@ export default function Comments() {
                 {replyTo === comment.id ? "Cancel" : "Reply"}
               </button>
             )}
+            {user && user === comment.username && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditingComment(comment.id);
+                    setEditText(comment.text);
+                    setReplyTo(null);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#888",
+                    fontSize: isMobile ? "14px" : "12px",
+                    padding: isMobile ? "8px 10px" : "2px 6px",
+                    minHeight: isMobile ? "44px" : undefined,
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#8a5a4a",
+                    fontSize: isMobile ? "14px" : "12px",
+                    padding: isMobile ? "8px 10px" : "2px 6px",
+                    minHeight: isMobile ? "44px" : undefined,
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            )}
           </div>
+          )}
 
           {/* Inline reply form */}
           {replyTo === comment.id && (

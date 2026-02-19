@@ -99,3 +99,28 @@ export const voteOnComment = async (
   );
   return res.data;
 };
+
+export const editComment = async (
+  postId: string,
+  commentId: string,
+  username: string,
+  text: string
+) => {
+  const res = await axios.put(
+    `${API_BASE}/api/comments/${postId}/${commentId}`,
+    { username, text }
+  );
+  return res.data;
+};
+
+export const deleteComment = async (
+  postId: string,
+  commentId: string,
+  username: string
+) => {
+  const res = await axios.delete(
+    `${API_BASE}/api/comments/${postId}/${commentId}`,
+    { data: { username } }
+  );
+  return res.data;
+};

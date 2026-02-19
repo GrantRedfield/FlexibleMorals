@@ -67,6 +67,8 @@ export default function ChatBox() {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const [allPosts, setAllPosts] = useState<any[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -114,6 +116,20 @@ export default function ChatBox() {
       if (container) container.scrollTop = container.scrollHeight;
     }, 350);
   }, []);
+
+  // Scroll handler: detect when user scrolls away from bottom (Twitch-style pause)
+  const handleChatScroll = useCallback(() => {
+    const atBottom = isAtBottom();
+    setIsPaused(!atBottom);
+    if (atBottom) setNewMessageCount(0);
+  }, [isAtBottom]);
+
+  // Resume: scroll to bottom and clear paused state
+  const handleResume = useCallback(() => {
+    scrollToBottom();
+    setIsPaused(false);
+    setNewMessageCount(0);
+  }, [scrollToBottom]);
 
   // Observe the messages container for any DOM mutations (new messages, image loads,
   // layout shifts) and re-snap to bottom if user was already near the bottom
@@ -278,17 +294,23 @@ export default function ChatBox() {
         const newMsgs: ChatMessage[] = data.messages || [];
         if (newMsgs.length > 0) {
           const wasAtBottom = isAtBottom();
+          let addedCount = 0;
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => m.id));
             const filtered = newMsgs.filter((m) => !existingIds.has(m.id));
             if (filtered.length === 0) return prev;
+            addedCount = filtered.length;
             const combined = [...prev, ...filtered];
             // Keep max 200 messages
             return combined.length > 200 ? combined.slice(-200) : combined;
           });
           lastTimestampRef.current = newMsgs[newMsgs.length - 1].createdAt;
           loadNewDonorStatuses(newMsgs);
-          if (wasAtBottom) requestAnimationFrame(() => scrollToBottom());
+          if (wasAtBottom) {
+            requestAnimationFrame(() => scrollToBottom());
+          } else if (addedCount > 0) {
+            setNewMessageCount((prev) => prev + addedCount);
+          }
         }
       } catch (err) {
         // Silent fail on poll
@@ -543,7 +565,7 @@ export default function ChatBox() {
           ✕
         </button>
       </div>
-      <div className="chat-messages" ref={messagesContainerRef}>
+      <div className="chat-messages" ref={messagesContainerRef} onScroll={handleChatScroll}>
         {messages.length === 0 && (
           <div className="chat-empty">No messages yet. Be the first to speak.</div>
         )}
@@ -574,6 +596,14 @@ export default function ChatBox() {
           );
         })}
         <div ref={messagesEndRef} />
+        {isPaused && (
+          <div className="chat-paused-banner">
+            <span className="chat-paused-text">Chat paused</span>
+            <button className="chat-resume-btn" onClick={handleResume}>
+              ▼ Resume{newMessageCount > 0 ? ` (${newMessageCount} new)` : ""}
+            </button>
+          </div>
+        )}
       </div>
       {/* Reply banner */}
       {replyTarget && (

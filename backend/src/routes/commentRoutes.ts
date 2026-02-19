@@ -16,6 +16,31 @@ const router = Router();
 // Simple in-memory rate limiter: 1 comment per 3 seconds per user
 const lastCommentTime: Record<string, number> = {};
 
+// Helper: find a comment by commentId within a post (queries PK + filters by commentId)
+async function findComment(postId: string, commentId: string) {
+  const queryResult = await client.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      FilterExpression: "commentId = :cid",
+      ExpressionAttributeValues: marshall({
+        ":pk": `COMMENTS#${postId}`,
+        ":prefix": "COMMENT#",
+        ":cid": commentId,
+      }),
+    })
+  );
+
+  if (!queryResult.Items || queryResult.Items.length === 0) {
+    return null;
+  }
+
+  const rawItem = queryResult.Items[0];
+  const comment = unmarshall(rawItem);
+  const sk = rawItem.SK!.S!;
+  return { comment, sk };
+}
+
 // GET /api/comments/:postId
 router.get("/:postId", async (req: Request, res: Response) => {
   const { postId } = req.params;
@@ -43,6 +68,8 @@ router.get("/:postId", async (req: Request, res: Response) => {
         userVotes: record.userVotes ?? {},
         parentId: record.parentId || null,
         createdAt: record.createdAt,
+        editedAt: record.editedAt || null,
+        deleted: record.deleted || false,
       };
     });
 
@@ -126,27 +153,12 @@ router.post("/:postId/:commentId/vote", async (req: Request, res: Response) => {
   }
 
   try {
-    // We need to find the comment by scanning for commentId
-    // Since SK includes timestamp, we query and filter
-    const queryResult = await client.send(
-      new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
-        FilterExpression: "commentId = :cid",
-        ExpressionAttributeValues: marshall({
-          ":pk": `COMMENTS#${postId}`,
-          ":prefix": "COMMENT#",
-          ":cid": commentId,
-        }),
-      })
-    );
-
-    if (!queryResult.Items || queryResult.Items.length === 0) {
+    const found = await findComment(postId, commentId);
+    if (!found) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
-    const rawItem = queryResult.Items[0];
-    const comment = unmarshall(rawItem);
+    const { comment, sk } = found;
     let votes = Number(comment.votes ?? 0);
     let userVotes = comment.userVotes || {};
 
@@ -166,9 +178,6 @@ router.post("/:postId/:commentId/vote", async (req: Request, res: Response) => {
 
     userVotes[userId] = direction;
 
-    // Use the original SK from the queried item
-    const sk = rawItem.SK!.S!;
-
     await client.send(
       new UpdateItemCommand({
         TableName: TABLE_NAME,
@@ -185,6 +194,119 @@ router.post("/:postId/:commentId/vote", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Vote on comment failed:", err);
     return res.status(500).json({ error: "Vote failed" });
+  }
+});
+
+// PUT /api/comments/:postId/:commentId — Edit comment
+router.put("/:postId/:commentId", async (req: Request, res: Response) => {
+  const { postId, commentId } = req.params;
+  const { username, text } = req.body;
+
+  if (!username || !username.trim()) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: "Comment text is required" });
+  }
+  if (text.length > 500) {
+    return res.status(400).json({ error: "Comment too long (max 500 characters)" });
+  }
+
+  try {
+    const found = await findComment(postId, commentId);
+    if (!found) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    const { comment, sk } = found;
+
+    // Ownership check
+    if (comment.username !== username.trim()) {
+      return res.status(403).json({ error: "You can only edit your own comments" });
+    }
+
+    // Cannot edit deleted comments
+    if (comment.deleted) {
+      return res.status(400).json({ error: "Cannot edit a deleted comment" });
+    }
+
+    const editedAt = new Date().toISOString();
+
+    await client.send(
+      new UpdateItemCommand({
+        TableName: TABLE_NAME,
+        Key: marshall({ PK: `COMMENTS#${postId}`, SK: sk }),
+        UpdateExpression: "SET #txt = :t, editedAt = :e",
+        ExpressionAttributeNames: { "#txt": "text" },
+        ExpressionAttributeValues: marshall({
+          ":t": text.trim(),
+          ":e": editedAt,
+        }),
+      })
+    );
+
+    return res.json({
+      id: commentId,
+      username: comment.username,
+      text: text.trim(),
+      votes: comment.votes ?? 0,
+      userVotes: comment.userVotes ?? {},
+      parentId: comment.parentId || null,
+      createdAt: comment.createdAt,
+      editedAt,
+      deleted: false,
+    });
+  } catch (err) {
+    console.error("Failed to edit comment:", err);
+    return res.status(500).json({ error: "Failed to edit comment" });
+  }
+});
+
+// DELETE /api/comments/:postId/:commentId — Soft-delete comment (Reddit-style)
+router.delete("/:postId/:commentId", async (req: Request, res: Response) => {
+  const { postId, commentId } = req.params;
+  const { username } = req.body;
+
+  if (!username || !username.trim()) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+
+  try {
+    const found = await findComment(postId, commentId);
+    if (!found) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    const { comment, sk } = found;
+
+    // Ownership check
+    if (comment.username !== username.trim()) {
+      return res.status(403).json({ error: "You can only delete your own comments" });
+    }
+
+    // Already deleted
+    if (comment.deleted) {
+      return res.status(400).json({ error: "Comment is already deleted" });
+    }
+
+    await client.send(
+      new UpdateItemCommand({
+        TableName: TABLE_NAME,
+        Key: marshall({ PK: `COMMENTS#${postId}`, SK: sk }),
+        UpdateExpression: "SET #txt = :t, username = :u, deleted = :d",
+        ExpressionAttributeNames: { "#txt": "text" },
+        ExpressionAttributeValues: marshall({
+          ":t": "[deleted]",
+          ":u": "[deleted]",
+          ":d": true,
+        }),
+      })
+    );
+
+    return res.json({ success: true, id: commentId });
+  } catch (err) {
+    console.error("Failed to delete comment:", err);
+    return res.status(500).json({ error: "Failed to delete comment" });
   }
 });
 
