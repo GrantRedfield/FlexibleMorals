@@ -695,24 +695,24 @@ export default function Vote() {
                 key={slot.postId}
                 style={{
                   border: "1px solid #555",
-                  padding: isMobile ? "8px 10px" : "24px",
+                  padding: isMobile ? "10px 12px" : "16px 20px",
                   borderRadius: isMobile ? "8px" : "12px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
                   backgroundColor: "rgba(255,255,255,0.05)",
                   overflow: "hidden",
-                  minHeight: isMobile ? 0 : "180px",
+                  minHeight: isMobile ? 0 : "140px",
                   transition: "all 0.25s ease",
                   ...getAnimStyle(slot.animState),
                 }}
               >
                 <div>
-                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "0.95rem" : "1.15rem", margin: isMobile ? "0 0 3px 0" : "0 0 4px 0", lineHeight: isMobile ? 1.2 : 1.3, wordBreak: "break-word", whiteSpace: "normal" }}>
+                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "1.15rem" : "1.4rem", margin: isMobile ? "0 0 4px 0" : "0 0 6px 0", lineHeight: isMobile ? 1.25 : 1.35, wordBreak: "break-word", whiteSpace: "normal" }}>
                     {post.title || post.content}
                   </h2>
                   <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px", marginTop: isMobile ? "2px" : "4px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: isMobile ? "12px" : "15px", color: "#d1b97b", fontWeight: 600 }}>
+                    <span style={{ fontSize: isMobile ? "14px" : "16px", color: "#d1b97b", fontWeight: 600 }}>
                       {post.votes ?? 0} votes
                     </span>
                     <span
@@ -722,7 +722,7 @@ export default function Vote() {
                           setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
                         }
                       }}
-                      style={{ fontSize: isMobile ? "12px" : "13px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                      style={{ fontSize: isMobile ? "14px" : "15px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
                     >
                       {post.username || "unknown"}
                       {getDonorStatus(post.username || "")?.tier && (
@@ -731,17 +731,35 @@ export default function Vote() {
                     </span>
                     <Link
                       to={`/comments/${post.id}`}
-                      style={{ fontSize: isMobile ? "12px" : "13px", color: "#888", textDecoration: "none" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "#d4af37")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
+                      style={{
+                        fontSize: isMobile ? "15px" : "16px",
+                        color: "#d4af37",
+                        textDecoration: "none",
+                        padding: isMobile ? "6px 12px" : "5px 10px",
+                        borderRadius: "6px",
+                        backgroundColor: "rgba(212, 175, 55, 0.12)",
+                        border: "1px solid rgba(212, 175, 55, 0.3)",
+                        fontWeight: 600,
+                        fontFamily: "'Cinzel', serif",
+                        letterSpacing: "0.02em",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.25)";
+                        e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.6)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
+                        e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.3)";
+                      }}
                     >
-                      💬 ({commentCounts[String(post.id)] ?? 0})
+                      💬 {commentCounts[String(post.id)] ?? 0}
                     </Link>
                   </div>
                 </div>
                 {isOwnPost ? (
-                  <div style={{ marginTop: isMobile ? "4px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.8rem", fontStyle: "italic", margin: isMobile ? "0 0 3px 0" : "0 0 4px 0" }}>
+                  <div style={{ marginTop: "auto", paddingTop: isMobile ? "6px" : "8px" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.8rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 3px 0" : "0 0 4px 0" }}>
                       Your commandment
                     </p>
                     <button
@@ -764,8 +782,8 @@ export default function Vote() {
                     </button>
                   </div>
                 ) : userVote ? (
-                  <div style={{ marginTop: isMobile ? "4px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.8rem", fontStyle: "italic", margin: isMobile ? "0 0 3px 0" : "0 0 4px 0" }}>
+                  <div style={{ marginTop: "auto", paddingTop: isMobile ? "6px" : "8px" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.8rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 3px 0" : "0 0 4px 0" }}>
                       Already voted
                     </p>
                     <button
@@ -788,7 +806,7 @@ export default function Vote() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: isMobile ? "8px" : "10px", marginTop: isMobile ? "4px" : "8px" }}>
+                  <div style={{ display: "flex", gap: isMobile ? "8px" : "10px", marginTop: isMobile ? "auto" : "auto", paddingTop: isMobile ? "6px" : "8px" }}>
                     <button
                       style={{
                         flex: 1,
@@ -797,13 +815,15 @@ export default function Vote() {
                         border: "none",
                         cursor: "pointer",
                         backgroundColor: "#7a9a6a",
+                        background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
                         color: "#fdf8e6",
-                        fontSize: isMobile ? "18px" : "20px",
-                        minHeight: isMobile ? "34px" : "44px",
+                        fontSize: isMobile ? "22px" : "26px",
+                        minHeight: isMobile ? "38px" : "48px",
+                        boxShadow: "0 0 12px rgba(200, 220, 140, 0.25)",
                       }}
                       onClick={() => handleVote(post.id, "up")}
                     >
-                      😇
+                      <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 223, 100, 0.8))" }}>👍</span>
                     </button>
                     <button
                       style={{
@@ -813,13 +833,15 @@ export default function Vote() {
                         border: "none",
                         cursor: "pointer",
                         backgroundColor: "#a87a6a",
+                        background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
                         color: "#fdf8e6",
-                        fontSize: isMobile ? "18px" : "20px",
-                        minHeight: isMobile ? "34px" : "44px",
+                        fontSize: isMobile ? "22px" : "26px",
+                        minHeight: isMobile ? "38px" : "48px",
+                        boxShadow: "0 0 12px rgba(255, 80, 40, 0.2)",
                       }}
                       onClick={() => handleVote(post.id, "down")}
                     >
-                      🔥
+                      <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 50, 20, 0.8))" }}>👎</span>
                     </button>
                   </div>
                 )}
