@@ -459,7 +459,7 @@ export default function Home() {
               Coming Soon! Each month's top commandments on the back.
             </p>
 
-            {/* T-Shirt photo */}
+            {/* T-Shirt photos */}
             <img
               src="/merch_tee.png"
               alt="Flexible Morals Tee - Front and Back"
@@ -469,6 +469,17 @@ export default function Home() {
                 borderRadius: "8px",
                 display: "block",
                 margin: "0 auto",
+              }}
+            />
+            <img
+              src="/merch_tee_2.png"
+              alt="Flexible Morals Tee - Modeled Front and Back"
+              style={{
+                width: "100%",
+                maxWidth: "800px",
+                borderRadius: "8px",
+                display: "block",
+                margin: "1rem auto 0",
               }}
             />
 
