@@ -137,6 +137,11 @@ router.post("/login", async (req, res) => {
   }
 
   // Legacy path: username + password login (no Cognito configured)
+  // All local accounts use the same password
+  if (password !== "password") {
+    return res.status(401).json({ error: "Incorrect password" });
+  }
+
   const accessToken = jwt.sign({ username }, JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
   });
