@@ -212,7 +212,7 @@ export default function Home() {
           <div
             style={{
               position: "absolute",
-              top: "0.3rem",
+              top: 0,
               right: "0.3rem",
               zIndex: 20,
               textAlign: "right",
