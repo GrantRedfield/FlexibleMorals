@@ -1100,8 +1100,8 @@
   .mobile-tablet-overlay {
     position: absolute;
     z-index: 10;
-    top: 7.5%;
-    bottom: 11%;
+    top: 8%;
+    bottom: 10%;
     left: 15%;
     right: 15%;
     padding: 4px 0;

@@ -204,7 +204,7 @@ export default function Home() {
       {isMobile ? (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundColor: "#1a0e08" }}>
           <img
-            src="/FlexibleMoralsMobile7.png"
+            src="/FlexibleMoralsMobile8.png"
             alt="Flexible Morals Background"
             className="home-background-balanced"
           />
