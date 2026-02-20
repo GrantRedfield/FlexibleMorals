@@ -462,7 +462,7 @@ export default function Home() {
             {/* T-Shirt photos */}
             <img
               src="/merch_tee.png"
-              alt="Flexible Morals Tee - Front and Back"
+              alt="Flexible Morals Tee - Back with Commandments"
               style={{
                 width: "100%",
                 maxWidth: "800px",
@@ -483,8 +483,8 @@ export default function Home() {
               }}
             />
 
-            <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#888" }}>
-              * Design updates monthly with new commandments
+            <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#d4af37", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+              Shirts updated with our most recent morals!
             </p>
             <button
               onClick={() => setShowMerchPopup(false)}
