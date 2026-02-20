@@ -520,26 +520,30 @@
     display: none;
   }
 
-  /* Header with room for close button */
+  /* Header compact with room for close button */
   .chat-box.chat-mobile-expanded .chat-header {
-    padding-right: 3rem;
+    padding: 0.4rem 3rem 0.4rem 1rem;
   }
 
-  /* Show close button when expanded — top right, no overlap */
+  .chat-box.chat-mobile-expanded .chat-header h3 {
+    font-size: 1rem;
+  }
+
+  /* Show close button when expanded — top right, large and obvious */
   .chat-box.chat-mobile-expanded .chat-mobile-close {
     display: flex;
     align-items: center;
     justify-content: center;
     position: absolute;
-    right: 8px;
-    top: 4px;
-    transform: none;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: #d4af37;
-    font-size: 1.5rem;
+    font-size: 2rem;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 4px 10px;
     min-height: 44px;
     min-width: 44px;
   }
