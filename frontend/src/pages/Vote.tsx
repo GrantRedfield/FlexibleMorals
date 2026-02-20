@@ -771,16 +771,16 @@ export default function Vote() {
                     <button
                       style={{
                         width: "100%",
-                        padding: isMobile ? "4px 0" : "10px 0",
+                        padding: isMobile ? "8px 0" : "10px 0",
                         borderRadius: isMobile ? "5px" : "8px",
                         border: "1px solid #555",
                         cursor: "pointer",
                         backgroundColor: "rgba(255,255,255,0.08)",
                         color: "#d1b97b",
-                        fontSize: isMobile ? "0.8rem" : "0.95rem",
+                        fontSize: isMobile ? "0.85rem" : "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "28px" : "44px",
+                        minHeight: isMobile ? "36px" : "44px",
                       }}
                       onClick={() => handleSkip(post.id)}
                     >
@@ -795,16 +795,16 @@ export default function Vote() {
                     <button
                       style={{
                         width: "100%",
-                        padding: isMobile ? "4px 0" : "10px 0",
+                        padding: isMobile ? "8px 0" : "10px 0",
                         borderRadius: isMobile ? "5px" : "8px",
                         border: "1px solid #555",
                         cursor: "pointer",
                         backgroundColor: "rgba(255,255,255,0.08)",
                         color: "#d1b97b",
-                        fontSize: isMobile ? "0.8rem" : "0.95rem",
+                        fontSize: isMobile ? "0.85rem" : "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "28px" : "44px",
+                        minHeight: isMobile ? "36px" : "44px",
                       }}
                       onClick={() => handleSkip(post.id)}
                     >
