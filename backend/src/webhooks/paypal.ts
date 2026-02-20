@@ -8,6 +8,7 @@ import {
   QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
+import { nanoid } from "nanoid";
 import { client, TABLE_NAME } from "../lib/dynamodb.ts";
 
 // Tier thresholds in cents
@@ -187,6 +188,30 @@ async function updateDonorStatus(username: string, newAmount: number, paypalEmai
   console.log(`✅ Updated donor status for ${username}: tier=${tier}, total=$${newTotal / 100}`);
 }
 
+// Post a bot message to the live chat
+async function postBotChatMessage(message: string) {
+  const createdAt = new Date().toISOString();
+  const messageId = nanoid(8);
+  try {
+    await client.send(
+      new PutItemCommand({
+        TableName: TABLE_NAME,
+        Item: marshall({
+          PK: "CHAT#global",
+          SK: `MSG#${createdAt}#${messageId}`,
+          messageId,
+          username: "FLEXIBLE_BOT",
+          message,
+          createdAt,
+        }),
+      })
+    );
+    console.log(`🤖 Bot chat message posted: ${message}`);
+  } catch (err) {
+    console.error("Failed to post bot chat message:", err);
+  }
+}
+
 // Main webhook handler
 export async function handlePayPalWebhook(req: Request, res: Response) {
   console.log("📨 Received PayPal webhook");
@@ -266,6 +291,14 @@ export async function handlePayPalWebhook(req: Request, res: Response) {
       // If linked, update donor status
       if (linkedUsername && payerEmail) {
         await updateDonorStatus(linkedUsername, amountCents, payerEmail);
+      }
+
+      // Post thank-you message in live chat
+      const amountFormatted = `$${(amountCents / 100).toFixed(2)}`;
+      if (linkedUsername) {
+        await postBotChatMessage(`Thank you @${linkedUsername} for your ${amountFormatted} offering! 🙏`);
+      } else {
+        await postBotChatMessage(`Thank you to an anonymous disciple for their ${amountFormatted} offering! 🙏`);
       }
     }
   } catch (err) {

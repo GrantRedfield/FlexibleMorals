@@ -392,8 +392,8 @@ export default function Vote() {
   const swipeCurrentPostIdRef = useRef(swipeCurrentPostId);
   useEffect(() => { swipeCurrentPostIdRef.current = swipeCurrentPostId; }, [swipeCurrentPostId]);
 
-  // Track the last exit direction so AnimatePresence exit knows which way to fly
-  const lastSwipeDirection = useRef<"up" | "down" | null>(null);
+  // Track the exit direction so AnimatePresence exit knows which way to fly
+  const [exitDirection, setExitDirection] = useState<"up" | "down" | null>(null);
 
   // === Swipe mode: advance to next card ===
   const advanceSwipeCard = useCallback(() => {
@@ -447,29 +447,28 @@ export default function Vote() {
     const delta = direction === "up" ? 1 : -1;
     const newTotal = currentVotes + delta;
 
-    lastSwipeDirection.current = direction;
     handleVoteOptimistic(currentPid, direction);
     setSwipeResult({ direction, delta, newTotal });
 
-    // Show +1/-1 indicator in background
+    // Show +1/-1 indicator in background (visible during exit animation only)
     if (voteIndicatorTimer.current) clearTimeout(voteIndicatorTimer.current);
     setVoteIndicator({ direction, opacity: 1 });
-    // Fade out after 1.2s
-    voteIndicatorTimer.current = setTimeout(() => {
-      setVoteIndicator((prev) => prev ? { ...prev, opacity: 0 } : null);
-      // Remove from DOM after fade
-      setTimeout(() => setVoteIndicator(null), 500);
-    }, 1200);
 
-    // Immediately trigger exit — no delay
-    setSwipeExiting(true);
+    // Set exit direction and trigger exit in next tick so the exit prop picks up the direction
+    setExitDirection(direction);
+    requestAnimationFrame(() => {
+      setSwipeExiting(true);
+    });
   }, [posts, swipeExiting]);
 
-  // When exit animation completes, advance to next card
+  // When exit animation completes, clear indicator then advance to next card
   const handleSwipeExitComplete = useCallback(() => {
     if (swipeExiting) {
       setSwipeExiting(false);
       setSwipeResult(null);
+      // Clear the +1/-1 indicator before the next card appears
+      setVoteIndicator(null);
+      if (voteIndicatorTimer.current) clearTimeout(voteIndicatorTimer.current);
       advanceSwipeCard();
     }
   }, [swipeExiting, advanceSwipeCard]);
@@ -931,14 +930,15 @@ export default function Vote() {
                         }
                         setSwipeDragX(0);
                       }}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
                       exit={{
                         opacity: 0,
-                        x: lastSwipeDirection.current === "up" ? 300 : -300,
-                        rotate: lastSwipeDirection.current === "up" ? 15 : -15,
+                        x: exitDirection === "up" ? 300 : -300,
+                        rotate: exitDirection === "up" ? 12 : -12,
+                        transition: { duration: 0.2, ease: "easeIn" },
                       }}
-                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
                       style={{
                         x: dragX,
                         rotate: cardRotation,
