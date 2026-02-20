@@ -94,7 +94,7 @@ export default function HamburgerMenu({ onOfferingClick, onMerchClick, onCharter
           <button onClick={() => handleNav(onMerchClick)} className="hamburger-nav-btn">
             Merch
           </button>
-          <button onClick={() => handleNav(onCharterClick)} className="hamburger-nav-btn">
+          <button onClick={() => handleNav(onCharterClick)} className={`hamburger-nav-btn${!user ? " hamburger-nav-glow" : ""}`}>
             Our Charter
           </button>
         </nav>
