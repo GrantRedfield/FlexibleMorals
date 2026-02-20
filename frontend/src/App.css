@@ -1001,7 +1001,7 @@
   /* --- Mobile buttons: two side-by-side buttons below the tablet --- */
   .mobile-buttons-overlay {
     position: absolute;
-    top: 88%;
+    top: 92%;
     left: 0;
     right: 0;
     bottom: 0;
@@ -1101,7 +1101,7 @@
     position: absolute;
     z-index: 10;
     top: 9%;
-    bottom: 10%;
+    bottom: 9%;
     left: 15%;
     right: 15%;
     padding: 4px 0;
