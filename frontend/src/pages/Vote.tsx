@@ -55,7 +55,7 @@ export default function Vote() {
   const [showDonationPopup, setShowDonationPopup] = useState(false);
 
   // Swipe mode state
-  const [swipeResult, setSwipeResult] = useState<{ direction: "up" | "down"; delta: number } | null>(null);
+  const [swipeResult, setSwipeResult] = useState<{ direction: "up" | "down"; delta: number; newTotal: number } | null>(null);
   const [swipeCardKey, setSwipeCardKey] = useState(0);
   const [swipeCurrentPostId, setSwipeCurrentPostId] = useState<string | null>(null);
   const [swipeDragX, setSwipeDragX] = useState(0);
@@ -134,8 +134,14 @@ export default function Vote() {
     const currentSorted = sortedPostsRef.current;
     if (sortOption === "swipe") {
       setVisibleSlots([]);
-      if (currentSorted.length > 0) {
-        const firstPid = String(currentSorted[0].id);
+      // Find first unvoted, non-own post
+      const votes = userVotesRef.current;
+      const firstPost = currentSorted.find((p) => {
+        const pid = String(p.id);
+        return !votes[pid] && p.username !== user;
+      });
+      if (firstPost) {
+        const firstPid = String(firstPost.id);
         setSwipeCurrentPostId(firstPid);
         shownPostIds.current = new Set([firstPid]);
       } else {
@@ -370,22 +376,23 @@ export default function Vote() {
   const advanceSwipeCard = useCallback(() => {
     const currentPid = swipeCurrentPostIdRef.current;
     const currentVisibleIds = new Set(currentPid ? [currentPid] : []);
-    // Use sortedPostsRef to avoid stale random sort
     const allPosts = sortedPostsRef.current;
+    const votes = userVotesRef.current;
+    const currentUser = user;
     let nextPost: Post | null = null;
-    // First try posts not yet shown
+    // First try unvoted, non-own posts not yet shown
     for (const post of allPosts) {
       const pid = String(post.id);
-      if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid)) {
+      if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && !votes[pid] && post.username !== currentUser) {
         nextPost = post;
         break;
       }
     }
-    // If all shown, allow re-showing
+    // If all unvoted shown, try unvoted not currently visible
     if (!nextPost) {
       for (const post of allPosts) {
         const pid = String(post.id);
-        if (!currentVisibleIds.has(pid)) {
+        if (!currentVisibleIds.has(pid) && !votes[pid] && post.username !== currentUser) {
           nextPost = post;
           break;
         }
@@ -399,7 +406,7 @@ export default function Vote() {
     } else {
       setSwipeCurrentPostId(null);
     }
-  }, []);
+  }, [user]);
 
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
@@ -408,28 +415,19 @@ export default function Vote() {
     if (!requireLogin()) return;
 
     const post = posts.find((p) => String(p.id) === currentPid);
-    const isOwnPost = post?.username === user;
-    const prevVote = userVotesRef.current[currentPid];
-
-    // Own post or already voted same direction — just skip
-    if (isOwnPost || prevVote === direction) {
-      setSwipeResult({ direction, delta: 0 });
-      setTimeout(() => {
-        setSwipeResult(null);
-        advanceSwipeCard();
-      }, 500);
-      return;
-    }
-
+    if (!post) return;
+    const currentVotes = post.votes ?? 0;
     const delta = direction === "up" ? 1 : -1;
+    const newTotal = currentVotes + delta;
+
     handleVoteOptimistic(currentPid, direction);
-    setSwipeResult({ direction, delta });
+    setSwipeResult({ direction, delta, newTotal });
 
     setTimeout(() => {
       setSwipeResult(null);
       advanceSwipeCard();
     }, 800);
-  }, [posts, user, advanceSwipeCard]);
+  }, [posts, advanceSwipeCard]);
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
@@ -800,18 +798,19 @@ export default function Vote() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              opacity: swipeDragX < -20 ? 1 : 0.35,
+              opacity: swipeDragX < -20 ? 1 : 0.6,
               transition: "opacity 0.2s ease",
-              minWidth: isMobile ? "40px" : "80px",
+              minWidth: isMobile ? "50px" : "100px",
             }}>
-              <span style={{ fontSize: isMobile ? "1.5rem" : "3rem", color: "#c85a4a" }}>←</span>
+              <span style={{ fontSize: isMobile ? "2.5rem" : "4rem", color: "#c85a4a", textShadow: "0 0 12px rgba(200, 90, 74, 0.6)" }}>←</span>
               <span style={{
                 fontFamily: "'Cinzel', serif",
                 color: "#c85a4a",
                 fontWeight: 700,
-                fontSize: isMobile ? "0.55rem" : "0.9rem",
+                fontSize: isMobile ? "0.75rem" : "1.1rem",
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
+                textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
               }}>Downvote</span>
             </div>
 
@@ -829,19 +828,30 @@ export default function Vote() {
                       position: "absolute",
                       inset: 0,
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       zIndex: 10,
                     }}
                   >
                     <span style={{
-                      fontSize: isMobile ? "3rem" : "4rem",
+                      fontSize: isMobile ? "2rem" : "2.5rem",
                       fontWeight: 900,
                       color: swipeResult.direction === "up" ? "#8ab47a" : "#c85a4a",
                       fontFamily: "'Cinzel', serif",
                       textShadow: "0 0 20px currentColor",
                     }}>
-                      {swipeResult.delta === 0 ? "Skip" : swipeResult.direction === "up" ? "+1" : "-1"}
+                      {swipeResult.direction === "up" ? "+1" : "-1"}
+                    </span>
+                    <span style={{
+                      fontSize: isMobile ? "3rem" : "4rem",
+                      fontWeight: 900,
+                      color: "#d4af37",
+                      fontFamily: "'Cinzel', serif",
+                      textShadow: "0 0 15px rgba(212, 175, 55, 0.5)",
+                      marginTop: "4px",
+                    }}>
+                      {swipeResult.newTotal} votes
                     </span>
                   </motion.div>
                 )}
@@ -852,8 +862,6 @@ export default function Vote() {
                 {swipeCurrentPostId && !swipeResult && (() => {
                   const post = getPost(swipeCurrentPostId);
                   if (!post) return null;
-                  const userVote = userVotes[String(post.id)];
-                  const isOwnPost = post.username === user;
 
                   return (
                     <motion.div
@@ -883,10 +891,11 @@ export default function Vote() {
                       style={{
                         x: dragX,
                         rotate: cardRotation,
-                        border: "2px solid #555",
+                        border: "2px solid #d4af37",
                         padding: isMobile ? "16px 14px" : "28px 32px",
                         borderRadius: "12px",
                         backgroundColor: "rgba(255,255,255,0.05)",
+                        boxShadow: "0 0 12px rgba(212, 175, 55, 0.15)",
                         cursor: "grab",
                         textAlign: "center",
                       }}
@@ -929,18 +938,6 @@ export default function Vote() {
                         </Link>
                       </div>
 
-                      {(isOwnPost || userVote) && (
-                        <p style={{
-                          textAlign: "center",
-                          color: "#888",
-                          fontSize: "0.85rem",
-                          fontStyle: "italic",
-                          marginTop: "12px",
-                          marginBottom: 0,
-                        }}>
-                          {isOwnPost ? "Your commandment — swipe to skip" : `Already voted ${userVote}`}
-                        </p>
-                      )}
 
                     </motion.div>
                   );
@@ -965,18 +962,19 @@ export default function Vote() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              opacity: swipeDragX > 20 ? 1 : 0.35,
+              opacity: swipeDragX > 20 ? 1 : 0.6,
               transition: "opacity 0.2s ease",
-              minWidth: isMobile ? "40px" : "80px",
+              minWidth: isMobile ? "50px" : "100px",
             }}>
-              <span style={{ fontSize: isMobile ? "1.5rem" : "3rem", color: "#8ab47a" }}>→</span>
+              <span style={{ fontSize: isMobile ? "2.5rem" : "4rem", color: "#8ab47a", textShadow: "0 0 12px rgba(138, 180, 122, 0.6)" }}>→</span>
               <span style={{
                 fontFamily: "'Cinzel', serif",
                 color: "#8ab47a",
                 fontWeight: 700,
-                fontSize: isMobile ? "0.55rem" : "0.9rem",
+                fontSize: isMobile ? "0.75rem" : "1.1rem",
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
+                textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
               }}>Upvote</span>
             </div>
           </div>
