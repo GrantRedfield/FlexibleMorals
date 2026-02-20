@@ -238,7 +238,7 @@ export default function Home() {
                 <p style={{ fontFamily: "'Cinzel', serif", fontSize: "0.85rem", color: "#5a4a2a", margin: "0 0 12px 0" }}>
                   Be the first to inscribe a commandment.
                 </p>
-                <button onClick={() => navigate("/vote")} style={{ fontFamily: "'Cinzel', serif", fontSize: "0.9rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "8px 20px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
+                <button onClick={() => navigate("/vote", { state: { fromHome: true } })} style={{ fontFamily: "'Cinzel', serif", fontSize: "0.9rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "8px 20px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
                   Inscribe a Commandment
                 </button>
               </div>
@@ -251,7 +251,7 @@ export default function Home() {
           </div>
           {/* Mobile buttons — Vote + Live Chat */}
           <div className="mobile-buttons-overlay">
-            <button onClick={() => navigate("/vote")} className="vote-button mobile-btn">
+            <button onClick={() => navigate("/vote", { state: { fromHome: true } })} className="vote-button mobile-btn">
               Vote
             </button>
             <button onClick={() => chatBoxRef.current?.expand()} className="vote-button mobile-btn">
@@ -335,7 +335,7 @@ export default function Home() {
             <span className="prayer-hands prayer-bottom">🙏</span>
           </>
         )}
-        <button onClick={() => navigate("/vote")} className="vote-button">
+        <button onClick={() => navigate("/vote", { state: { fromHome: true } })} className="vote-button">
           Vote
         </button>
       </div>
@@ -519,7 +519,7 @@ export default function Home() {
               <p style={{ fontFamily: "'Cinzel', serif", fontSize: "0.95rem", color: "#c8b070", textShadow: "1px 1px 3px rgba(0,0,0,0.8)", margin: "0 0 12px 0" }}>
                 Be the first to create a commandment and define the morals for humanity.
               </p>
-              <button onClick={() => navigate("/vote")} style={{ fontFamily: "'Cinzel', serif", fontSize: "1rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "10px 24px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
+              <button onClick={() => navigate("/vote", { state: { fromHome: true } })} style={{ fontFamily: "'Cinzel', serif", fontSize: "1rem", fontWeight: 700, color: "#fdf8e6", backgroundColor: "#b79b3d", border: "2px solid #d4af37", borderRadius: "8px", padding: "10px 24px", cursor: "pointer", textShadow: "1px 1px 2px rgba(0,0,0,0.5)" }}>
                 Inscribe a Commandment
               </button>
             </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { getPosts, voteOnPost, createPost, getComments } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
@@ -39,7 +39,19 @@ export default function Vote() {
   const [error, setError] = useState<string | null>(null);
   const [newCommandment, setNewCommandment] = useState("");
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
-  const [sortOption, setSortOption] = useState<SortOption>("random");
+  const location = useLocation();
+  const [sortOption, setSortOption] = useState<SortOption>(() => {
+    // If navigated from home page, default to random
+    if ((location.state as any)?.fromHome) {
+      sessionStorage.removeItem("fm_voteSort");
+      return "random";
+    }
+    // Otherwise restore last sort (e.g. back from comments)
+    const saved = sessionStorage.getItem("fm_voteSort") as SortOption | null;
+    const validSorts: SortOption[] = ["top", "hot", "new", "random", "swipe"];
+    if (saved && validSorts.includes(saved)) return saved;
+    return "random";
+  });
   const [shuffleTrigger, setShuffleTrigger] = useState(0);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [visibleSlots, setVisibleSlots] = useState<VisibleSlot[]>([]);
@@ -269,6 +281,11 @@ export default function Vote() {
     }
   }, [postsLoaded, sortOption, shuffleTrigger]);
 
+  // Persist sort option to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("fm_voteSort", sortOption);
+  }, [sortOption]);
+
   // Persist userVotes locally (scoped per user)
   useEffect(() => {
     const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
@@ -372,6 +389,9 @@ export default function Vote() {
   const swipeCurrentPostIdRef = useRef(swipeCurrentPostId);
   useEffect(() => { swipeCurrentPostIdRef.current = swipeCurrentPostId; }, [swipeCurrentPostId]);
 
+  // Track the last exit direction so AnimatePresence exit knows which way to fly
+  const lastSwipeDirection = useRef<"up" | "down" | null>(null);
+
   // === Swipe mode: advance to next card ===
   const advanceSwipeCard = useCallback(() => {
     const currentPid = swipeCurrentPostIdRef.current;
@@ -408,10 +428,14 @@ export default function Vote() {
     }
   }, [user]);
 
+  // Swipe exiting state — when true, card is removed from DOM triggering exit anim
+  const [swipeExiting, setSwipeExiting] = useState(false);
+
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
+    if (swipeExiting) return; // prevent double-vote during exit
     if (!requireLogin()) return;
 
     const post = posts.find((p) => String(p.id) === currentPid);
@@ -420,14 +444,24 @@ export default function Vote() {
     const delta = direction === "up" ? 1 : -1;
     const newTotal = currentVotes + delta;
 
+    lastSwipeDirection.current = direction;
     handleVoteOptimistic(currentPid, direction);
     setSwipeResult({ direction, delta, newTotal });
 
+    // Show updated count briefly, then trigger exit
     setTimeout(() => {
+      setSwipeExiting(true);
+    }, 800);
+  }, [posts, swipeExiting]);
+
+  // When exit animation completes, advance to next card
+  const handleSwipeExitComplete = useCallback(() => {
+    if (swipeExiting) {
+      setSwipeExiting(false);
       setSwipeResult(null);
       advanceSwipeCard();
-    }, 800);
-  }, [posts, advanceSwipeCard]);
+    }
+  }, [swipeExiting, advanceSwipeCard]);
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
@@ -816,13 +850,43 @@ export default function Vote() {
 
             {/* Card area */}
             <div style={{ flex: 1, maxWidth: isMobile ? undefined : "500px", position: "relative", minHeight: isMobile ? "180px" : "280px" }}>
+              {/* Background +1 / -1 indicator */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 0,
+                pointerEvents: "none",
+              }}>
+                <span style={{
+                  fontSize: isMobile ? "5rem" : "8rem",
+                  fontWeight: 900,
+                  fontFamily: "'Cinzel', serif",
+                  opacity: Math.min(Math.abs(swipeDragX) / 150, 0.4),
+                  color: swipeDragX > 0 ? "#8ab47a" : swipeDragX < 0 ? "#c85a4a" : "transparent",
+                  transition: swipeDragX === 0 ? "opacity 0.2s ease" : "none",
+                  userSelect: "none",
+                }}>
+                  {swipeDragX > 0 ? "+1" : swipeDragX < 0 ? "-1" : ""}
+                </span>
+              </div>
+
               {/* The draggable card */}
-              <AnimatePresence mode="wait">
-                {swipeCurrentPostId && (() => {
+              <AnimatePresence mode="wait" onExitComplete={handleSwipeExitComplete}>
+                {swipeCurrentPostId && !swipeExiting && (() => {
                   const post = getPost(swipeCurrentPostId);
                   if (!post) return null;
                   const isVoted = !!swipeResult;
                   const votedColor = swipeResult?.direction === "up" ? "#8ab47a" : swipeResult?.direction === "down" ? "#c85a4a" : "#d4af37";
+
+                  // Preview vote count: show +1/-1 as user drags past threshold
+                  const baseVotes = post.votes ?? 0;
+                  const dragThreshold = 80;
+                  const previewDelta = !isVoted && swipeDragX > dragThreshold ? 1 : !isVoted && swipeDragX < -dragThreshold ? -1 : 0;
+                  const displayVotes = isVoted ? baseVotes : baseVotes + previewDelta;
+                  const previewColor = previewDelta > 0 ? "#8ab47a" : previewDelta < 0 ? "#c85a4a" : "#d1b97b";
 
                   return (
                     <motion.div
@@ -845,8 +909,8 @@ export default function Vote() {
                       animate={{ opacity: 1, scale: 1, x: 0 }}
                       exit={{
                         opacity: 0,
-                        x: swipeResult?.direction === "up" ? 300 : -300,
-                        rotate: swipeResult?.direction === "up" ? 15 : -15,
+                        x: lastSwipeDirection.current === "up" ? 300 : -300,
+                        rotate: lastSwipeDirection.current === "up" ? 15 : -15,
                       }}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
                       style={{
@@ -861,7 +925,8 @@ export default function Vote() {
                           : "0 0 12px rgba(212, 175, 55, 0.15)",
                         cursor: isVoted ? "default" : "grab",
                         textAlign: "center",
-                        transition: "border 0.2s ease, box-shadow 0.2s ease",
+                        position: "relative",
+                        zIndex: 1,
                       }}
                       whileDrag={{ cursor: "grabbing" }}
                     >
@@ -878,13 +943,13 @@ export default function Vote() {
 
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
                         <span style={{
-                          fontSize: isVoted ? (isMobile ? "22px" : "26px") : (isMobile ? "14px" : "16px"),
-                          color: isVoted ? votedColor : "#d1b97b",
-                          fontWeight: isVoted ? 900 : 600,
-                          transition: "all 0.3s ease",
-                          textShadow: isVoted ? `0 0 12px ${votedColor}80` : "none",
+                          fontSize: (isVoted || previewDelta !== 0) ? (isMobile ? "22px" : "26px") : (isMobile ? "14px" : "16px"),
+                          color: isVoted ? votedColor : previewColor,
+                          fontWeight: (isVoted || previewDelta !== 0) ? 900 : 600,
+                          transition: "all 0.2s ease",
+                          textShadow: isVoted ? `0 0 12px ${votedColor}80` : previewDelta !== 0 ? `0 0 8px ${previewColor}60` : "none",
                         }}>
-                          {post.votes ?? 0} votes
+                          {displayVotes} votes
                         </span>
                         <span style={{ fontSize: isMobile ? "13px" : "15px", color: "#888", fontStyle: "italic" }}>
                           {post.username || "unknown"}
@@ -908,6 +973,43 @@ export default function Vote() {
                         </Link>
                       </div>
 
+                      {/* Vote buttons */}
+                      {!isVoted && (
+                        <div style={{ display: "flex", gap: "10px", marginTop: "16px", justifyContent: "center" }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSwipeVote("down"); }}
+                            style={{
+                              padding: isMobile ? "8px 18px" : "10px 24px",
+                              borderRadius: "8px",
+                              border: "none",
+                              cursor: "pointer",
+                              background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
+                              color: "#fdf8e6",
+                              fontSize: isMobile ? "0.85rem" : "1rem",
+                              fontWeight: 700,
+                              fontFamily: "'Cinzel', serif",
+                            }}
+                          >
+                            👎 Downvote
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSwipeVote("up"); }}
+                            style={{
+                              padding: isMobile ? "8px 18px" : "10px 24px",
+                              borderRadius: "8px",
+                              border: "none",
+                              cursor: "pointer",
+                              background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
+                              color: "#fdf8e6",
+                              fontSize: isMobile ? "0.85rem" : "1rem",
+                              fontWeight: 700,
+                              fontFamily: "'Cinzel', serif",
+                            }}
+                          >
+                            👍 Upvote
+                          </button>
+                        </div>
+                      )}
 
                     </motion.div>
                   );
