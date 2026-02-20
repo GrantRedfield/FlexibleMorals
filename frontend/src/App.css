@@ -1100,10 +1100,10 @@
   .mobile-tablet-overlay {
     position: absolute;
     z-index: 10;
-    top: 18.5%;
+    top: 15%;
     bottom: 29.5%;
-    left: 12%;
-    right: 12%;
+    left: 6%;
+    right: 6%;
     padding: 4px 0;
     display: flex;
     flex-direction: column;
@@ -1133,7 +1133,7 @@
     width: 100% !important;
     max-width: none;
     margin-bottom: 0;
-    gap: 2px;
+    gap: 4px;
     display: flex;
     flex-direction: column;
   }
@@ -1141,9 +1141,9 @@
   .mobile-tablet-overlay .commandment-border {
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(212, 175, 55, 0.4);
-    border-radius: 3px;
-    font-size: 0.75rem;
-    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    padding: 5px 8px;
     min-height: 0;
     color: #fff;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
@@ -1158,34 +1158,18 @@
   }
 
   .mobile-tablet-overlay .commandment-text {
-    font-size: 0.75rem;
-    line-height: 1.15;
+    font-size: 0.85rem;
+    line-height: 1.2;
   }
 
   .mobile-tablet-overlay .commandment-number {
     color: #ffd700;
     font-weight: 700;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
   }
 
-  /* Show vote count on mobile, hide username */
+  /* Hide vote count and username row on mobile tablet to maximize space */
   .mobile-tablet-overlay .commandment-border > div:last-child {
-    display: flex !important;
-    margin-top: 0px;
-    gap: 4px;
-  }
-
-  .mobile-tablet-overlay .vote-count {
-    font-size: 0.5rem;
-    opacity: 0.7;
-    color: #c8b070;
-    font-family: "Cinzel", serif;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  /* Hide username on mobile tablet to save space */
-  .mobile-tablet-overlay .commandment-border > div:last-child > span:last-child {
     display: none !important;
   }
 
