@@ -1,26 +1,26 @@
 /* --- Hamburger icon button --- */
 .hamburger-icon {
   position: fixed;
-  top: 0.5rem;
-  left: 0.5rem;
+  top: 0.4rem;
+  left: 0.4rem;
   z-index: 1001;
   background: rgba(20, 15, 5, 0.85);
   border: 1.5px solid #d4af37;
   border-radius: 6px;
-  padding: 8px 9px;
+  padding: 7px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 34px;
+  min-height: 34px;
   align-items: center;
   justify-content: center;
 }
 
 .hamburger-bar {
   display: block;
-  width: 18px;
+  width: 16px;
   height: 2px;
   background-color: #d4af37;
   border-radius: 1px;
