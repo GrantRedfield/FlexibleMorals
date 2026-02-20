@@ -202,17 +202,12 @@ export default function Home() {
     <div className="home-root">
       {/* ✅ Background + overlays wrapper */}
       {isMobile ? (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundColor: "#1a0e08" }}>
-          <img
-            src="/FlexibleMoralsMobile8.png"
-            alt="Flexible Morals Background"
-            className="home-background-balanced"
-          />
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundImage: "url(/FlexibleMoralsMobile8.png)", backgroundSize: "100% 100%", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
           {/* Countdown — top right */}
           <div
             style={{
               position: "absolute",
-              top: 0,
+              top: "-0.2rem",
               right: "0.3rem",
               zIndex: 20,
               textAlign: "right",
