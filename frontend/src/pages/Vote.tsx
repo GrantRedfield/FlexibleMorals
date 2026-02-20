@@ -816,58 +816,19 @@ export default function Vote() {
 
             {/* Card area */}
             <div style={{ flex: 1, maxWidth: isMobile ? undefined : "500px", position: "relative", minHeight: isMobile ? "180px" : "280px" }}>
-              {/* Vote result overlay */}
-              <AnimatePresence>
-                {swipeResult && (
-                  <motion.div
-                    key="vote-result"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 10,
-                    }}
-                  >
-                    <span style={{
-                      fontSize: isMobile ? "2rem" : "2.5rem",
-                      fontWeight: 900,
-                      color: swipeResult.direction === "up" ? "#8ab47a" : "#c85a4a",
-                      fontFamily: "'Cinzel', serif",
-                      textShadow: "0 0 20px currentColor",
-                    }}>
-                      {swipeResult.direction === "up" ? "+1" : "-1"}
-                    </span>
-                    <span style={{
-                      fontSize: isMobile ? "3rem" : "4rem",
-                      fontWeight: 900,
-                      color: "#d4af37",
-                      fontFamily: "'Cinzel', serif",
-                      textShadow: "0 0 15px rgba(212, 175, 55, 0.5)",
-                      marginTop: "4px",
-                    }}>
-                      {swipeResult.newTotal} votes
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {/* The draggable card */}
               <AnimatePresence mode="wait">
-                {swipeCurrentPostId && !swipeResult && (() => {
+                {swipeCurrentPostId && (() => {
                   const post = getPost(swipeCurrentPostId);
                   if (!post) return null;
+                  const isVoted = !!swipeResult;
+                  const votedColor = swipeResult?.direction === "up" ? "#8ab47a" : swipeResult?.direction === "down" ? "#c85a4a" : "#d4af37";
 
                   return (
                     <motion.div
                       key={swipeCardKey}
                       className="swipe-card"
-                      drag="x"
+                      drag={isVoted ? false : "x"}
                       dragConstraints={{ left: 0, right: 0 }}
                       dragElastic={0.9}
                       onDrag={(_: any, info: any) => setSwipeDragX(info.offset.x)}
@@ -884,20 +845,23 @@ export default function Vote() {
                       animate={{ opacity: 1, scale: 1, x: 0 }}
                       exit={{
                         opacity: 0,
-                        x: swipeDragX > 0 ? 300 : -300,
-                        rotate: swipeDragX > 0 ? 15 : -15,
+                        x: swipeResult?.direction === "up" ? 300 : -300,
+                        rotate: swipeResult?.direction === "up" ? 15 : -15,
                       }}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
                       style={{
-                        x: dragX,
-                        rotate: cardRotation,
-                        border: "2px solid #d4af37",
+                        x: isVoted ? 0 : dragX,
+                        rotate: isVoted ? 0 : cardRotation,
+                        border: isVoted ? `3px solid ${votedColor}` : "2px solid #d4af37",
                         padding: isMobile ? "16px 14px" : "28px 32px",
                         borderRadius: "12px",
                         backgroundColor: "rgba(255,255,255,0.05)",
-                        boxShadow: "0 0 12px rgba(212, 175, 55, 0.15)",
-                        cursor: "grab",
+                        boxShadow: isVoted
+                          ? `0 0 25px ${votedColor}40, 0 0 10px ${votedColor}25`
+                          : "0 0 12px rgba(212, 175, 55, 0.15)",
+                        cursor: isVoted ? "default" : "grab",
                         textAlign: "center",
+                        transition: "border 0.2s ease, box-shadow 0.2s ease",
                       }}
                       whileDrag={{ cursor: "grabbing" }}
                     >
@@ -913,7 +877,13 @@ export default function Vote() {
                       </h2>
 
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: isMobile ? "14px" : "16px", color: "#d1b97b", fontWeight: 600 }}>
+                        <span style={{
+                          fontSize: isVoted ? (isMobile ? "22px" : "26px") : (isMobile ? "14px" : "16px"),
+                          color: isVoted ? votedColor : "#d1b97b",
+                          fontWeight: isVoted ? 900 : 600,
+                          transition: "all 0.3s ease",
+                          textShadow: isVoted ? `0 0 12px ${votedColor}80` : "none",
+                        }}>
                           {post.votes ?? 0} votes
                         </span>
                         <span style={{ fontSize: isMobile ? "13px" : "15px", color: "#888", fontStyle: "italic" }}>
