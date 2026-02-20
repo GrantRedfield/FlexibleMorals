@@ -562,8 +562,8 @@ export default function Vote() {
             textShadow:
               "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 15px rgba(200, 176, 112, 0.25)",
             letterSpacing: "0.08em",
-            marginBottom: isMobile ? "0.2rem" : "0.4rem",
-            marginTop: isMobile ? "1.2rem" : undefined,
+            marginBottom: isMobile ? "0.15rem" : "0.4rem",
+            marginTop: isMobile ? "1.8rem" : undefined,
             textTransform: "uppercase",
           }}
         >
@@ -701,7 +701,7 @@ export default function Vote() {
                 key={slot.postId}
                 style={{
                   border: "1px solid #555",
-                  padding: isMobile ? "8px 10px" : "16px 20px",
+                  padding: isMobile ? "6px 10px" : "16px 20px",
                   borderRadius: isMobile ? "6px" : "12px",
                   display: "flex",
                   flexDirection: "column",
@@ -714,7 +714,7 @@ export default function Vote() {
                 }}
               >
                 <div>
-                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "1.05rem" : "1.4rem", margin: isMobile ? "0 0 3px 0" : "0 0 6px 0", lineHeight: isMobile ? 1.25 : 1.35, wordBreak: "break-word", whiteSpace: "normal" }}>
+                  <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "0.95rem" : "1.4rem", margin: isMobile ? "0 0 2px 0" : "0 0 6px 0", lineHeight: isMobile ? 1.2 : 1.35, wordBreak: "break-word", whiteSpace: "normal" }}>
                     {post.title || post.content}
                   </h2>
                   <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "12px", marginTop: isMobile ? "1px" : "4px", flexWrap: "wrap" }}>
@@ -765,22 +765,22 @@ export default function Vote() {
                 </div>
                 {isOwnPost ? (
                   <div style={{ marginTop: "auto", paddingTop: isMobile ? "3px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.75rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
                       Your commandment
                     </p>
                     <button
                       style={{
                         width: "100%",
-                        padding: isMobile ? "5px 0" : "10px 0",
+                        padding: isMobile ? "4px 0" : "10px 0",
                         borderRadius: isMobile ? "5px" : "8px",
                         border: "1px solid #555",
                         cursor: "pointer",
                         backgroundColor: "rgba(255,255,255,0.08)",
                         color: "#d1b97b",
-                        fontSize: isMobile ? "0.85rem" : "0.95rem",
+                        fontSize: isMobile ? "0.8rem" : "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "30px" : "44px",
+                        minHeight: isMobile ? "28px" : "44px",
                       }}
                       onClick={() => handleSkip(post.id)}
                     >
@@ -789,22 +789,22 @@ export default function Vote() {
                   </div>
                 ) : userVote ? (
                   <div style={{ marginTop: "auto", paddingTop: isMobile ? "3px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.75rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
+                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
                       Already voted
                     </p>
                     <button
                       style={{
                         width: "100%",
-                        padding: isMobile ? "5px 0" : "10px 0",
+                        padding: isMobile ? "4px 0" : "10px 0",
                         borderRadius: isMobile ? "5px" : "8px",
                         border: "1px solid #555",
                         cursor: "pointer",
                         backgroundColor: "rgba(255,255,255,0.08)",
                         color: "#d1b97b",
-                        fontSize: isMobile ? "0.85rem" : "0.95rem",
+                        fontSize: isMobile ? "0.8rem" : "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "30px" : "44px",
+                        minHeight: isMobile ? "28px" : "44px",
                       }}
                       onClick={() => handleSkip(post.id)}
                     >
@@ -812,19 +812,19 @@ export default function Vote() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: isMobile ? "6px" : "10px", marginTop: isMobile ? "auto" : "auto", paddingTop: isMobile ? "4px" : "8px" }}>
+                  <div style={{ display: "flex", gap: isMobile ? "6px" : "10px", marginTop: isMobile ? "auto" : "auto", paddingTop: isMobile ? "3px" : "8px" }}>
                     <button
                       style={{
                         flex: 1,
-                        padding: isMobile ? "5px 0" : "12px 0",
+                        padding: isMobile ? "4px 0" : "12px 0",
                         borderRadius: isMobile ? "5px" : "8px",
                         border: "none",
                         cursor: "pointer",
                         backgroundColor: "#7a9a6a",
                         background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
                         color: "#fdf8e6",
-                        fontSize: isMobile ? "22px" : "26px",
-                        minHeight: isMobile ? "34px" : "48px",
+                        fontSize: isMobile ? "20px" : "26px",
+                        minHeight: isMobile ? "32px" : "48px",
                         boxShadow: "0 0 12px rgba(200, 220, 140, 0.25)",
                       }}
                       onClick={() => handleVote(post.id, "up")}
@@ -841,8 +841,8 @@ export default function Vote() {
                         backgroundColor: "#a87a6a",
                         background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
                         color: "#fdf8e6",
-                        fontSize: isMobile ? "22px" : "26px",
-                        minHeight: isMobile ? "34px" : "48px",
+                        fontSize: isMobile ? "20px" : "26px",
+                        minHeight: isMobile ? "32px" : "48px",
                         boxShadow: "0 0 12px rgba(255, 80, 40, 0.2)",
                       }}
                       onClick={() => handleVote(post.id, "down")}
