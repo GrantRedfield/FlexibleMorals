@@ -461,7 +461,7 @@ export default function Home() {
 
             {/* T-Shirt photos */}
             <img
-              src="/merch_tee.png"
+              src="/merch_tee_back.png"
               alt="Flexible Morals Tee - Back with Commandments"
               style={{
                 width: "100%",
