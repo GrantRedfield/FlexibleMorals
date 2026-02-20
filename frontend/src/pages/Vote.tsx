@@ -942,41 +942,6 @@ export default function Vote() {
                         </p>
                       )}
 
-                      {/* Desktop click buttons */}
-                      <div style={{ display: "flex", gap: "10px", marginTop: "16px", justifyContent: "center" }}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleSwipeVote("down"); }}
-                          style={{
-                            padding: isMobile ? "8px 18px" : "10px 24px",
-                            borderRadius: "8px",
-                            border: "none",
-                            cursor: "pointer",
-                            background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
-                            color: "#fdf8e6",
-                            fontSize: isMobile ? "0.85rem" : "1rem",
-                            fontWeight: 700,
-                            fontFamily: "'Cinzel', serif",
-                          }}
-                        >
-                          👎 Downvote
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleSwipeVote("up"); }}
-                          style={{
-                            padding: isMobile ? "8px 18px" : "10px 24px",
-                            borderRadius: "8px",
-                            border: "none",
-                            cursor: "pointer",
-                            background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
-                            color: "#fdf8e6",
-                            fontSize: isMobile ? "0.85rem" : "1rem",
-                            fontWeight: 700,
-                            fontFamily: "'Cinzel', serif",
-                          }}
-                        >
-                          👍 Upvote
-                        </button>
-                      </div>
                     </motion.div>
                   );
                 })()}
