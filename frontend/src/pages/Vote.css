@@ -139,6 +139,30 @@ button:hover {
   }
 }
 
+/* ============================================================
+   Swipe Mode
+   ============================================================ */
+
+.swipe-card {
+  user-select: none;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+}
+
+.swipe-mode-active {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@keyframes arrowPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.swipe-arrow-active {
+  animation: arrowPulse 0.5s ease-in-out infinite;
+}
+
 /* --- Mobile: hide all clouds --- */
 @media (max-width: 768px) {
   .cloud {
