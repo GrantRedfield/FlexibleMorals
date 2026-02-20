@@ -939,7 +939,7 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center top;
+    object-position: center center;
     display: block;
   }
 
@@ -1001,7 +1001,7 @@
   /* --- Mobile buttons: two side-by-side buttons below the tablet --- */
   .mobile-buttons-overlay {
     position: absolute;
-    top: 71%;
+    top: 88%;
     left: 0;
     right: 0;
     bottom: 0;
@@ -1100,10 +1100,10 @@
   .mobile-tablet-overlay {
     position: absolute;
     z-index: 10;
-    top: 15%;
-    bottom: 26%;
-    left: 10%;
-    right: 10%;
+    top: 9%;
+    bottom: 10%;
+    left: 15%;
+    right: 15%;
     padding: 4px 0;
     display: flex;
     flex-direction: column;
