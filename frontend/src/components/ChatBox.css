@@ -459,6 +459,11 @@
 }
 
 @media (max-width: 768px) {
+  /* Hide collapsed FAB when we have a dedicated Live Chat button */
+  .chat-box.chat-mobile-hidden:not(.chat-mobile-expanded) {
+    display: none !important;
+  }
+
   /* Collapsed state: circular FAB */
   .chat-box {
     position: fixed;

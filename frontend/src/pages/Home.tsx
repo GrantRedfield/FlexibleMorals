@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useNavigate } from "react-router-dom";
 import { getPosts } from "../utils/api";
@@ -6,6 +6,8 @@ import DonationPopup from "../components/DonationPopup";
 import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import ChatBox from "../components/ChatBox";
+import type { ChatBoxHandle } from "../components/ChatBox";
+import HamburgerMenu from "../components/HamburgerMenu";
 import UserProfilePopup from "../components/UserProfilePopup";
 import { useDonor } from "../context/DonorContext";
 import { useAuth } from "../context/AuthContext";
@@ -45,11 +47,8 @@ export default function Home() {
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
-  const [mobileCommandmentPage, setMobileCommandmentPage] = useState<0 | 1>(0);
-  const [slideDirection, setSlideDirection] = useState<"" | "slide-up" | "slide-down">("");
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [pendingPage, setPendingPage] = useState<0 | 1 | null>(null);
 
+  const chatBoxRef = useRef<ChatBoxHandle>(null);
   const navigate = useNavigate();
   const { donorStatuses, loadDonorStatuses, getDonorStatus } = useDonor();
   const { user } = useAuth();
@@ -137,22 +136,6 @@ export default function Home() {
   const leftPosts = sortedPosts.slice(0, 5);
   const rightPosts = sortedPosts.slice(5, 10);
   const allPosts = sortedPosts.slice(0, 10);
-  const mobileVisiblePosts = mobileCommandmentPage === 0 ? allPosts.slice(0, 5) : allPosts.slice(5, 10);
-  const mobileIncomingPosts = pendingPage === 0 ? allPosts.slice(0, 5) : pendingPage === 1 ? allPosts.slice(5, 10) : [];
-
-  const handlePageChange = (newPage: 0 | 1) => {
-    if (isTransitioning) return;
-    const direction = newPage === 1 ? "slide-up" : "slide-down";
-    setSlideDirection(direction);
-    setPendingPage(newPage);
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setMobileCommandmentPage(newPage);
-      setSlideDirection("");
-      setPendingPage(null);
-      setIsTransitioning(false);
-    }, 300);
-  };
 
   // Shared renderer for a single commandment card
   const renderCommandment = (post: Post, index: number, showNumber: boolean) => {
@@ -250,7 +233,7 @@ export default function Home() {
               {daysLeft} days until moral reset
             </span>
           </div>
-          {/* Commandments — overlaid on the tablet */}
+          {/* Commandments — scrollable on the tablet */}
           <div className="mobile-tablet-overlay">
             {!loading && !error && posts.length === 0 && (
               <div className="empty-state" style={{ textAlign: "center", zIndex: 10 }}>
@@ -265,72 +248,19 @@ export default function Home() {
                 </button>
               </div>
             )}
-            {/* Outgoing commandments (current page, animates out) — arrows inside so they slide together */}
-            <div className={`stone-column ${slideDirection}`}>
-              {/* Up arrow at top — only when viewing page 1 (commandments 6-10) */}
-              {mobileCommandmentPage === 1 && (
-                <div
-                  className="tablet-nav-arrow tablet-nav-arrow-up"
-                  onClick={() => handlePageChange(0)}
-                >
-                  <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
-                  <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>I — V</span>
-                </div>
-              )}
+            <div className="stone-column">
               {loading && <div className="commandment-border">Loading...</div>}
               {error && <div className="commandment-border">{error}</div>}
-              {!loading && !error && mobileVisiblePosts.map((post, index) => renderCommandment(post, index + (mobileCommandmentPage === 1 ? 5 : 0), true))}
-              {/* Down arrow at bottom — only when viewing page 0 (commandments 1-5) */}
-              {mobileCommandmentPage === 0 && allPosts.length > 5 && (
-                <div
-                  className="tablet-nav-arrow tablet-nav-arrow-down"
-                  onClick={() => handlePageChange(1)}
-                >
-                  <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>VI — X</span>
-                  <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
-                </div>
-              )}
+              {!loading && !error && allPosts.map((post, index) => renderCommandment(post, index, true))}
             </div>
-            {/* Incoming commandments (next page, animates in) — arrows inside so they slide in together */}
-            {isTransitioning && pendingPage !== null && (
-              <div className={`stone-column ${slideDirection === "slide-up" ? "slide-in-up" : "slide-in-down"}`}>
-                {/* Up arrow at top — incoming page 1 */}
-                {pendingPage === 1 && (
-                  <div
-                    className="tablet-nav-arrow tablet-nav-arrow-up"
-                    onClick={() => handlePageChange(0)}
-                  >
-                    <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
-                    <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>I — V</span>
-                  </div>
-                )}
-                {mobileIncomingPosts.map((post, index) => renderCommandment(post, index + (pendingPage === 1 ? 5 : 0), true))}
-                {/* Down arrow at bottom — incoming page 0 */}
-                {pendingPage === 0 && allPosts.length > 5 && (
-                  <div
-                    className="tablet-nav-arrow tablet-nav-arrow-down"
-                    onClick={() => handlePageChange(1)}
-                  >
-                    <span style={{ fontSize: "1.1rem", letterSpacing: "0.2em" }}>VI — X</span>
-                    <span style={{ fontSize: "2.8rem", lineHeight: 0.6 }}>⟡</span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
-          {/* Mobile buttons — on the red floor, right below the tablet */}
+          {/* Mobile buttons — Vote + Live Chat */}
           <div className="mobile-buttons-overlay">
             <button onClick={() => navigate("/vote")} className="vote-button mobile-btn">
               Vote
             </button>
-            <button onClick={() => setShowDonationPopup(true)} className="vote-button mobile-btn">
-              Offering
-            </button>
-            <button onClick={() => setShowMerchPopup(true)} className="merch-link mobile-btn">
-              Merch
-            </button>
-            <button onClick={() => setShowInfoPopup(true)} className={`info-link mobile-btn${!user ? " charter-glow" : ""}`}>
-              OUR CHARTER
+            <button onClick={() => chatBoxRef.current?.expand()} className="vote-button mobile-btn">
+              Live Chat
             </button>
           </div>
         </div>
@@ -387,11 +317,19 @@ export default function Home() {
         </>
       )}
 
-      {/* ✅ Login Button (Top Left) */}
-      <LoginButton />
+      {/* Login / Menu (Top Left) */}
+      {isMobile ? (
+        <HamburgerMenu
+          onOfferingClick={() => setShowDonationPopup(true)}
+          onMerchClick={() => setShowMerchPopup(true)}
+          onCharterClick={() => setShowInfoPopup(true)}
+        />
+      ) : (
+        <LoginButton />
+      )}
 
-      {/* ✅ Chat Box (Right Side) */}
-      <ChatBox />
+      {/* Chat Box (Right Side) */}
+      <ChatBox ref={chatBoxRef} hideMobileFab={isMobile} />
 
       {/* ✅ Vote button */}
       <div className="vote-button-container">

@@ -1,0 +1,169 @@
+/* --- Hamburger icon button --- */
+.hamburger-icon {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1001;
+  background: rgba(20, 15, 5, 0.85);
+  border: 1.5px solid #d4af37;
+  border-radius: 6px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hamburger-bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background-color: #d4af37;
+  border-radius: 1px;
+}
+
+/* --- Backdrop --- */
+.hamburger-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1002;
+}
+
+/* --- Slide-out panel --- */
+.hamburger-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: rgba(15, 12, 5, 0.97);
+  border-right: 2px solid #d4af37;
+  z-index: 1003;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  font-family: "Cinzel", serif;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.6);
+}
+
+.hamburger-panel.open {
+  transform: translateX(0);
+}
+
+/* --- Close button --- */
+.hamburger-close {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  color: #d4af37;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* --- Auth section --- */
+.hamburger-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+
+.hamburger-welcome {
+  color: #c8b070;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.hamburger-username {
+  color: #d4af37;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  word-break: break-all;
+}
+
+.hamburger-login-btn {
+  background-color: #b79b3d;
+  color: #fdf8e6;
+  border: 2px solid #d4af37;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-family: "Cinzel", serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+}
+
+.hamburger-login-btn:hover {
+  background-color: #d3b956;
+}
+
+.hamburger-logout-btn {
+  background: none;
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 6px 14px;
+  color: #aaa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: "Cinzel", serif;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.hamburger-logout-btn:hover {
+  border-color: #d4af37;
+  color: #d4af37;
+}
+
+/* --- Divider --- */
+.hamburger-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #d4af37, transparent);
+  margin: 1rem 0;
+}
+
+/* --- Navigation buttons --- */
+.hamburger-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hamburger-nav-btn {
+  background: none;
+  border: none;
+  color: #c8b070;
+  font-family: "Cinzel", serif;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 8px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  letter-spacing: 0.05em;
+}
+
+.hamburger-nav-btn:hover {
+  background: rgba(212, 175, 55, 0.12);
+  color: #d4af37;
+}

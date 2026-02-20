@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { getChatMessages, sendChatMessage, getPosts } from "../utils/api";
@@ -58,11 +58,24 @@ interface ChatMessage {
   createdAt: string;
 }
 
-export default function ChatBox() {
+export interface ChatBoxHandle {
+  expand: () => void;
+}
+
+interface ChatBoxProps {
+  hideMobileFab?: boolean;
+}
+
+const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideMobileFab }, ref) {
   const { user, openLoginModal } = useAuth();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [mobileExpanded, setMobileExpanded] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    expand: () => setMobileExpanded(true),
+  }));
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -545,7 +558,7 @@ export default function ChatBox() {
   };
 
   return (
-    <div className={`chat-box${isMobile && mobileExpanded ? " chat-mobile-expanded" : ""}`}>
+    <div className={`chat-box${isMobile && mobileExpanded ? " chat-mobile-expanded" : ""}${hideMobileFab ? " chat-mobile-hidden" : ""}`}>
       {/* Mobile FAB toggle */}
       <button
         className="chat-mobile-toggle"
@@ -750,4 +763,6 @@ export default function ChatBox() {
       )}
     </div>
   );
-}
+});
+
+export default ChatBox;

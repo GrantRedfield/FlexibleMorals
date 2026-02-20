@@ -998,7 +998,7 @@
     display: none !important;
   }
 
-  /* --- Mobile buttons: on the red floor, right below the tablet --- */
+  /* --- Mobile buttons: two side-by-side buttons below the tablet --- */
   .mobile-buttons-overlay {
     position: absolute;
     top: 71%;
@@ -1007,15 +1007,16 @@
     bottom: 0;
     z-index: 15;
     display: flex !important;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    justify-content: space-evenly;
+    justify-content: center;
+    gap: 12px;
     padding: 2px 16px 4px;
   }
 
   .mobile-buttons-overlay .mobile-btn {
-    width: 75%;
-    max-width: 280px;
+    flex: 1;
+    max-width: 160px;
     text-align: center;
     font-family: "Cinzel", serif;
     cursor: pointer;
@@ -1025,7 +1026,7 @@
     color: #d4af37;
     font-weight: 600;
     font-size: 0.9rem;
-    padding: 8px 12px;
+    padding: 10px 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 4px rgba(212, 175, 55, 0.3);
   }
 
@@ -1051,61 +1052,9 @@
     font-size: 1.2rem;
   }
 
-  /* --- Login button: small on mobile --- */
+  /* --- Login button: hidden on mobile (replaced by hamburger menu) --- */
   .login-button-container {
-    top: 0.3rem;
-    left: 0.5rem;
-    padding: 0.1rem 0.3rem;
-    font-size: 0.5rem;
-    max-width: 130px;
-    gap: 1px;
-    border-radius: 5px;
-    border-width: 1px;
-  }
-
-  .login-btn {
-    padding: 1px 6px;
-    font-size: 0.5rem;
-    min-height: 16px;
-    display: flex;
-    align-items: center;
-    border-width: 1px;
-  }
-
-  .login-username {
-    font-size: 0.45rem;
-    max-width: 45px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .logout-btn {
-    min-height: 14px;
-    display: flex;
-    align-items: center;
-    padding: 1px 5px;
-    font-size: 0.45rem;
-  }
-
-  /* On mobile, keep login horizontal and hide "Welcome disciple" text */
-  .login-button-container.logged-in {
-    flex-direction: row;
-    align-items: center;
-    gap: 1px;
-    padding: 0.1rem 0.3rem;
-    max-width: 110px;
-  }
-
-  /* Hide "Welcome disciple" text on mobile — show only username */
-  .login-welcome {
-    font-size: 0;
-    gap: 1px;
-  }
-
-  .login-welcome .login-username {
-    font-size: 0.45rem;
-    max-width: 40px;
+    display: none !important;
   }
 
   /* --- Popups: fit mobile screens --- */
@@ -1147,7 +1096,7 @@
     text-align: center;
   }
 
-  /* --- Mobile tablet overlay: positioned over the tablet in the image --- */
+  /* --- Mobile tablet overlay: positioned over the tablet in the image, scrollable --- */
   .mobile-tablet-overlay {
     position: absolute;
     z-index: 10;
@@ -1159,8 +1108,21 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-tablet-overlay::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .mobile-tablet-overlay::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .mobile-tablet-overlay::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.4);
+    border-radius: 2px;
   }
 
   .mobile-tablet-overlay .stone-column {
@@ -1172,17 +1134,15 @@
     max-width: none;
     margin-bottom: 0;
     gap: 2px;
-    flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
   }
 
   .mobile-tablet-overlay .commandment-border {
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(212, 175, 55, 0.4);
     border-radius: 3px;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     padding: 3px 6px;
     min-height: 0;
     color: #fff;
@@ -1190,6 +1150,7 @@
     font-weight: 400;
     text-align: left;
     align-items: flex-start;
+    flex-shrink: 0;
   }
 
   .mobile-tablet-overlay .commandment-border:hover {
@@ -1197,14 +1158,14 @@
   }
 
   .mobile-tablet-overlay .commandment-text {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     line-height: 1.15;
   }
 
   .mobile-tablet-overlay .commandment-number {
     color: #ffd700;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
   }
 
   /* Show vote count on mobile, hide username */
@@ -1228,116 +1189,9 @@
     display: none !important;
   }
 
-  /* --- Tablet navigation arrows --- */
-  .tablet-nav-arrow {
-    font-family: "Cinzel", serif;
-    font-size: 1.4rem;
-    font-weight: 900;
-    text-align: center;
-    cursor: pointer;
-    z-index: 15;
-    color: #d4af37;
-    text-shadow:
-      0 0 8px rgba(212, 175, 55, 0.7),
-      0 0 18px rgba(212, 175, 55, 0.4),
-      1px 1px 0px #3a2e0b,
-      -1px -1px 0px #3a2e0b;
-    padding: 2px 0;
-    flex-shrink: 0;
-    animation: blinkArrow 1.8s ease-in-out infinite;
-    letter-spacing: 0.15em;
-    line-height: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    width: 100%;
-  }
-
-  .tablet-nav-arrow-up {
-    margin-bottom: 0;
-  }
-
-  .tablet-nav-arrow-down {
-    margin-top: 0;
-  }
-
   /* --- Coin animation overflow guard --- */
   .coin-animation {
     overflow: hidden;
   }
 }
 
-/* Blinking arrow animation — golden pulse */
-@keyframes blinkArrow {
-  0%, 100% {
-    opacity: 1;
-    color: #d4af37;
-    text-shadow:
-      0 0 6px rgba(212, 175, 55, 0.6),
-      0 0 14px rgba(212, 175, 55, 0.3),
-      1px 1px 0px #3a2e0b,
-      -1px -1px 0px #3a2e0b;
-  }
-  50% {
-    opacity: 0.4;
-    color: #c8b070;
-    text-shadow:
-      0 0 2px rgba(200, 176, 112, 0.3),
-      1px 1px 0px #3a2e0b,
-      -1px -1px 0px #3a2e0b;
-  }
-}
-
-/* Slide animations for commandment page transitions */
-@keyframes slideOutUp {
-  0% { transform: translateY(0); opacity: 1; }
-  100% { transform: translateY(-100%); opacity: 0; }
-}
-
-@keyframes slideOutDown {
-  0% { transform: translateY(0); opacity: 1; }
-  100% { transform: translateY(100%); opacity: 0; }
-}
-
-@keyframes slideInFromBottom {
-  0% { transform: translateY(100%); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes slideInFromTop {
-  0% { transform: translateY(-100%); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-
-/* Outgoing: slide-up means navigating down (to 6-10), old set exits upward */
-.mobile-tablet-overlay .stone-column.slide-up {
-  animation: slideOutUp 0.3s ease-in forwards;
-}
-
-/* Outgoing: slide-down means navigating up (to 1-5), old set exits downward */
-.mobile-tablet-overlay .stone-column.slide-down {
-  animation: slideOutDown 0.3s ease-in forwards;
-}
-
-/* Incoming: when navigating down, new set enters from bottom */
-.mobile-tablet-overlay .stone-column.slide-in-up {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  animation: slideInFromBottom 0.3s ease-out forwards;
-}
-
-/* Incoming: when navigating up, new set enters from top */
-.mobile-tablet-overlay .stone-column.slide-in-down {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  animation: slideInFromTop 0.3s ease-out forwards;
-}
