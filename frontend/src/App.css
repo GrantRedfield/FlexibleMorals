@@ -933,13 +933,13 @@
     overflow: hidden;
   }
 
-  /* --- Background: fill the viewport --- */
+  /* --- Background: show entire image, no cropping --- */
   .home-background-balanced {
     position: absolute;
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center center;
+    object-fit: contain;
+    object-position: center top;
     display: block;
   }
 
