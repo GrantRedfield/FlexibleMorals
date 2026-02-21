@@ -43,7 +43,7 @@ export default function Home() {
   const [showMerchPopup, setShowMerchPopup] = useState(false);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
-  const [daysLeft, setDaysLeft] = useState<number>(0);
+
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
@@ -75,7 +75,6 @@ export default function Home() {
       const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const minutes = Math.floor((diff / (1000 * 60)) % 60);
       const seconds = Math.floor((diff / 1000) % 60);
-      setDaysLeft(days);
       setTimeLeft({ days, hours, minutes, seconds });
     };
     calcTimeLeft();
@@ -381,47 +380,67 @@ export default function Home() {
             alt="Flexible Morals Background"
             className="home-background-balanced"
           />
-          {/* Desktop countdown — fixed position */}
+          {/* Desktop countdown — fixed position, DD:HH:MM:SS */}
           <div
             style={{
               position: "fixed",
               top: "1rem",
-              right: "0.5rem",
+              right: "1rem",
               zIndex: 999,
               textAlign: "center",
-              width: "340px",
             }}
           >
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+              {[
+                { val: timeLeft.days, label: "DAYS" },
+                { val: timeLeft.hours, label: "HRS" },
+                { val: timeLeft.minutes, label: "MIN" },
+                { val: timeLeft.seconds, label: "SEC" },
+              ].map((unit) => (
+                <div key={unit.label} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "2.8rem",
+                      fontWeight: 900,
+                      color: "#c8b070",
+                      textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
+                      lineHeight: 1,
+                      minWidth: "3.2rem",
+                    }}
+                  >
+                    {String(unit.val).padStart(2, "0")}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      color: "#c8b070",
+                      textShadow: "1px 1px 0px #3a2e0b",
+                      letterSpacing: "0.1em",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {unit.label}
+                  </span>
+                </div>
+              ))}
+            </div>
             <span
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: "3rem",
-                fontWeight: 900,
-                color: "#c8b070",
-                textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
-                letterSpacing: "0.08em",
-                lineHeight: 1,
-                display: "block",
-              }}
-            >
-              {daysLeft}
-            </span>
-            <span
-              style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: "0.95rem",
+                fontSize: "0.85rem",
                 fontWeight: 700,
                 color: "#c8b070",
                 textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
-                letterSpacing: "0.22em",
-                lineHeight: 1,
+                letterSpacing: "0.15em",
                 textTransform: "uppercase" as const,
-                marginTop: "0.3rem",
+                marginTop: "8px",
                 display: "block",
-                width: "100%",
               }}
             >
-              days until moral reset
+              until moral reset
             </span>
           </div>
         </>

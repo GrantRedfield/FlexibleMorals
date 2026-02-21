@@ -1200,9 +1200,10 @@
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
   }
 
-  /* Hide username on mobile tablet to save space */
   .mobile-tablet-overlay .commandment-border > div:last-child > span:last-child {
-    display: none !important;
+    display: inline !important;
+    font-size: 0.7rem;
+    color: #c8b070;
   }
 
   /* --- Coin animation overflow guard --- */

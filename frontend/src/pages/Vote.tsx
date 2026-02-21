@@ -535,6 +535,7 @@ export default function Vote() {
       const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
       if (guestSwipeCount.current >= halfPosts) {
         setShowGuestLoginPrompt(true);
+        setSwipeCurrentPostId(null);
         return;
       }
     }
@@ -985,16 +986,16 @@ export default function Vote() {
                 gap: "4px",
                 padding: "0",
               }}>
-                {/* Left arrow — Downvote */}
+                {/* Left arrow — Downvote (demon) */}
                 <div className={swipeDragX < -50 ? "swipe-arrow-active" : ""} style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  opacity: swipeDragX < -20 ? 1 : 0.6,
+                  opacity: swipeDragX < -20 ? 1 : 0.85,
                   transition: "opacity 0.2s ease",
-                  minWidth: "50px",
+                  minWidth: "70px",
                 }}>
-                  <span style={{ fontSize: "2.5rem", color: "#c85a4a", textShadow: "0 0 12px rgba(200, 90, 74, 0.6)" }}>←</span>
+                  <img src="/demon.png" alt="Downvote" style={{ width: "72px", height: "72px", objectFit: "contain", filter: "drop-shadow(0 0 10px rgba(200, 90, 74, 0.6))" }} />
                   <span style={{
                     fontFamily: "'Cinzel', serif",
                     color: "#c85a4a",
@@ -1064,15 +1065,8 @@ export default function Vote() {
                           </h2>
 
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
-                            <span style={{
-                              fontSize: "14px",
-                              color: "#d1b97b",
-                              fontWeight: 600,
-                            }}>
-                              {post.votes ?? 0} votes
-                            </span>
-                            <span style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>
-                              {post.username || "unknown"}
+                            <span style={{ fontSize: "14px", color: "#888", fontStyle: "italic" }}>
+                              — {post.username || "unknown"}
                             </span>
                           </div>
                         </motion.div>
@@ -1115,7 +1109,19 @@ export default function Vote() {
 
                   {/* Guest login prompt — shown after swiping half the commandments */}
                   {showGuestLoginPrompt && (
-                    <div style={{ textAlign: "center", padding: "2rem 1rem" }}>
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      textAlign: "center",
+                      padding: "2rem 1rem",
+                    }}>
                       <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.3rem", margin: "0 0 12px 0", fontWeight: 700 }}>
                         Create an account to keep voting!
                       </p>
@@ -1156,16 +1162,16 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Right arrow — Upvote */}
+                {/* Right arrow — Upvote (angel) */}
                 <div className={swipeDragX > 50 ? "swipe-arrow-active" : ""} style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  opacity: swipeDragX > 20 ? 1 : 0.6,
+                  opacity: swipeDragX > 20 ? 1 : 0.85,
                   transition: "opacity 0.2s ease",
-                  minWidth: "50px",
+                  minWidth: "70px",
                 }}>
-                  <span style={{ fontSize: "2.5rem", color: "#8ab47a", textShadow: "0 0 12px rgba(138, 180, 122, 0.6)" }}>→</span>
+                  <img src="/angel.png" alt="Upvote" style={{ width: "72px", height: "72px", objectFit: "contain", filter: "drop-shadow(0 0 10px rgba(138, 180, 122, 0.6))" }} />
                   <span style={{
                     fontFamily: "'Cinzel', serif",
                     color: "#8ab47a",
