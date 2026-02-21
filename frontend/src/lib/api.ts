@@ -1,9 +1,28 @@
 // src/lib/api.ts or src/api.ts
 import axios from "axios";
 
-// Uses relative URLs so requests go through the Vite dev proxy.
-// Set VITE_API_URL for production builds.
-const API_BASE = import.meta.env.VITE_API_URL || "";
+// See utils/api.ts for explanation — fall back to relative URLs (Vite proxy)
+// when accessed from a non-localhost host (mobile / LAN).
+function resolveApiBase(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return "";
+  try {
+    const parsed = new URL(envUrl);
+    if (
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
+      typeof window !== "undefined" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+    ) {
+      return "";
+    }
+  } catch {
+    // Not a valid URL, use as-is
+  }
+  return envUrl;
+}
+
+const API_BASE = resolveApiBase();
 
 // Create the axios instance
 const api = axios.create({

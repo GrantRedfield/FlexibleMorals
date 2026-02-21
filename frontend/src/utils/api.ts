@@ -1,9 +1,33 @@
 import axios from "axios";
 
-// Vite exposes env vars prefixed with VITE_ at build time.
-// Default to "" (relative URLs) so requests go through the Vite dev proxy,
-// which allows mobile devices on the same network to reach the backend.
-const API_BASE = import.meta.env.VITE_API_URL || "";
+// Resolve the API base URL for both desktop and mobile access.
+// In development, relative URLs ("") let the Vite proxy forward requests to
+// the backend, which works from any device on the local network.
+// If VITE_API_URL is set to a localhost address but the page is loaded from a
+// different host (e.g. a phone at 192.168.x.x), fall back to relative URLs so
+// the Vite proxy handles forwarding instead of the browser hitting localhost
+// (which on a phone would be the phone itself, not the dev machine).
+function resolveApiBase(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return "";
+  try {
+    const parsed = new URL(envUrl);
+    if (
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
+      typeof window !== "undefined" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+    ) {
+      // Mobile/LAN access — use relative URLs through the Vite proxy
+      return "";
+    }
+  } catch {
+    // Not a valid URL, use as-is
+  }
+  return envUrl;
+}
+
+const API_BASE = resolveApiBase();
 
 export const getPosts = async () => {
   const res = await axios.get(`${API_BASE}/posts`);
