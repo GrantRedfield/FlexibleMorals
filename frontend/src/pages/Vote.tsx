@@ -76,6 +76,9 @@ export default function Vote() {
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
   const shownPostIds = useRef<Set<string>>(new Set());
+  // Guest swipe tracking — show login prompt after viewing half the commandments
+  const guestSwipeCount = useRef(0);
+  const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(false);
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
@@ -182,11 +185,9 @@ export default function Vote() {
     const currentSorted = sortedPostsRef.current;
     if (sortOption === "swipe") {
       setVisibleSlots([]);
-      // Find first unvoted, non-own post
-      const votes = userVotesRef.current;
+      // Find first non-own post (unlimited voting — don't skip voted)
       const firstPost = currentSorted.find((p) => {
-        const pid = String(p.id);
-        return !votes[pid] && p.username !== user;
+        return p.username !== user;
       });
       if (firstPost) {
         const firstPid = String(firstPost.id);
@@ -461,27 +462,27 @@ export default function Vote() {
   const swipeCurrentPostIdRef = useRef(swipeCurrentPostId);
   useEffect(() => { swipeCurrentPostIdRef.current = swipeCurrentPostId; }, [swipeCurrentPostId]);
 
-  // === Swipe mode: advance to next card ===
+  // === Swipe mode: advance to next card (unlimited — loops when all shown) ===
   const advanceSwipeCard = useCallback(() => {
     const currentPid = swipeCurrentPostIdRef.current;
     const currentVisibleIds = new Set(currentPid ? [currentPid] : []);
     const allPosts = sortedPostsRef.current;
-    const votes = userVotesRef.current;
     const currentUser = user;
     let nextPost: Post | null = null;
-    // First try unvoted, non-own posts not yet shown
+    // First try posts not yet shown this cycle (skip own posts)
     for (const post of allPosts) {
       const pid = String(post.id);
-      if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && !votes[pid] && post.username !== currentUser) {
+      if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && post.username !== currentUser) {
         nextPost = post;
         break;
       }
     }
-    // If all unvoted shown, try unvoted not currently visible
+    // If all have been shown, reset and loop back through
     if (!nextPost) {
+      shownPostIds.current = new Set();
       for (const post of allPosts) {
         const pid = String(post.id);
-        if (!currentVisibleIds.has(pid) && !votes[pid] && post.username !== currentUser) {
+        if (!currentVisibleIds.has(pid) && post.username !== currentUser) {
           nextPost = post;
           break;
         }
@@ -497,11 +498,19 @@ export default function Vote() {
     }
   }, [user]);
 
+  // Reset guest login prompt when user logs in
+  useEffect(() => {
+    if (user && showGuestLoginPrompt) {
+      setShowGuestLoginPrompt(false);
+      guestSwipeCount.current = 0;
+      advanceSwipeCard();
+    }
+  }, [user, showGuestLoginPrompt, advanceSwipeCard]);
+
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
-    if (!requireLogin()) return;
 
     const post = posts.find((p) => String(p.id) === currentPid);
     if (!post) return;
@@ -509,16 +518,28 @@ export default function Vote() {
     const delta = direction === "up" ? 1 : -1;
     const newTotal = currentVotes + delta;
 
-    // Record the vote on the server
-    handleVoteOptimistic(currentPid, direction);
+    // Only record vote if logged in; guests can swipe but votes don't count
+    if (user) {
+      handleVoteOptimistic(currentPid, direction);
+    }
     // Store exit direction in ref so it's available during AnimatePresence exit animation
     swipeExitDirectionRef.current = direction;
     setSwipeResult({ direction, delta, newTotal });
     // Show emoji feedback
     setSwipeEmoji(direction);
     setTimeout(() => setSwipeEmoji(null), 700);
+
+    // Guest half-limit: after swiping through half the commandments, prompt login
+    if (!user) {
+      guestSwipeCount.current += 1;
+      const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
+      if (guestSwipeCount.current >= halfPosts) {
+        setShowGuestLoginPrompt(true);
+        return;
+      }
+    }
     advanceSwipeCard();
-  }, [posts, advanceSwipeCard]);
+  }, [posts, user, advanceSwipeCard]);
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
@@ -725,20 +746,25 @@ export default function Vote() {
           onClick={() => navigate("/")}
           style={{
             position: "fixed",
-            top: isMobile ? "0.45rem" : "1rem",
-            right: isMobile ? "0.4rem" : "1rem",
+            top: isMobile ? "0.5rem" : "1rem",
+            right: isMobile ? "0.5rem" : "1rem",
             zIndex: 1000,
             backgroundColor: "rgba(20, 15, 5, 0.85)",
-            border: "1.5px solid #d4af37",
-            borderRadius: "5px",
-            padding: isMobile ? "3px 8px" : "0.5rem 1rem",
+            border: "2px solid #d4af37",
+            borderRadius: "7px",
+            padding: isMobile ? "12px 13px" : "0.5rem 1rem",
             boxShadow: "0 0 8px rgba(212, 175, 55, 0.2)",
             color: "#d4af37",
             fontFamily: "'Cinzel', serif",
             fontWeight: 700,
-            fontSize: isMobile ? "0.55rem" : "1rem",
+            fontSize: isMobile ? "0.85rem" : "1rem",
             cursor: "pointer",
             letterSpacing: "0.06em",
+            minWidth: isMobile ? "50px" : undefined,
+            minHeight: isMobile ? "50px" : undefined,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           Home
@@ -755,7 +781,7 @@ export default function Vote() {
               "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 15px rgba(200, 176, 112, 0.25)",
             letterSpacing: "0.08em",
             marginBottom: isMobile ? "0.5rem" : "0.4rem",
-            marginTop: isMobile ? "1.8rem" : undefined,
+            marginTop: isMobile ? "4rem" : undefined,
             textTransform: "uppercase",
           }}
         >
@@ -1087,8 +1113,38 @@ export default function Vote() {
                     )}
                   </AnimatePresence>
 
+                  {/* Guest login prompt — shown after swiping half the commandments */}
+                  {showGuestLoginPrompt && (
+                    <div style={{ textAlign: "center", padding: "2rem 1rem" }}>
+                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.3rem", margin: "0 0 12px 0", fontWeight: 700 }}>
+                        Create an account to keep voting!
+                      </p>
+                      <p style={{ color: "#c8b070", fontSize: "0.9rem", margin: "0 0 20px 0", fontFamily: "'Cinzel', serif" }}>
+                        Log in to make your votes count and see all commandments.
+                      </p>
+                      <button
+                        onClick={() => { openLoginModal(); }}
+                        style={{
+                          fontFamily: "'Cinzel', serif",
+                          fontSize: "1.1rem",
+                          fontWeight: 700,
+                          color: "#fdf8e6",
+                          backgroundColor: "#b79b3d",
+                          border: "2px solid #d4af37",
+                          borderRadius: "10px",
+                          padding: "14px 32px",
+                          cursor: "pointer",
+                          textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+                          boxShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
+                        }}
+                      >
+                        Log In / Sign Up
+                      </button>
+                    </div>
+                  )}
+
                   {/* No more cards */}
-                  {!swipeCurrentPostId && (
+                  {!swipeCurrentPostId && !showGuestLoginPrompt && (
                     <div style={{ textAlign: "center", padding: "2rem 0" }}>
                       <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
                         You've seen all commandments!
@@ -1421,30 +1477,6 @@ export default function Vote() {
                       <div style={{ marginTop: "auto", paddingTop: "8px" }}>
                         <p style={{ textAlign: "center", color: "#888", fontSize: "0.85rem", fontStyle: "italic", margin: "0 0 4px 0" }}>
                           Your commandment
-                        </p>
-                        <button
-                          style={{
-                            width: "100%",
-                            padding: "10px 0",
-                            borderRadius: "8px",
-                            border: "1px solid #555",
-                            cursor: "pointer",
-                            backgroundColor: "rgba(255,255,255,0.08)",
-                            color: "#d1b97b",
-                            fontSize: "0.95rem",
-                            fontWeight: 600,
-                            fontFamily: "'Cinzel', serif",
-                            minHeight: "44px",
-                          }}
-                          onClick={() => handleSkip(post.id)}
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    ) : userVote ? (
-                      <div style={{ marginTop: "auto", paddingTop: "8px" }}>
-                        <p style={{ textAlign: "center", color: "#888", fontSize: "0.85rem", fontStyle: "italic", margin: "0 0 4px 0" }}>
-                          Already voted
                         </p>
                         <button
                           style={{
