@@ -76,9 +76,17 @@ export default function Vote() {
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
   const shownPostIds = useRef<Set<string>>(new Set());
-  // Guest swipe tracking — show login prompt after viewing half the commandments
-  const guestSwipeCount = useRef(0);
+  // Guest swipe tracking — persisted in localStorage so refreshing doesn't reset
+  const guestSwipeCount = useRef(
+    parseInt(localStorage.getItem("guestSwipeCount") || "0", 10)
+  );
   const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(false);
+  // Swipe tutorial gif — shows for 1 second each time user visits the vote page
+  const [showSwipeTutorial, setShowSwipeTutorial] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSwipeTutorial(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
@@ -503,14 +511,28 @@ export default function Vote() {
     if (user && showGuestLoginPrompt) {
       setShowGuestLoginPrompt(false);
       guestSwipeCount.current = 0;
+      localStorage.removeItem("guestSwipeCount");
       advanceSwipeCard();
     }
   }, [user, showGuestLoginPrompt, advanceSwipeCard]);
+
+  // On mount: if guest already hit the limit (persisted), show prompt immediately
+  useEffect(() => {
+    if (!user && posts.length > 0) {
+      const halfPosts = Math.ceil(posts.length / 2);
+      if (guestSwipeCount.current >= halfPosts) {
+        setShowGuestLoginPrompt(true);
+        setSwipeCurrentPostId(null);
+      }
+    }
+  }, [user, posts.length]);
 
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
+    // Dismiss swipe tutorial on first swipe
+    setShowSwipeTutorial(false);
 
     const post = posts.find((p) => String(p.id) === currentPid);
     if (!post) return;
@@ -532,6 +554,7 @@ export default function Vote() {
     // Guest half-limit: after swiping through half the commandments, prompt login
     if (!user) {
       guestSwipeCount.current += 1;
+      localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
       const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
       if (guestSwipeCount.current >= halfPosts) {
         setShowGuestLoginPrompt(true);
@@ -977,38 +1000,76 @@ export default function Vote() {
             {mobileTab === "swipe" && posts.length > 0 && (
               <div className="swipe-mode-active" style={{
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 flex: 1,
                 minHeight: 0,
                 position: "relative",
                 width: "100%",
-                gap: "4px",
+                gap: "0px",
                 padding: "0",
               }}>
-                {/* Left arrow — Downvote (demon) */}
-                <div className={swipeDragX < -50 ? "swipe-arrow-active" : ""} style={{
+                {/* Angel — above the card, aligned right edge */}
+                <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  opacity: swipeDragX < -20 ? 1 : 0.85,
+                  alignItems: "flex-end",
+                  justifyContent: "flex-end",
+                  alignSelf: "flex-end",
+                  opacity: swipeDragX > 20 ? 1 : 0.85,
                   transition: "opacity 0.2s ease",
-                  minWidth: "70px",
+                  pointerEvents: "none",
+                  overflow: "hidden",
+                  paddingBottom: "4px",
+                  height: "220px",
+                  marginRight: "-40px",
                 }}>
-                  <img src="/demon.png" alt="Downvote" style={{ width: "72px", height: "72px", objectFit: "contain", filter: "drop-shadow(0 0 10px rgba(200, 90, 74, 0.6))" }} />
+                  <img src="/angel.png" alt="Upvote" style={{ height: "200px", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   <span style={{
                     fontFamily: "'Cinzel', serif",
-                    color: "#c85a4a",
+                    color: "#8ab47a",
                     fontWeight: 700,
-                    fontSize: "0.75rem",
+                    fontSize: "0.85rem",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
-                    textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
-                  }}>Downvote</span>
+                    textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
+                    marginTop: "-32px",
+                    marginRight: "90px",
+                    textAlign: "center",
+                    flexShrink: 0,
+                  }}>Upvote</span>
                 </div>
 
                 {/* Card area */}
-                <div style={{ flex: 1, position: "relative", minHeight: "180px" }}>
+                <div style={{ position: "relative", width: "100%", padding: "0 10px", flexShrink: 0 }}>
+                  {/* Swipe tutorial gifs — on top of and below gold border */}
+                  {showSwipeTutorial && swipeCurrentPostId && (
+                    <>
+                      <img src="/swipe.gif" alt="Swipe to vote" style={{
+                        position: "absolute",
+                        top: "-150px",
+                        left: "20px",
+                        width: "160px",
+                        height: "auto",
+                        opacity: 1,
+                        filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
+                        zIndex: 10,
+                        pointerEvents: "none",
+                      }} />
+                      <img src="/swipe.gif" alt="Swipe to vote" style={{
+                        position: "absolute",
+                        bottom: "-150px",
+                        right: "20px",
+                        width: "160px",
+                        height: "auto",
+                        opacity: 1,
+                        filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
+                        zIndex: 10,
+                        pointerEvents: "none",
+                      }} />
+                    </>
+                  )}
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
                     {swipeCurrentPostId && (() => {
                       const post = getPost(swipeCurrentPostId);
@@ -1162,26 +1223,39 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Right arrow — Upvote (angel) */}
-                <div className={swipeDragX > 50 ? "swipe-arrow-active" : ""} style={{
+                {/* Demon — below the card, aligned left edge */}
+                <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  opacity: swipeDragX > 20 ? 1 : 0.85,
+                  alignItems: "flex-start",
+                  justifyContent: "flex-start",
+                  alignSelf: "flex-start",
+                  opacity: swipeDragX < -20 ? 1 : 0.85,
                   transition: "opacity 0.2s ease",
-                  minWidth: "70px",
+                  pointerEvents: "none",
+                  overflow: "hidden",
+                  paddingTop: "4px",
+                  height: "220px",
+                  marginLeft: "-40px",
                 }}>
-                  <img src="/angel.png" alt="Upvote" style={{ width: "72px", height: "72px", objectFit: "contain", filter: "drop-shadow(0 0 10px rgba(138, 180, 122, 0.6))" }} />
                   <span style={{
                     fontFamily: "'Cinzel', serif",
-                    color: "#8ab47a",
+                    color: "#c85a4a",
                     fontWeight: 700,
-                    fontSize: "0.75rem",
+                    fontSize: "0.85rem",
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
-                    textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
-                  }}>Upvote</span>
+                    textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
+                    marginBottom: "-20px",
+                    textAlign: "center",
+                    zIndex: 3,
+                    position: "relative",
+                    alignSelf: "center",
+                    marginLeft: "40px",
+                  }}>Downvote</span>
+                  <img src="/demon.png" alt="Downvote" style={{ height: "200px", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                 </div>
+
               </div>
             )}
 

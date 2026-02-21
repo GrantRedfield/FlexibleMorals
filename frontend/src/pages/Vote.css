@@ -154,13 +154,22 @@ button:hover {
   -webkit-user-select: none;
 }
 
-@keyframes arrowPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+@keyframes angelPulse {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(212, 175, 55, 0.4)) brightness(1); }
+  50% { filter: drop-shadow(0 0 28px rgba(212, 175, 55, 0.9)) brightness(1.3); }
 }
 
-.swipe-arrow-active {
-  animation: arrowPulse 0.5s ease-in-out infinite;
+@keyframes demonPulse {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(200, 50, 30, 0.4)) brightness(1); }
+  50% { filter: drop-shadow(0 0 28px rgba(220, 40, 20, 0.9)) brightness(1.3); }
+}
+
+.swipe-arrow-active-angel img {
+  animation: angelPulse 0.5s ease-in-out infinite;
+}
+
+.swipe-arrow-active-demon img {
+  animation: demonPulse 0.5s ease-in-out infinite;
 }
 
 /* ============================================================
