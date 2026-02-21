@@ -13,7 +13,7 @@
     "dev:all": "npm-run-all -p dev:dynamodb dev:backend dev:frontend",
 
   
-    "dev:dynamodb": "java -Djava.library.path=C:\\DynamoDB\\DynamoDBLocal_lib -jar C:\\DynamoDB\\DynamoDBLocal.jar -sharedDb -port 8000",
+    "dev:dynamodb": "java -Djava.library.path=.dynamodb/DynamoDBLocal_lib -jar .dynamodb/DynamoDBLocal.jar -sharedDb -port 8000",
 
 
     "dev:backend": "npm --workspace backend run dev",

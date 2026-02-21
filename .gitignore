@@ -19,6 +19,9 @@ build/
 .DS_Store
 Thumbs.db
 
+# DynamoDB Local
+.dynamodb/
+
 # Logs
 *.log
 npm-debug.log*
