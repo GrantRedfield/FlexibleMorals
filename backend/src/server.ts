@@ -23,12 +23,16 @@ const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173").split(",").map(s => s.trim());
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+    // Allow requests with no origin (mobile apps, curl, Vite proxy, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // In development, allow any local-network origin (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    // so mobile devices on the same WiFi can reach the backend directly
+    if (process.env.NODE_ENV !== "production") {
+      const localNet = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+      if (localNet.test(origin)) return callback(null, true);
     }
+    callback(new Error("Not allowed by CORS"));
   },
 }));
 
@@ -221,8 +225,9 @@ app.post("/posts/:id/vote", async (req, res) => {
 
 // === Start Server ===
 const PORT = parseInt(process.env.PORT || "3001", 10);
-app.listen(PORT, () => {
+const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces for mobile access
+app.listen(PORT, HOST, () => {
   const cognitoEnabled = !!process.env.COGNITO_USER_POOL_ID && !!process.env.COGNITO_CLIENT_ID;
-  console.log(`✅ FlexibleMorals backend running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
+  console.log(`✅ FlexibleMorals backend running on ${HOST}:${PORT} (${process.env.NODE_ENV || "development"})`);
   console.log(`   Auth: ${cognitoEnabled ? "Amazon Cognito" : "Legacy JWT"}`);
 });

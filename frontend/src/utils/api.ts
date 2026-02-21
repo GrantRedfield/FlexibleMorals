@@ -1,7 +1,9 @@
 import axios from "axios";
 
-// Vite exposes env vars prefixed with VITE_ at build time
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+// Vite exposes env vars prefixed with VITE_ at build time.
+// Default to "" (relative URLs) so requests go through the Vite dev proxy,
+// which allows mobile devices on the same network to reach the backend.
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export const getPosts = async () => {
   const res = await axios.get(`${API_BASE}/posts`);

@@ -1,8 +1,9 @@
 // src/lib/api.ts or src/api.ts
 import axios from "axios";
 
-// Base API URL (adjust for production)
-const API_BASE = "http://localhost:3001";
+// Uses relative URLs so requests go through the Vite dev proxy.
+// Set VITE_API_URL for production builds.
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 // Create the axios instance
 const api = axios.create({
