@@ -44,11 +44,13 @@ export default function Home() {
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
   const [daysLeft, setDaysLeft] = useState<number>(0);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [showPrayerHands, setShowPrayerHands] = useState(false);
   const [showCoins, setShowCoins] = useState(false);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
 
   const chatBoxRef = useRef<ChatBoxHandle>(null);
+  const wheelContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { donorStatuses, loadDonorStatuses, getDonorStatus } = useDonor();
   const { user } = useAuth();
@@ -63,13 +65,22 @@ export default function Home() {
     [posts]
   );
 
-  // ✅ Countdown logic
+  // ✅ Countdown logic — ticks every second for days/hours/minutes/seconds
   useEffect(() => {
-    const today = new Date();
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const diffTime = endOfMonth.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    setDaysLeft(diffDays);
+    const calcTimeLeft = () => {
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0); // midnight of 1st next month
+      const diff = endOfMonth.getTime() - now.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setDaysLeft(days);
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+    calcTimeLeft();
+    const interval = setInterval(calcTimeLeft, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // ✅ Prayer hands animation every 30 seconds
@@ -130,6 +141,63 @@ export default function Home() {
       }
     }
   }, [posts, loadDonorStatuses]);
+
+  // Wheel carousel scroll handler for mobile commandments
+  useEffect(() => {
+    if (!isMobile || loading || posts.length === 0) return;
+    const container = wheelContainerRef.current;
+    if (!container) return;
+
+    let rafId: number;
+
+    const updateWheel = () => {
+      const items = container.querySelectorAll('.wheel-item') as NodeListOf<HTMLElement>;
+      const containerRect = container.getBoundingClientRect();
+      const containerHeight = containerRect.height;
+      // Only bottom fade zone — items at top are fully visible, bottom 20% fades out.
+      // Items that scroll above the container are clipped by overflow + CSS mask.
+      const bottomFade = containerHeight * 0.30;
+      const safeBottom = containerRect.bottom - bottomFade;
+
+      items.forEach((item) => {
+        const itemRect = item.getBoundingClientRect();
+        const itemCenter = itemRect.top + itemRect.height / 2;
+
+        let t = 0; // 0 = fully visible, 1 = fully faded
+        if (itemCenter > safeBottom) {
+          t = Math.min((itemCenter - safeBottom) / bottomFade, 1);
+        }
+
+        const scale = 1 - t * 0.3;
+        const opacity = 1 - t * 0.95;
+        item.style.transform = `scale(${scale})`;
+        item.style.opacity = `${Math.max(opacity, 0.03)}`;
+      });
+    };
+
+    const onScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateWheel);
+    };
+
+    // Set bottom spacer so last items can scroll into the visible zone
+    const containerHeight = container.clientHeight;
+    const bottomSpacer = container.querySelector('.wheel-spacer-bottom') as HTMLElement;
+    if (bottomSpacer) bottomSpacer.style.height = `${containerHeight * 0.5}px`;
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+
+    // Start at top, then apply initial transforms
+    setTimeout(() => {
+      container.scrollTop = 0;
+      updateWheel();
+    }, 50);
+
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isMobile, posts, loading]);
 
   // Sort by votes (highest first) and take top 10
   const sortedPosts = [...posts].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
@@ -207,29 +275,67 @@ export default function Home() {
           <div
             style={{
               position: "absolute",
-              top: "-0.2rem",
-              right: "0.3rem",
+              top: "0.4rem",
+              right: "0.5rem",
               zIndex: 20,
-              textAlign: "right",
+              textAlign: "center",
             }}
           >
+            <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+              {[
+                { val: timeLeft.days, label: "D" },
+                { val: timeLeft.hours, label: "H" },
+                { val: timeLeft.minutes, label: "M" },
+                { val: timeLeft.seconds, label: "S" },
+              ].map((unit) => (
+                <div key={unit.label} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "1.6rem",
+                      fontWeight: 900,
+                      color: "#c8b070",
+                      textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 10px rgba(200, 176, 112, 0.3)",
+                      lineHeight: 1,
+                      minWidth: "1.8rem",
+                    }}
+                  >
+                    {String(unit.val).padStart(2, "0")}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "0.55rem",
+                      fontWeight: 700,
+                      color: "#c8b070",
+                      textShadow: "1px 1px 0px #3a2e0b",
+                      letterSpacing: "0.08em",
+                      marginTop: "1px",
+                    }}
+                  >
+                    {unit.label}
+                  </span>
+                </div>
+              ))}
+            </div>
             <span
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: "0.55rem",
-                fontWeight: 900,
+                fontSize: "0.65rem",
+                fontWeight: 700,
                 color: "#c8b070",
-                textShadow: "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 20px rgba(200, 176, 112, 0.3)",
-                letterSpacing: "0.05em",
-                lineHeight: 1,
-                whiteSpace: "nowrap",
+                textShadow: "1px 1px 0px #3a2e0b, 0 0 10px rgba(200, 176, 112, 0.3)",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase" as const,
+                marginTop: "3px",
+                display: "block",
               }}
             >
-              {daysLeft} days until moral reset
+              until moral reset
             </span>
           </div>
-          {/* Commandments — scrollable on the tablet */}
-          <div className="mobile-tablet-overlay">
+          {/* Commandments — wheel carousel on the tablet */}
+          <div className="mobile-tablet-overlay" ref={wheelContainerRef}>
             {!loading && !error && posts.length === 0 && (
               <div className="empty-state" style={{ textAlign: "center", zIndex: 10 }}>
                 <p style={{ fontFamily: "'Cinzel', serif", fontSize: "1.1rem", fontWeight: 700, color: "#3a2e0b", textShadow: "0 0 4px rgba(200,176,112,0.3)", margin: "0 0 8px 0" }}>
@@ -246,7 +352,16 @@ export default function Home() {
             <div className="stone-column">
               {loading && <div className="commandment-border">Loading...</div>}
               {error && <div className="commandment-border">{error}</div>}
-              {!loading && !error && allPosts.map((post, index) => renderCommandment(post, index, true))}
+              {!loading && !error && (
+                <>
+                  {allPosts.map((post, index) => (
+                    <div key={post.id} className="wheel-item">
+                      {renderCommandment(post, index, true)}
+                    </div>
+                  ))}
+                  <div className="wheel-spacer wheel-spacer-bottom" />
+                </>
+              )}
             </div>
           </div>
           {/* Mobile buttons — Vote + Live Chat */}
