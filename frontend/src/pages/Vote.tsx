@@ -24,6 +24,8 @@ interface Post {
 }
 
 type SortOption = "top" | "hot" | "new" | "random" | "swipe";
+type MobileTab = "swipe" | "comments" | "declare";
+type MobileFilter = "top" | "hot" | "new" | "random";
 type AnimState = "visible" | "voted" | "fadingOut" | "fadingIn";
 
 interface VisibleSlot {
@@ -54,6 +56,12 @@ export default function Vote() {
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
 
+  // Mobile tab state
+  const [mobileTab, setMobileTab] = useState<MobileTab>("swipe");
+  const [mobileFilter, setMobileFilter] = useState<MobileFilter>("top");
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(10);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+
   // Swipe mode state
   const [swipeResult, setSwipeResult] = useState<{ direction: "up" | "down"; delta: number; newTotal: number } | null>(null);
   const [swipeCardKey, setSwipeCardKey] = useState(0);
@@ -61,6 +69,10 @@ export default function Vote() {
   const [swipeDragX, setSwipeDragX] = useState(0);
   const dragX = useMotionValue(0);
   const cardRotation = useTransform(dragX, [-200, 0, 200], [-12, 0, 12]);
+  // Ref for exit animation direction — survives across renders so AnimatePresence can read it
+  const swipeExitDirectionRef = useRef<"up" | "down" | null>(null);
+  // Emoji feedback after swipe vote
+  const [swipeEmoji, setSwipeEmoji] = useState<"up" | "down" | null>(null);
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
   const shownPostIds = useRef<Set<string>>(new Set());
@@ -98,6 +110,42 @@ export default function Vote() {
         return sorted;
     }
   }, [posts, sortOption, shuffleTrigger]);
+
+  // Mobile Comments tab: sort posts by mobileFilter (independent of desktop sortOption)
+  const mobileFilteredPosts = useMemo(() => {
+    const sorted = [...posts];
+    switch (mobileFilter) {
+      case "top":
+        return sorted.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
+      case "hot":
+        return sorted.sort((a, b) => {
+          const now = Date.now();
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const aAge = Math.max((now - aTime) / 3600000, 0.1);
+          const bAge = Math.max((now - bTime) / 3600000, 0.1);
+          const aScore = (a.votes ?? 0) / Math.pow(aAge, 1.5);
+          const bScore = (b.votes ?? 0) / Math.pow(bAge, 1.5);
+          return bScore - aScore;
+        });
+      case "new":
+        return sorted.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      case "random":
+        return sorted.sort(() => Math.random() - 0.5);
+      default:
+        return sorted;
+    }
+  }, [posts, mobileFilter, shuffleTrigger]);
+
+  // Mobile Comments tab: slice for infinite scroll
+  const mobileVisiblePosts = useMemo(
+    () => mobileFilteredPosts.slice(0, mobileVisibleCount),
+    [mobileFilteredPosts, mobileVisibleCount]
+  );
 
   // Get the next post to show (in sort order), excluding currently visible ones
   const getNextPost = useCallback(
@@ -148,12 +196,16 @@ export default function Vote() {
         setSwipeCurrentPostId(null);
       }
       setSwipeResult(null);
+      setSwipeEmoji(null);
+      swipeExitDirectionRef.current = null;
       setSwipeDragX(0);
       return;
     }
     // Reset swipe state when leaving swipe mode
     setSwipeCurrentPostId(null);
     setSwipeResult(null);
+    setSwipeEmoji(null);
+    swipeExitDirectionRef.current = null;
     setSwipeDragX(0);
 
     const initial = currentSorted.slice(0, VISIBLE_COUNT).map((p) => ({
@@ -269,6 +321,13 @@ export default function Vote() {
     }
   }, [postsLoaded, sortOption, shuffleTrigger]);
 
+  // Mobile: initialize swipe mode on first load
+  useEffect(() => {
+    if (isMobile && postsLoaded) {
+      setSortOption("swipe");
+    }
+  }, [isMobile, postsLoaded]);
+
   // Persist userVotes locally (scoped per user)
   useEffect(() => {
     const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
@@ -278,6 +337,29 @@ export default function Vote() {
   // Voted count
   const votedCount = Object.keys(userVotes).filter((k) => userVotes[k]).length;
   const totalCount = posts.length;
+
+  // === Mobile: infinite scroll handler ===
+  const handleMobileScroll = useCallback(() => {
+    const el = mobileScrollRef.current;
+    if (!el) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+      setMobileVisibleCount((prev) => {
+        const total = mobileFilteredPosts.length;
+        if (prev >= total) return prev;
+        return Math.min(prev + 10, total);
+      });
+    }
+  }, [mobileFilteredPosts.length]);
+
+  // === Mobile: tab change handler ===
+  const handleMobileTabChange = useCallback((tab: MobileTab) => {
+    setMobileTab(tab);
+    setMobileVisibleCount(10);
+    if (tab === "swipe") {
+      setSortOption("swipe");
+      setShuffleTrigger((t) => t + 1);
+    }
+  }, []);
 
   // === Require login ===
   const requireLogin = (): boolean => {
@@ -316,8 +398,15 @@ export default function Vote() {
       localStorage.setItem(`lastSubmission_${user}`, new Date().toISOString());
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 4000);
-      // Switch to "New" sort so user sees their submission at the top
-      setSortOption("new");
+      if (isMobile) {
+        // Mobile: switch to Comments tab with "new" filter so user sees their post
+        setMobileTab("comments");
+        setMobileFilter("new");
+        setMobileVisibleCount(10);
+      } else {
+        // Desktop: Switch to "New" sort so user sees their submission at the top
+        setSortOption("new");
+      }
       // Reset shown tracking so the new post appears in the first batch
       shownPostIds.current = new Set();
       // Defer shuffle trigger to next tick so sortedPostsRef has the new post
@@ -420,13 +509,15 @@ export default function Vote() {
     const delta = direction === "up" ? 1 : -1;
     const newTotal = currentVotes + delta;
 
+    // Record the vote on the server
     handleVoteOptimistic(currentPid, direction);
+    // Store exit direction in ref so it's available during AnimatePresence exit animation
+    swipeExitDirectionRef.current = direction;
     setSwipeResult({ direction, delta, newTotal });
-
-    setTimeout(() => {
-      setSwipeResult(null);
-      advanceSwipeCard();
-    }, 800);
+    // Show emoji feedback
+    setSwipeEmoji(direction);
+    setTimeout(() => setSwipeEmoji(null), 700);
+    advanceSwipeCard();
   }, [posts, advanceSwipeCard]);
 
   // === Handle vote with fade animation (4-card mode) ===
@@ -656,67 +747,67 @@ export default function Vote() {
         <h1
           style={{
             fontFamily: "'Cinzel', serif",
-            fontSize: isMobile ? "1.3rem" : "2.5rem",
+            fontSize: isMobile ? "2.2rem" : "2.5rem",
             fontWeight: 900,
             textAlign: "center",
             color: "#c8b070",
             textShadow:
               "2px 2px 0px #3a2e0b, -1px -1px 0px #3a2e0b, 1px -1px 0px #3a2e0b, -1px 1px 0px #3a2e0b, 0 0 15px rgba(200, 176, 112, 0.25)",
             letterSpacing: "0.08em",
-            marginBottom: isMobile ? "0.15rem" : "0.4rem",
+            marginBottom: isMobile ? "0.5rem" : "0.4rem",
             marginTop: isMobile ? "1.8rem" : undefined,
             textTransform: "uppercase",
           }}
         >
-          Vote on Commandments
+          {isMobile ? "Commandments" : "Vote on Commandments"}
         </h1>
 
-        {/* Create Post Form */}
-        <form onSubmit={handleSubmit} style={{ marginBottom: isMobile ? "0.2rem" : "0.5rem", width: "100%" }}>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            <input
-              type="text"
-              placeholder="Enter a new commandment..."
-              value={newCommandment}
-              onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
-              maxLength={60}
-              style={{
-                flex: 1,
-                border: "1px solid #555",
-                borderRadius: "6px",
-                padding: isMobile ? "8px 10px" : "8px 12px",
-                fontSize: isMobile ? "0.95rem" : "0.95rem",
-                boxSizing: "border-box",
-                backgroundColor: "#1a1a1a",
-                color: "#fdf8e6",
-                minWidth: 0,
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                backgroundColor: "#b79b3d",
-                color: "#fdf8e6",
-                padding: isMobile ? "8px 14px" : "4px 16px",
-                borderRadius: "4px",
-                fontSize: isMobile ? "0.9rem" : "0.9rem",
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Submit
-            </button>
-          </div>
-          {!isMobile && (
+        {/* Create Post Form — desktop only (mobile uses Declare tab) */}
+        {!isMobile && (
+          <form onSubmit={handleSubmit} style={{ marginBottom: "0.5rem", width: "100%" }}>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <input
+                type="text"
+                placeholder="Enter a new commandment..."
+                value={newCommandment}
+                onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
+                maxLength={60}
+                style={{
+                  flex: 1,
+                  border: "1px solid #555",
+                  borderRadius: "6px",
+                  padding: "8px 12px",
+                  fontSize: "0.95rem",
+                  boxSizing: "border-box",
+                  backgroundColor: "#1a1a1a",
+                  color: "#fdf8e6",
+                  minWidth: 0,
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  backgroundColor: "#b79b3d",
+                  color: "#fdf8e6",
+                  padding: "4px 16px",
+                  borderRadius: "4px",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Submit
+              </button>
+            </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px", marginBottom: "4px" }}>
               <span style={{ fontSize: "11px", color: newCommandment.length >= 50 ? "#e07050" : "#888" }}>
                 {newCommandment.length}/60
               </span>
             </div>
-          )}
-        </form>
+          </form>
+        )}
 
         {/* Submission Success Message */}
         {submitSuccess && (
@@ -736,164 +827,373 @@ export default function Vote() {
           </div>
         )}
 
-        {/* Sort Options */}
-        <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? "5px" : "10px", marginBottom: isMobile ? "0.2rem" : "0.75rem", flexWrap: "wrap" }}>
-          {(["top", "hot", "new", "random", "swipe"] as SortOption[]).map((option) => (
-            <button
-              key={option}
-              onClick={() => {
-                setSortOption(option);
-                setShuffleTrigger((t) => t + 1);
-              }}
-              style={{
-                padding: isMobile ? "5px 12px" : "10px 24px",
-                borderRadius: isMobile ? "5px" : "8px",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: isMobile ? "0.8rem" : "1rem",
-                fontFamily: "'Cinzel', serif",
-                letterSpacing: "0.04em",
-                backgroundColor: sortOption === option ? "#b79b3d" : "transparent",
-                color: sortOption === option ? "#fdf8e6" : "#d1b97b",
-                border: sortOption === option ? "2px solid #d4af37" : "2px solid #555",
-                transition: "all 0.2s ease",
-                minHeight: isMobile ? "24px" : "44px",
-              }}
-            >
-              {option.charAt(0).toUpperCase() + option.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* Commandment Cards — Single Column, 4 at a time */}
-        {posts.length === 0 && (
-          <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-            <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 12px 0" }}>
-              The tablets are empty.
-            </p>
-            <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif" }}>
-              Be the first to inscribe a commandment and define the morals for humanity.
-            </p>
-            <p style={{ color: "#888", fontSize: "13px", margin: 0, fontStyle: "italic" }}>
-              Use the form above to submit your commandment.
-            </p>
+        {/* === MOBILE TAB BAR === */}
+        {isMobile && (
+          <div style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "6px",
+            marginBottom: "0.15rem",
+            width: "100%",
+            padding: "0 4px",
+          }}>
+            {(["swipe", "comments", "declare"] as MobileTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => handleMobileTabChange(tab)}
+                style={{
+                  flex: 1,
+                  padding: "28px 0",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "1.1rem",
+                  fontFamily: "'Cinzel', serif",
+                  letterSpacing: "0.06em",
+                  backgroundColor: mobileTab === tab ? "#b79b3d" : "rgba(255,255,255,0.05)",
+                  color: mobileTab === tab ? "#fdf8e6" : "#d1b97b",
+                  border: mobileTab === tab ? "2px solid #d4af37" : "1.5px solid #555",
+                  borderRadius: "8px",
+                  transition: "all 0.2s ease",
+                  boxShadow: mobileTab === tab ? "0 0 12px rgba(212, 175, 55, 0.25)" : "none",
+                }}
+              >
+                {tab === "swipe" ? "Vote" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
         )}
 
-        {/* ===== SWIPE MODE ===== */}
-        {sortOption === "swipe" && posts.length > 0 ? (
-          <div className="swipe-mode-active" style={{
+        {/* === MOBILE SUB-FILTER BUTTONS (Comments tab only) === */}
+        {isMobile && mobileTab === "comments" && (
+          <div style={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "center",
-            flex: isMobile ? 1 : undefined,
-            minHeight: isMobile ? 0 : "400px",
-            position: "relative",
-            width: "100%",
-            gap: isMobile ? "4px" : "24px",
-            padding: isMobile ? "0" : "1rem 0",
+            gap: "5px",
+            marginBottom: "0.2rem",
+            marginTop: "0.15rem",
+            flexWrap: "wrap",
           }}>
-            {/* Left arrow — Downvote */}
-            <div className={swipeDragX < -50 ? "swipe-arrow-active" : ""} style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              opacity: swipeDragX < -20 ? 1 : 0.6,
-              transition: "opacity 0.2s ease",
-              minWidth: isMobile ? "50px" : "100px",
-            }}>
-              <span style={{ fontSize: isMobile ? "2.5rem" : "4rem", color: "#c85a4a", textShadow: "0 0 12px rgba(200, 90, 74, 0.6)" }}>←</span>
-              <span style={{
-                fontFamily: "'Cinzel', serif",
-                color: "#c85a4a",
-                fontWeight: 700,
-                fontSize: isMobile ? "0.75rem" : "1.1rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
-              }}>Downvote</span>
-            </div>
+            {(["top", "hot", "new", "random"] as MobileFilter[]).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => {
+                  setMobileFilter(filter);
+                  setMobileVisibleCount(10);
+                  setShuffleTrigger((t) => t + 1);
+                }}
+                style={{
+                  padding: "4px 14px",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  fontFamily: "'Cinzel', serif",
+                  backgroundColor: mobileFilter === filter ? "#b79b3d" : "transparent",
+                  color: mobileFilter === filter ? "#fdf8e6" : "#d1b97b",
+                  border: mobileFilter === filter ? "1.5px solid #d4af37" : "1.5px solid #555",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
 
-            {/* Card area */}
-            <div style={{ flex: 1, maxWidth: isMobile ? undefined : "500px", position: "relative", minHeight: isMobile ? "180px" : "280px" }}>
-              {/* The draggable card */}
-              <AnimatePresence mode="wait">
-                {swipeCurrentPostId && (() => {
-                  const post = getPost(swipeCurrentPostId);
-                  if (!post) return null;
-                  const isVoted = !!swipeResult;
-                  const votedColor = swipeResult?.direction === "up" ? "#8ab47a" : swipeResult?.direction === "down" ? "#c85a4a" : "#d4af37";
+        {/* === DESKTOP SORT BUTTONS (unchanged) === */}
+        {!isMobile && (
+          <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+            {(["top", "hot", "new", "random"] as SortOption[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => {
+                  setSortOption(option);
+                  setShuffleTrigger((t) => t + 1);
+                }}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  fontFamily: "'Cinzel', serif",
+                  letterSpacing: "0.04em",
+                  backgroundColor: sortOption === option ? "#b79b3d" : "transparent",
+                  color: sortOption === option ? "#fdf8e6" : "#d1b97b",
+                  border: sortOption === option ? "2px solid #d4af37" : "2px solid #555",
+                  transition: "all 0.2s ease",
+                  minHeight: "44px",
+                }}
+              >
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
 
-                  return (
-                    <motion.div
-                      key={swipeCardKey}
-                      className="swipe-card"
-                      drag={isVoted ? false : "x"}
-                      dragConstraints={{ left: 0, right: 0 }}
-                      dragElastic={0.9}
-                      onDrag={(_: any, info: any) => setSwipeDragX(info.offset.x)}
-                      onDragEnd={(_: any, info: any) => {
-                        const threshold = 100;
-                        if (info.offset.x > threshold) {
-                          handleSwipeVote("up");
-                        } else if (info.offset.x < -threshold) {
-                          handleSwipeVote("down");
-                        }
-                        setSwipeDragX(0);
-                      }}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{
-                        opacity: 0,
-                        x: swipeResult?.direction === "up" ? 300 : -300,
-                        rotate: swipeResult?.direction === "up" ? 15 : -15,
-                      }}
-                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        {/* ===== MOBILE CONTENT AREA ===== */}
+        {isMobile ? (
+          <>
+            {/* Empty state */}
+            {posts.length === 0 && (
+              <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+                <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 12px 0" }}>
+                  The tablets are empty.
+                </p>
+                <p style={{ color: "#c8b070", fontSize: "0.9rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif" }}>
+                  Be the first to inscribe a commandment.
+                </p>
+              </div>
+            )}
+
+            {/* SWIPE TAB */}
+            {mobileTab === "swipe" && posts.length > 0 && (
+              <div className="swipe-mode-active" style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: 1,
+                minHeight: 0,
+                position: "relative",
+                width: "100%",
+                gap: "4px",
+                padding: "0",
+              }}>
+                {/* Left arrow — Downvote */}
+                <div className={swipeDragX < -50 ? "swipe-arrow-active" : ""} style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  opacity: swipeDragX < -20 ? 1 : 0.6,
+                  transition: "opacity 0.2s ease",
+                  minWidth: "50px",
+                }}>
+                  <span style={{ fontSize: "2.5rem", color: "#c85a4a", textShadow: "0 0 12px rgba(200, 90, 74, 0.6)" }}>←</span>
+                  <span style={{
+                    fontFamily: "'Cinzel', serif",
+                    color: "#c85a4a",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
+                  }}>Downvote</span>
+                </div>
+
+                {/* Card area */}
+                <div style={{ flex: 1, position: "relative", minHeight: "180px" }}>
+                  <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
+                    {swipeCurrentPostId && (() => {
+                      const post = getPost(swipeCurrentPostId);
+                      if (!post) return null;
+
+                      return (
+                        <motion.div
+                          key={swipeCardKey}
+                          className="swipe-card"
+                          custom={swipeExitDirectionRef.current}
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.9}
+                          onDrag={(_: any, info: any) => setSwipeDragX(info.offset.x)}
+                          onDragEnd={(_: any, info: any) => {
+                            const threshold = 100;
+                            if (info.offset.x > threshold) {
+                              handleSwipeVote("up");
+                            } else if (info.offset.x < -threshold) {
+                              handleSwipeVote("down");
+                            }
+                            setSwipeDragX(0);
+                          }}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          exit={(dir: any) => ({
+                            opacity: 0,
+                            x: (dir ?? swipeExitDirectionRef.current) === "up" ? 300 : -300,
+                            rotate: (dir ?? swipeExitDirectionRef.current) === "up" ? 15 : -15,
+                          })}
+                          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                          style={{
+                            x: dragX,
+                            rotate: cardRotation,
+                            border: "2px solid #d4af37",
+                            padding: "32px 14px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(255,255,255,0.05)",
+                            boxShadow: "0 0 12px rgba(212, 175, 55, 0.15)",
+                            cursor: "grab",
+                            textAlign: "center",
+                          }}
+                          whileDrag={{ cursor: "grabbing" }}
+                        >
+                          <h2 style={{
+                            fontWeight: 700,
+                            color: "#fdf8e6",
+                            fontSize: "1.6rem",
+                            margin: "0 0 16px 0",
+                            lineHeight: 1.4,
+                            wordBreak: "break-word",
+                          }}>
+                            {post.title || post.content}
+                          </h2>
+
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+                            <span style={{
+                              fontSize: "14px",
+                              color: "#d1b97b",
+                              fontWeight: 600,
+                            }}>
+                              {post.votes ?? 0} votes
+                            </span>
+                            <span style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>
+                              {post.username || "unknown"}
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
+                  </AnimatePresence>
+
+                  {/* Emoji feedback overlay */}
+                  <AnimatePresence>
+                    {swipeEmoji && (
+                      <div style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10,
+                        pointerEvents: "none",
+                      }}>
+                        <motion.div
+                          key="swipe-emoji"
+                          initial={{ opacity: 0, scale: 0.3 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 1.8 }}
+                          transition={{ duration: 0.3 }}
+                          style={{
+                            fontSize: "8rem",
+                            lineHeight: 1,
+                            filter: "drop-shadow(0 0 30px rgba(0,0,0,0.6))",
+                          }}
+                        >
+                          {swipeEmoji === "down" ? "\uD83D\uDD25" : "\uD83D\uDE4F"}
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* No more cards */}
+                  {!swipeCurrentPostId && (
+                    <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
+                        You've seen all commandments!
+                      </p>
+                      <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                        Submit a new one or switch tabs.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right arrow — Upvote */}
+                <div className={swipeDragX > 50 ? "swipe-arrow-active" : ""} style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  opacity: swipeDragX > 20 ? 1 : 0.6,
+                  transition: "opacity 0.2s ease",
+                  minWidth: "50px",
+                }}>
+                  <span style={{ fontSize: "2.5rem", color: "#8ab47a", textShadow: "0 0 12px rgba(138, 180, 122, 0.6)" }}>→</span>
+                  <span style={{
+                    fontFamily: "'Cinzel', serif",
+                    color: "#8ab47a",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
+                  }}>Upvote</span>
+                </div>
+              </div>
+            )}
+
+            {/* COMMENTS TAB — Reddit-style infinite scroll feed */}
+            {mobileTab === "comments" && (
+              <div
+                ref={mobileScrollRef}
+                onScroll={handleMobileScroll}
+                className="mobile-comments-feed"
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                  WebkitOverflowScrolling: "touch",
+                  padding: "0 2px",
+                }}
+              >
+                {mobileVisiblePosts.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                    <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1rem" }}>
+                      The tablets are empty.
+                    </p>
+                  </div>
+                ) : (
+                  mobileVisiblePosts.map((post) => (
+                    <div
+                      key={String(post.id)}
+                      className="mobile-comment-card"
                       style={{
-                        x: isVoted ? 0 : dragX,
-                        rotate: isVoted ? 0 : cardRotation,
-                        border: isVoted ? `3px solid ${votedColor}` : "2px solid #d4af37",
-                        padding: isMobile ? "16px 14px" : "28px 32px",
-                        borderRadius: "12px",
+                        border: "1px solid #555",
+                        padding: "10px 12px",
+                        borderRadius: "8px",
+                        marginBottom: "8px",
                         backgroundColor: "rgba(255,255,255,0.05)",
-                        boxShadow: isVoted
-                          ? `0 0 25px ${votedColor}40, 0 0 10px ${votedColor}25`
-                          : "0 0 12px rgba(212, 175, 55, 0.15)",
-                        cursor: isVoted ? "default" : "grab",
-                        textAlign: "center",
-                        transition: "border 0.2s ease, box-shadow 0.2s ease",
                       }}
-                      whileDrag={{ cursor: "grabbing" }}
                     >
-                      <h2 style={{
+                      <h3 style={{
                         fontWeight: 700,
                         color: "#fdf8e6",
-                        fontSize: isMobile ? "1.2rem" : "1.8rem",
-                        margin: "0 0 12px 0",
-                        lineHeight: 1.35,
+                        fontSize: "1rem",
+                        margin: "0 0 6px 0",
+                        lineHeight: 1.3,
                         wordBreak: "break-word",
                       }}>
                         {post.title || post.content}
-                      </h2>
-
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
-                        <span style={{
-                          fontSize: isVoted ? (isMobile ? "22px" : "26px") : (isMobile ? "14px" : "16px"),
-                          color: isVoted ? votedColor : "#d1b97b",
-                          fontWeight: isVoted ? 900 : 600,
-                          transition: "all 0.3s ease",
-                          textShadow: isVoted ? `0 0 12px ${votedColor}80` : "none",
-                        }}>
+                      </h3>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        flexWrap: "wrap",
+                      }}>
+                        <span style={{ fontSize: "13px", color: "#d1b97b", fontWeight: 600 }}>
                           {post.votes ?? 0} votes
                         </span>
-                        <span style={{ fontSize: isMobile ? "13px" : "15px", color: "#888", fontStyle: "italic" }}>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (post.username && post.username !== "unknown") {
+                              setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
+                            }
+                          }}
+                          style={{ fontSize: "13px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                        >
                           {post.username || "unknown"}
+                          {getDonorStatus(post.username || "")?.tier && (
+                            <DonorBadge tier={getDonorStatus(post.username || "")!.tier} size="small" />
+                          )}
                         </span>
                         <Link
                           to={`/comments/${post.id}`}
-                          onClick={(e) => e.stopPropagation()}
+                          state={{ from: "vote" }}
                           style={{
-                            fontSize: isMobile ? "13px" : "16px",
+                            fontSize: "13px",
                             color: "#d4af37",
                             textDecoration: "none",
                             padding: "3px 8px",
@@ -907,237 +1207,320 @@ export default function Vote() {
                           💬 {commentCounts[String(post.id)] ?? 0}
                         </Link>
                       </div>
+                    </div>
+                  ))
+                )}
+                {/* Loading more indicator */}
+                {mobileVisibleCount < mobileFilteredPosts.length && (
+                  <div style={{ textAlign: "center", padding: "12px 0", color: "#888", fontSize: "12px" }}>
+                    Scroll for more...
+                  </div>
+                )}
+                {mobileVisibleCount >= mobileFilteredPosts.length && mobileFilteredPosts.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "12px 0", color: "#666", fontSize: "12px", fontStyle: "italic" }}>
+                    All {mobileFilteredPosts.length} commandments shown
+                  </div>
+                )}
+              </div>
+            )}
 
+            {/* DECLARE TAB — Submit a new commandment */}
+            {mobileTab === "declare" && (
+              <div style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1.5rem 1.5rem",
+              }}>
+                <h2 style={{
+                  color: "#d4af37",
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: "1.8rem",
+                  fontWeight: 700,
+                  textAlign: "center",
+                  marginBottom: "1.5rem",
+                  letterSpacing: "0.06em",
+                  textShadow: "0 0 18px rgba(212, 175, 55, 0.35)",
+                  lineHeight: 1.3,
+                }}>
+                  Declare Your Commandment
+                </h2>
+                <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: "500px" }}>
+                  <input
+                    type="text"
+                    placeholder="Enter a new commandment..."
+                    value={newCommandment}
+                    onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
+                    maxLength={60}
+                    style={{
+                      width: "100%",
+                      border: "2px solid #d4af37",
+                      borderRadius: "10px",
+                      padding: "18px 18px",
+                      fontSize: "1.2rem",
+                      boxSizing: "border-box",
+                      backgroundColor: "rgba(26, 26, 26, 0.9)",
+                      color: "#fdf8e6",
+                      fontFamily: "'Cinzel', serif",
+                    }}
+                  />
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: "14px",
+                  }}>
+                    <span style={{
+                      fontSize: "13px",
+                      color: newCommandment.length >= 50 ? "#e07050" : "#999",
+                    }}>
+                      {newCommandment.length}/60
+                    </span>
+                    <button
+                      type="submit"
+                      style={{
+                        backgroundColor: "#b79b3d",
+                        color: "#fdf8e6",
+                        padding: "16px 40px",
+                        borderRadius: "10px",
+                        fontSize: "1.15rem",
+                        fontWeight: 700,
+                        fontFamily: "'Cinzel', serif",
+                        border: "2px solid #d4af37",
+                        cursor: "pointer",
+                        letterSpacing: "0.06em",
+                        boxShadow: "0 0 12px rgba(212, 175, 55, 0.25)",
+                      }}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
-                    </motion.div>
-                  );
-                })()}
-              </AnimatePresence>
-
-              {/* No more cards */}
-              {!swipeCurrentPostId && !swipeResult && (
-                <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                  <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
-                    You've seen all commandments!
-                  </p>
-                  <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                    Submit a new one or change the sort order.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Right arrow — Upvote */}
-            <div className={swipeDragX > 50 ? "swipe-arrow-active" : ""} style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              opacity: swipeDragX > 20 ? 1 : 0.6,
-              transition: "opacity 0.2s ease",
-              minWidth: isMobile ? "50px" : "100px",
-            }}>
-              <span style={{ fontSize: isMobile ? "2.5rem" : "4rem", color: "#8ab47a", textShadow: "0 0 12px rgba(138, 180, 122, 0.6)" }}>→</span>
-              <span style={{
-                fontFamily: "'Cinzel', serif",
-                color: "#8ab47a",
-                fontWeight: 700,
-                fontSize: isMobile ? "0.75rem" : "1.1rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
-              }}>Upvote</span>
-            </div>
-          </div>
+            {/* Mobile progress indicator */}
+            {posts.length > 0 && mobileTab !== "declare" && (
+              <div style={{ textAlign: "center", marginTop: "4px", paddingTop: "3px", borderTop: "1px solid #555" }}>
+                <span style={{ color: "#d1b97b", fontSize: "12px" }}>
+                  Voted on {votedCount} of {totalCount} commandments
+                </span>
+              </div>
+            )}
+          </>
         ) : (
           <>
-            {/* ===== 4-CARD GRID MODE ===== */}
-            {visibleSlots.length === 0 && posts.length > 0 && (
-              <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
-                  You've seen all commandments!
+            {/* ===== DESKTOP CONTENT (unchanged) ===== */}
+
+            {/* Empty state */}
+            {posts.length === 0 && (
+              <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+                <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 12px 0" }}>
+                  The tablets are empty.
                 </p>
-                <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                  Submit a new one or change the sort order.
+                <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif" }}>
+                  Be the first to inscribe a commandment and define the morals for humanity.
+                </p>
+                <p style={{ color: "#888", fontSize: "13px", margin: 0, fontStyle: "italic" }}>
+                  Use the form above to submit your commandment.
                 </p>
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gridTemplateRows: isMobile ? "repeat(4, 1fr)" : undefined, gap: isMobile ? "5px" : "16px", width: "100%", flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined }}>
-              {visibleSlots.map((slot) => {
-                const post = getPost(slot.postId);
-                if (!post) return null;
-                const userVote = userVotes[String(post.id)];
-                const isOwnPost = post.username === user;
-
-                return (
-                  <div
-                    key={slot.postId}
-                    style={{
-                      border: "1px solid #555",
-                      padding: isMobile ? "6px 10px" : "16px 20px",
-                      borderRadius: isMobile ? "6px" : "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      backgroundColor: "rgba(255,255,255,0.05)",
-                      overflow: "hidden",
-                      minHeight: isMobile ? 0 : "140px",
-                      transition: "all 0.25s ease",
-                      ...getAnimStyle(slot.animState),
-                    }}
-                  >
-                    <div>
-                      <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: isMobile ? "0.95rem" : "1.4rem", margin: isMobile ? "0 0 2px 0" : "0 0 6px 0", lineHeight: isMobile ? 1.2 : 1.35, wordBreak: "break-word", whiteSpace: "normal" }}>
-                        {post.title || post.content}
-                      </h2>
-                      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "12px", marginTop: isMobile ? "1px" : "4px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: isMobile ? "13px" : "16px", color: "#d1b97b", fontWeight: 600 }}>
-                          {post.votes ?? 0} votes
-                        </span>
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (post.username && post.username !== "unknown") {
-                              setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
-                            }
-                          }}
-                          style={{ fontSize: isMobile ? "13px" : "15px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
-                        >
-                          {post.username || "unknown"}
-                          {getDonorStatus(post.username || "")?.tier && (
-                            <DonorBadge tier={getDonorStatus(post.username || "")!.tier} size="small" />
-                          )}
-                        </span>
-                        <Link
-                          to={`/comments/${post.id}`}
-                          style={{
-                            fontSize: isMobile ? "13px" : "16px",
-                            color: "#d4af37",
-                            textDecoration: "none",
-                            padding: isMobile ? "3px 8px" : "5px 10px",
-                            borderRadius: "4px",
-                            backgroundColor: "rgba(212, 175, 55, 0.12)",
-                            border: "1px solid rgba(212, 175, 55, 0.3)",
-                            fontWeight: 600,
-                            fontFamily: "'Cinzel', serif",
-                            letterSpacing: "0.02em",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.25)";
-                            e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.6)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
-                            e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.3)";
-                          }}
-                        >
-                          💬 {commentCounts[String(post.id)] ?? 0}
-                        </Link>
-                      </div>
-                    </div>
-                {isOwnPost ? (
-                  <div style={{ marginTop: "auto", paddingTop: isMobile ? "3px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
-                      Your commandment
+            {/* ===== DESKTOP 4-CARD GRID MODE ===== */}
+            {posts.length > 0 && (
+              <>
+                {visibleSlots.length === 0 && posts.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                    <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
+                      You've seen all commandments!
                     </p>
-                    <button
-                      style={{
-                        width: "100%",
-                        padding: isMobile ? "8px 0" : "10px 0",
-                        borderRadius: isMobile ? "5px" : "8px",
-                        border: "1px solid #555",
-                        cursor: "pointer",
-                        backgroundColor: "rgba(255,255,255,0.08)",
-                        color: "#d1b97b",
-                        fontSize: isMobile ? "0.85rem" : "0.95rem",
-                        fontWeight: 600,
-                        fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "36px" : "44px",
-                      }}
-                      onClick={() => handleSkip(post.id)}
-                    >
-                      Skip
-                    </button>
-                  </div>
-                ) : userVote ? (
-                  <div style={{ marginTop: "auto", paddingTop: isMobile ? "3px" : "8px" }}>
-                    <p style={{ textAlign: "center", color: "#888", fontSize: isMobile ? "0.7rem" : "0.85rem", fontStyle: "italic", margin: isMobile ? "0 0 2px 0" : "0 0 4px 0" }}>
-                      Already voted
+                    <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                      Submit a new one or change the sort order.
                     </p>
-                    <button
-                      style={{
-                        width: "100%",
-                        padding: isMobile ? "8px 0" : "10px 0",
-                        borderRadius: isMobile ? "5px" : "8px",
-                        border: "1px solid #555",
-                        cursor: "pointer",
-                        backgroundColor: "rgba(255,255,255,0.08)",
-                        color: "#d1b97b",
-                        fontSize: isMobile ? "0.85rem" : "0.95rem",
-                        fontWeight: 600,
-                        fontFamily: "'Cinzel', serif",
-                        minHeight: isMobile ? "36px" : "44px",
-                      }}
-                      onClick={() => handleSkip(post.id)}
-                    >
-                      Skip
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: isMobile ? "6px" : "10px", marginTop: isMobile ? "auto" : "auto", paddingTop: isMobile ? "3px" : "8px" }}>
-                    <button
-                      style={{
-                        flex: 1,
-                        padding: isMobile ? "4px 0" : "12px 0",
-                        borderRadius: isMobile ? "5px" : "8px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: "#7a9a6a",
-                        background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
-                        color: "#fdf8e6",
-                        fontSize: isMobile ? "20px" : "26px",
-                        minHeight: isMobile ? "32px" : "48px",
-                        boxShadow: "0 0 12px rgba(200, 220, 140, 0.25)",
-                      }}
-                      onClick={() => handleVote(post.id, "up")}
-                    >
-                      <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 223, 100, 0.8))" }}>👍</span>
-                    </button>
-                    <button
-                      style={{
-                        flex: 1,
-                        padding: isMobile ? "4px 0" : "12px 0",
-                        borderRadius: isMobile ? "5px" : "8px",
-                        border: "none",
-                        cursor: "pointer",
-                        backgroundColor: "#a87a6a",
-                        background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
-                        color: "#fdf8e6",
-                        fontSize: isMobile ? "20px" : "26px",
-                        minHeight: isMobile ? "32px" : "48px",
-                        boxShadow: "0 0 12px rgba(255, 80, 40, 0.2)",
-                      }}
-                      onClick={() => handleVote(post.id, "down")}
-                    >
-                      <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 50, 20, 0.8))" }}>👎</span>
-                    </button>
                   </div>
                 )}
-              </div>
-            );
-          })}
-        </div>
-          </>
-        )}
 
-        {/* Progress indicator */}
-        {posts.length > 0 && (
-          <div style={{ textAlign: "center", marginTop: isMobile ? "4px" : "10px", paddingTop: isMobile ? "3px" : "8px", borderTop: "1px solid #555" }}>
-            <span style={{ color: "#d1b97b", fontSize: isMobile ? "12px" : "12px" }}>
-              Voted on {votedCount} of {totalCount} commandments
-            </span>
-          </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
+                  {visibleSlots.map((slot) => {
+                    const post = getPost(slot.postId);
+                    if (!post) return null;
+                    const userVote = userVotes[String(post.id)];
+                    const isOwnPost = post.username === user;
+
+                    return (
+                      <div
+                        key={slot.postId}
+                        style={{
+                          border: "1px solid #555",
+                          padding: "16px 20px",
+                          borderRadius: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          backgroundColor: "rgba(255,255,255,0.05)",
+                          overflow: "hidden",
+                          minHeight: "140px",
+                          transition: "all 0.25s ease",
+                          ...getAnimStyle(slot.animState),
+                        }}
+                      >
+                        <div>
+                          <h2 style={{ fontWeight: 700, color: "#fdf8e6", fontSize: "1.4rem", margin: "0 0 6px 0", lineHeight: 1.35, wordBreak: "break-word", whiteSpace: "normal" }}>
+                            {post.title || post.content}
+                          </h2>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "16px", color: "#d1b97b", fontWeight: 600 }}>
+                              {post.votes ?? 0} votes
+                            </span>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (post.username && post.username !== "unknown") {
+                                  setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
+                                }
+                              }}
+                              style={{ fontSize: "15px", color: "#888", fontStyle: "italic", cursor: "pointer" }}
+                            >
+                              {post.username || "unknown"}
+                              {getDonorStatus(post.username || "")?.tier && (
+                                <DonorBadge tier={getDonorStatus(post.username || "")!.tier} size="small" />
+                              )}
+                            </span>
+                            <Link
+                              to={`/comments/${post.id}`}
+                              style={{
+                                fontSize: "16px",
+                                color: "#d4af37",
+                                textDecoration: "none",
+                                padding: "5px 10px",
+                                borderRadius: "4px",
+                                backgroundColor: "rgba(212, 175, 55, 0.12)",
+                                border: "1px solid rgba(212, 175, 55, 0.3)",
+                                fontWeight: 600,
+                                fontFamily: "'Cinzel', serif",
+                                letterSpacing: "0.02em",
+                                transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.25)";
+                                e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.6)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
+                                e.currentTarget.style.borderColor = "rgba(212, 175, 55, 0.3)";
+                              }}
+                            >
+                              💬 {commentCounts[String(post.id)] ?? 0}
+                            </Link>
+                          </div>
+                        </div>
+                    {isOwnPost ? (
+                      <div style={{ marginTop: "auto", paddingTop: "8px" }}>
+                        <p style={{ textAlign: "center", color: "#888", fontSize: "0.85rem", fontStyle: "italic", margin: "0 0 4px 0" }}>
+                          Your commandment
+                        </p>
+                        <button
+                          style={{
+                            width: "100%",
+                            padding: "10px 0",
+                            borderRadius: "8px",
+                            border: "1px solid #555",
+                            cursor: "pointer",
+                            backgroundColor: "rgba(255,255,255,0.08)",
+                            color: "#d1b97b",
+                            fontSize: "0.95rem",
+                            fontWeight: 600,
+                            fontFamily: "'Cinzel', serif",
+                            minHeight: "44px",
+                          }}
+                          onClick={() => handleSkip(post.id)}
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    ) : userVote ? (
+                      <div style={{ marginTop: "auto", paddingTop: "8px" }}>
+                        <p style={{ textAlign: "center", color: "#888", fontSize: "0.85rem", fontStyle: "italic", margin: "0 0 4px 0" }}>
+                          Already voted
+                        </p>
+                        <button
+                          style={{
+                            width: "100%",
+                            padding: "10px 0",
+                            borderRadius: "8px",
+                            border: "1px solid #555",
+                            cursor: "pointer",
+                            backgroundColor: "rgba(255,255,255,0.08)",
+                            color: "#d1b97b",
+                            fontSize: "0.95rem",
+                            fontWeight: 600,
+                            fontFamily: "'Cinzel', serif",
+                            minHeight: "44px",
+                          }}
+                          onClick={() => handleSkip(post.id)}
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: "10px", marginTop: "auto", paddingTop: "8px" }}>
+                        <button
+                          style={{
+                            flex: 1,
+                            padding: "12px 0",
+                            borderRadius: "8px",
+                            border: "none",
+                            cursor: "pointer",
+                            backgroundColor: "#7a9a6a",
+                            background: "linear-gradient(180deg, #8ab47a 0%, #5a8a4a 100%)",
+                            color: "#fdf8e6",
+                            fontSize: "26px",
+                            minHeight: "48px",
+                            boxShadow: "0 0 12px rgba(200, 220, 140, 0.25)",
+                          }}
+                          onClick={() => handleVote(post.id, "up")}
+                        >
+                          <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 223, 100, 0.8))" }}>👍</span>
+                        </button>
+                        <button
+                          style={{
+                            flex: 1,
+                            padding: "12px 0",
+                            borderRadius: "8px",
+                            border: "none",
+                            cursor: "pointer",
+                            backgroundColor: "#a87a6a",
+                            background: "linear-gradient(180deg, #c85a4a 0%, #8a3a2a 100%)",
+                            color: "#fdf8e6",
+                            fontSize: "26px",
+                            minHeight: "48px",
+                            boxShadow: "0 0 12px rgba(255, 80, 40, 0.2)",
+                          }}
+                          onClick={() => handleVote(post.id, "down")}
+                        >
+                          <span style={{ filter: "drop-shadow(0 0 6px rgba(255, 50, 20, 0.8))" }}>👎</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+              </>
+            )}
+
+            {/* Desktop Progress indicator */}
+            {posts.length > 0 && (
+              <div style={{ textAlign: "center", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #555" }}>
+                <span style={{ color: "#d1b97b", fontSize: "12px" }}>
+                  Voted on {votedCount} of {totalCount} commandments
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

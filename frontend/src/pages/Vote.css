@@ -163,6 +163,31 @@ button:hover {
   animation: arrowPulse 0.5s ease-in-out infinite;
 }
 
+/* ============================================================
+   Mobile Comments Feed — infinite scroll container
+   ============================================================ */
+
+.mobile-comments-feed::-webkit-scrollbar {
+  width: 4px;
+}
+
+.mobile-comments-feed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-comments-feed::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 2px;
+}
+
+.mobile-comment-card {
+  transition: background-color 0.2s ease;
+}
+
+.mobile-comment-card:active {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 /* --- Mobile: hide all clouds --- */
 @media (max-width: 768px) {
   .cloud {
