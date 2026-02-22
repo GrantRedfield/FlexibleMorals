@@ -1011,68 +1011,59 @@ export default function Vote() {
                 padding: "0",
                 overflow: "hidden",
               }}>
-                {/* Angel — above the card, aligned right edge */}
-                <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  justifyContent: "flex-end",
-                  alignSelf: "flex-end",
-                  opacity: swipeDragX > 20 ? 1 : 0.85,
-                  transition: "opacity 0.2s ease",
-                  pointerEvents: "none",
-                  overflow: "hidden",
-                  paddingBottom: "4px",
-                  flex: "1 1 0",
-                  minHeight: 0,
-                  maxHeight: "220px",
-                  marginRight: "-20px",
-                }}>
-                  <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
-                  <span style={{
-                    fontFamily: "'Cinzel', serif",
-                    color: "#8ab47a",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
-                    marginTop: "-28px",
-                    marginRight: "70px",
-                    textAlign: "center",
+                {/* Angel — above the card, aligned right edge (hidden during guest prompt) */}
+                {!showGuestLoginPrompt && (
+                  <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    justifyContent: "flex-end",
+                    alignSelf: "flex-end",
+                    opacity: swipeDragX > 20 ? 1 : 0.85,
+                    transition: "opacity 0.2s ease",
+                    pointerEvents: "none",
+                    overflow: "hidden",
+                    paddingBottom: "4px",
+                    flex: "1 1 0",
+                    minHeight: 0,
+                    maxHeight: "220px",
+                    marginRight: "-20px",
+                  }}>
+                    <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
+                    <span style={{
+                      fontFamily: "'Cinzel', serif",
+                      color: "#8ab47a",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
+                      marginTop: "-28px",
+                      marginRight: "70px",
+                      textAlign: "center",
+                      flexShrink: 0,
+                    }}>Upvote</span>
+                  </div>
+                )}
+
+                {/* Swipe tutorial gif — above card, left side */}
+                {showSwipeTutorial && swipeCurrentPostId && !showGuestLoginPrompt && (
+                  <img src="/swipe.gif" alt="Swipe to vote" style={{
+                    width: "100px",
+                    height: "auto",
+                    alignSelf: "flex-start",
+                    marginLeft: "20px",
+                    marginBottom: "-8px",
+                    opacity: 1,
+                    filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
+                    zIndex: 10,
+                    pointerEvents: "none",
                     flexShrink: 0,
-                  }}>Upvote</span>
-                </div>
+                  }} />
+                )}
 
                 {/* Card area */}
                 <div style={{ position: "relative", width: "100%", padding: "0 10px", flexShrink: 0, flexGrow: 0 }}>
-                  {/* Swipe tutorial gifs — on top of and below gold border */}
-                  {showSwipeTutorial && swipeCurrentPostId && (
-                    <>
-                      <img src="/swipe.gif" alt="Swipe to vote" style={{
-                        position: "absolute",
-                        top: "-150px",
-                        left: "20px",
-                        width: "160px",
-                        height: "auto",
-                        opacity: 1,
-                        filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
-                        zIndex: 10,
-                        pointerEvents: "none",
-                      }} />
-                      <img src="/swipe.gif" alt="Swipe to vote" style={{
-                        position: "absolute",
-                        bottom: "-150px",
-                        right: "20px",
-                        width: "160px",
-                        height: "auto",
-                        opacity: 1,
-                        filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
-                        zIndex: 10,
-                        pointerEvents: "none",
-                      }} />
-                    </>
-                  )}
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
                     {swipeCurrentPostId && (() => {
                       const post = getPost(swipeCurrentPostId);
@@ -1226,40 +1217,58 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Demon — below the card, aligned left edge */}
-                <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  justifyContent: "flex-start",
-                  alignSelf: "flex-start",
-                  opacity: swipeDragX < -20 ? 1 : 0.85,
-                  transition: "opacity 0.2s ease",
-                  pointerEvents: "none",
-                  overflow: "hidden",
-                  paddingTop: "4px",
-                  flex: "1 1 0",
-                  minHeight: 0,
-                  maxHeight: "220px",
-                  marginLeft: "-20px",
-                }}>
-                  <span style={{
-                    fontFamily: "'Cinzel', serif",
-                    color: "#c85a4a",
-                    fontWeight: 700,
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
-                    marginBottom: "-18px",
-                    textAlign: "center",
-                    zIndex: 3,
-                    position: "relative",
-                    alignSelf: "center",
-                    marginLeft: "20px",
-                  }}>Downvote</span>
-                  <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
-                </div>
+                {/* Swipe tutorial gif — below card, right side */}
+                {showSwipeTutorial && swipeCurrentPostId && !showGuestLoginPrompt && (
+                  <img src="/swipe.gif" alt="Swipe to vote" style={{
+                    width: "100px",
+                    height: "auto",
+                    alignSelf: "flex-end",
+                    marginRight: "20px",
+                    marginTop: "-8px",
+                    opacity: 1,
+                    filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    flexShrink: 0,
+                  }} />
+                )}
+
+                {/* Demon — below the card, aligned left edge (hidden during guest prompt) */}
+                {!showGuestLoginPrompt && (
+                  <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    justifyContent: "flex-start",
+                    alignSelf: "flex-start",
+                    opacity: swipeDragX < -20 ? 1 : 0.85,
+                    transition: "opacity 0.2s ease",
+                    pointerEvents: "none",
+                    overflow: "hidden",
+                    paddingTop: "4px",
+                    flex: "1 1 0",
+                    minHeight: 0,
+                    maxHeight: "220px",
+                    marginLeft: "-20px",
+                  }}>
+                    <span style={{
+                      fontFamily: "'Cinzel', serif",
+                      color: "#c85a4a",
+                      fontWeight: 700,
+                      fontSize: "0.85rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
+                      marginBottom: "-18px",
+                      textAlign: "center",
+                      zIndex: 3,
+                      position: "relative",
+                      alignSelf: "center",
+                      marginLeft: "20px",
+                    }}>Downvote</span>
+                    <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                  </div>
+                )}
 
               </div>
             )}
