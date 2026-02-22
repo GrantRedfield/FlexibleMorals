@@ -1,7 +1,9 @@
 import axios from "axios";
 
-// Vite exposes env vars prefixed with VITE_ at build time
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+// Vite exposes env vars prefixed with VITE_ at build time.
+// Use ?? so that an explicit empty string (VITE_API_URL=) produces relative
+// URLs that go through Vite's dev proxy, while an unset var falls back.
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
 export const getPosts = async () => {
   const res = await axios.get(`${API_BASE}/posts`);

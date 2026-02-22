@@ -113,7 +113,7 @@ export default function Home() {
   }, []);
 
 
-  // ✅ Fetch posts
+  // ✅ Fetch posts — initial load + poll every 30s + refetch on window focus
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -127,6 +127,18 @@ export default function Home() {
       }
     };
     fetchPosts();
+
+    // Poll every 30 seconds so votes are reflected without a page refresh
+    const interval = setInterval(fetchPosts, 30000);
+
+    // Refetch immediately when the user returns to this tab/window
+    const handleFocus = () => fetchPosts();
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   // Load donor statuses for displayed posts

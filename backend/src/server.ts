@@ -54,7 +54,10 @@ app.use("/auth", authRoutes);
 
 // === Helper: Fetch all posts ===
 const getAllPosts = async () => {
-  const command = new ScanCommand({ TableName: TABLE_NAME });
+  const command = new ScanCommand({
+    TableName: TABLE_NAME,
+    ConsistentRead: true,
+  });
   const result = await client.send(command);
 
   const posts = (result.Items || [])
@@ -70,6 +73,7 @@ const getAllPosts = async () => {
 // === GET /posts ===
 app.get("/posts", async (req, res) => {
   try {
+    res.set("Cache-Control", "no-store");
     const posts = await getAllPosts();
     const formatted = posts.map((p) => ({
       id: p.PK?.replace("POST#", ""),
