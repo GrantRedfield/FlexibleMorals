@@ -829,8 +829,8 @@ export default function Vote() {
                 type="text"
                 placeholder="Enter a new commandment..."
                 value={newCommandment}
-                onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
-                maxLength={60}
+                onChange={(e) => setNewCommandment(e.target.value.slice(0, 80))}
+                maxLength={80}
                 style={{
                   flex: 1,
                   border: "1px solid #555",
@@ -1347,8 +1347,8 @@ export default function Vote() {
                     type="text"
                     placeholder="Enter a new commandment..."
                     value={newCommandment}
-                    onChange={(e) => setNewCommandment(e.target.value.slice(0, 60))}
-                    maxLength={60}
+                    onChange={(e) => setNewCommandment(e.target.value.slice(0, 80))}
+                    maxLength={80}
                     style={{
                       width: "100%",
                       border: "2px solid #d4af37",
