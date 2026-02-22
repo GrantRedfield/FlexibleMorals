@@ -1009,6 +1009,7 @@ export default function Vote() {
                 width: "100%",
                 gap: "0px",
                 padding: "0",
+                overflow: "hidden",
               }}>
                 {/* Angel — above the card, aligned right edge */}
                 <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
@@ -1022,10 +1023,12 @@ export default function Vote() {
                   pointerEvents: "none",
                   overflow: "hidden",
                   paddingBottom: "4px",
-                  height: "220px",
-                  marginRight: "-40px",
+                  flex: "1 1 0",
+                  minHeight: 0,
+                  maxHeight: "220px",
+                  marginRight: "-20px",
                 }}>
-                  <img src="/angel.png" alt="Upvote" style={{ height: "200px", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
+                  <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   <span style={{
                     fontFamily: "'Cinzel', serif",
                     color: "#8ab47a",
@@ -1034,15 +1037,15 @@ export default function Vote() {
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                     textShadow: "0 0 8px rgba(138, 180, 122, 0.4)",
-                    marginTop: "-32px",
-                    marginRight: "90px",
+                    marginTop: "-28px",
+                    marginRight: "70px",
                     textAlign: "center",
                     flexShrink: 0,
                   }}>Upvote</span>
                 </div>
 
                 {/* Card area */}
-                <div style={{ position: "relative", width: "100%", padding: "0 10px", flexShrink: 0 }}>
+                <div style={{ position: "relative", width: "100%", padding: "0 10px", flexShrink: 0, flexGrow: 0 }}>
                   {/* Swipe tutorial gifs — on top of and below gold border */}
                   {showSwipeTutorial && swipeCurrentPostId && (
                     <>
@@ -1235,8 +1238,10 @@ export default function Vote() {
                   pointerEvents: "none",
                   overflow: "hidden",
                   paddingTop: "4px",
-                  height: "220px",
-                  marginLeft: "-40px",
+                  flex: "1 1 0",
+                  minHeight: 0,
+                  maxHeight: "220px",
+                  marginLeft: "-20px",
                 }}>
                   <span style={{
                     fontFamily: "'Cinzel', serif",
@@ -1246,14 +1251,14 @@ export default function Vote() {
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                     textShadow: "0 0 8px rgba(200, 90, 74, 0.4)",
-                    marginBottom: "-20px",
+                    marginBottom: "-18px",
                     textAlign: "center",
                     zIndex: 3,
                     position: "relative",
                     alignSelf: "center",
-                    marginLeft: "40px",
+                    marginLeft: "20px",
                   }}>Downvote</span>
-                  <img src="/demon.png" alt="Downvote" style={{ height: "200px", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                  <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                 </div>
 
               </div>
