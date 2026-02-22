@@ -1046,7 +1046,8 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginTop: "-20px",
+                      marginTop: "-28px",
+                      marginRight: "60px",
                       zIndex: 1,
                     }}>Upvote</span>
                   </div>
@@ -1233,6 +1234,7 @@ export default function Vote() {
                       letterSpacing: "0.05em",
                       flexShrink: 0,
                       marginBottom: "-16px",
+                      marginLeft: "50px",
                       zIndex: 1,
                     }}>Downvote</span>
                     <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
