@@ -1024,8 +1024,8 @@ export default function Vote() {
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
                     display: "flex",
-                    flexDirection: "row",
-                    alignItems: "flex-end",
+                    flexDirection: "column",
+                    alignItems: "center",
                     justifyContent: "flex-end",
                     alignSelf: "flex-end",
                     opacity: swipeDragX > 20 ? 1 : 0.85,
@@ -1036,8 +1036,8 @@ export default function Vote() {
                     minHeight: 0,
                     maxHeight: "220px",
                     marginRight: "-20px",
-                    gap: "4px",
                   }}>
+                    <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                     <span style={{
                       fontFamily: "'Cinzel', serif",
                       color: "#999",
@@ -1046,9 +1046,8 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginBottom: "8px",
+                      marginTop: "2px",
                     }}>Upvote</span>
-                    <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   </div>
                 )}
 
@@ -1211,8 +1210,8 @@ export default function Vote() {
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
                     display: "flex",
-                    flexDirection: "row",
-                    alignItems: "flex-start",
+                    flexDirection: "column",
+                    alignItems: "center",
                     justifyContent: "flex-start",
                     alignSelf: "flex-start",
                     opacity: swipeDragX < -20 ? 1 : 0.85,
@@ -1223,9 +1222,7 @@ export default function Vote() {
                     minHeight: 0,
                     maxHeight: "220px",
                     marginLeft: "-20px",
-                    gap: "4px",
                   }}>
-                    <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                     <span style={{
                       fontFamily: "'Cinzel', serif",
                       color: "#999",
@@ -1234,8 +1231,9 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginTop: "8px",
+                      marginBottom: "2px",
                     }}>Downvote</span>
+                    <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                   </div>
                 )}
 
