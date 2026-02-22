@@ -81,12 +81,6 @@ export default function Vote() {
     parseInt(localStorage.getItem("guestSwipeCount") || "0", 10)
   );
   const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(false);
-  // Swipe tutorial gif — shows for 1 second each time user visits the vote page
-  const [showSwipeTutorial, setShowSwipeTutorial] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSwipeTutorial(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
@@ -527,22 +521,37 @@ export default function Vote() {
     }
   }, [user, posts.length]);
 
-  // === Swipe mode: handle swipe vote ===
+  // === Swipe mode: handle swipe vote (always applies +1/-1, allows re-voting on loop) ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
-    // Dismiss swipe tutorial on first swipe
-    setShowSwipeTutorial(false);
-
     const post = posts.find((p) => String(p.id) === currentPid);
     if (!post) return;
     const currentVotes = post.votes ?? 0;
     const delta = direction === "up" ? 1 : -1;
     const newTotal = currentVotes + delta;
 
-    // Only record vote if logged in; guests can swipe but votes don't count
+    // Always apply a fresh +1/-1 vote (users can re-vote when looping through commandments)
     if (user) {
-      handleVoteOptimistic(currentPid, direction);
+      // Optimistic update — always add/subtract 1
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (String(p.id) !== currentPid) return p;
+          return { ...p, votes: (p.votes ?? 0) + delta };
+        })
+      );
+      // Fire API call
+      voteOnPost(currentPid, direction, user)
+        .then((updated) => {
+          setPosts((prev) =>
+            prev.map((p) =>
+              String(p.id) === String(updated.id)
+                ? { ...p, votes: updated.votes, userVotes: updated.userVotes }
+                : p
+            )
+          );
+        })
+        .catch((err) => console.error("Vote failed:", err));
     }
     // Store exit direction in ref so it's available during AnimatePresence exit animation
     swipeExitDirectionRef.current = direction;
@@ -702,7 +711,7 @@ export default function Vote() {
           </div>
         </div>
         <div className="loading-chisel">
-          <div className="chisel-tool">🪨</div>
+          <div className="chisel-tool"></div>
         </div>
         <div className="loading-tablet right-tablet">
           <div className="tablet-arch"></div>
@@ -1046,22 +1055,6 @@ export default function Vote() {
                   </div>
                 )}
 
-                {/* Swipe tutorial gif — above card, left side */}
-                {showSwipeTutorial && swipeCurrentPostId && !showGuestLoginPrompt && (
-                  <img src="/swipe.gif" alt="Swipe to vote" style={{
-                    width: "100px",
-                    height: "auto",
-                    alignSelf: "flex-start",
-                    marginLeft: "20px",
-                    marginBottom: "-8px",
-                    opacity: 1,
-                    filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                    flexShrink: 0,
-                  }} />
-                )}
-
                 {/* Card area */}
                 <div style={{ position: "relative", width: "100%", padding: "0 10px", flexShrink: 0, flexGrow: 0 }}>
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
@@ -1216,22 +1209,6 @@ export default function Vote() {
                     </div>
                   )}
                 </div>
-
-                {/* Swipe tutorial gif — below card, right side */}
-                {showSwipeTutorial && swipeCurrentPostId && !showGuestLoginPrompt && (
-                  <img src="/swipe.gif" alt="Swipe to vote" style={{
-                    width: "100px",
-                    height: "auto",
-                    alignSelf: "flex-end",
-                    marginRight: "20px",
-                    marginTop: "-8px",
-                    opacity: 1,
-                    filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.7)) brightness(1.3)",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                    flexShrink: 0,
-                  }} />
-                )}
 
                 {/* Demon — below the card, aligned left edge (hidden during guest prompt) */}
                 {!showGuestLoginPrompt && (
