@@ -179,10 +179,9 @@ export default function Home() {
       rafId = requestAnimationFrame(updateWheel);
     };
 
-    // Set bottom spacer so last items can scroll into the visible zone
-    const containerHeight = container.clientHeight;
+    // Set bottom spacer — small so scrolling stops once last commandment is fully visible
     const bottomSpacer = container.querySelector('.wheel-spacer-bottom') as HTMLElement;
-    if (bottomSpacer) bottomSpacer.style.height = `${containerHeight * 0.5}px`;
+    if (bottomSpacer) bottomSpacer.style.height = '0px';
 
     container.addEventListener('scroll', onScroll, { passive: true });
 
@@ -269,7 +268,7 @@ export default function Home() {
     <div className="home-root">
       {/* ✅ Background + overlays wrapper */}
       {isMobile ? (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundImage: "url(/FlexibleMoralsMobile8.png)", backgroundSize: "100% 100%", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundImage: "url(/mobile_bg_4.png)", backgroundSize: "100% 100%", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
           {/* Countdown — top right */}
           <div
             style={{
