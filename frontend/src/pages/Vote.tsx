@@ -1046,8 +1046,8 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginTop: "-28px",
-                      marginRight: "60px",
+                      marginTop: "-34px",
+                      marginRight: "40px",
                       zIndex: 1,
                     }}>Upvote</span>
                   </div>
