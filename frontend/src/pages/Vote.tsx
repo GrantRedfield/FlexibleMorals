@@ -1018,8 +1018,9 @@ export default function Vote() {
                 width: "100%",
                 gap: "0px",
                 padding: "0",
+                overflow: "hidden",
               }}>
-                {/* Angel — above the card, right side (hidden during guest prompt) */}
+                {/* Angel — above the card, aligned right edge (hidden during guest prompt) */}
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
                     display: "flex",
@@ -1030,10 +1031,11 @@ export default function Vote() {
                     opacity: swipeDragX > 20 ? 1 : 0.85,
                     transition: "opacity 0.2s ease",
                     pointerEvents: "none",
+                    overflow: "visible",
                     flex: "1 1 0",
                     minHeight: 0,
                     maxHeight: "220px",
-                    paddingRight: "4px",
+                    marginRight: "-20px",
                   }}>
                     <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                     <span style={{
@@ -1044,7 +1046,9 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginTop: "2px",
+                      marginTop: "-34px",
+                      marginRight: "40px",
+                      zIndex: 1,
                     }}>Upvote</span>
                   </div>
                 )}
@@ -1204,7 +1208,7 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Demon — below the card, left side (hidden during guest prompt) */}
+                {/* Demon — below the card, aligned left edge (hidden during guest prompt) */}
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
                     display: "flex",
@@ -1215,10 +1219,11 @@ export default function Vote() {
                     opacity: swipeDragX < -20 ? 1 : 0.85,
                     transition: "opacity 0.2s ease",
                     pointerEvents: "none",
+                    overflow: "visible",
                     flex: "1 1 0",
                     minHeight: 0,
                     maxHeight: "220px",
-                    paddingLeft: "4px",
+                    marginLeft: "-20px",
                   }}>
                     <span style={{
                       fontFamily: "'Cinzel', serif",
@@ -1228,7 +1233,9 @@ export default function Vote() {
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       flexShrink: 0,
-                      marginBottom: "2px",
+                      marginBottom: "-16px",
+                      marginLeft: "50px",
+                      zIndex: 1,
                     }}>Downvote</span>
                     <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                   </div>
