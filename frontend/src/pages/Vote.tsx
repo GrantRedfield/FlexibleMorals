@@ -1020,11 +1020,10 @@ export default function Vote() {
                 padding: "0",
                 overflow: "hidden",
               }}>
-                {/* Angel — above the card, aligned right edge (hidden during guest prompt) */}
+                {/* Angel+Upvote composite — above the card, aligned right edge (hidden during guest prompt) */}
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "flex-end",
                     alignSelf: "flex-end",
@@ -1035,21 +1034,9 @@ export default function Vote() {
                     flex: "1 1 0",
                     minHeight: 0,
                     maxHeight: "220px",
-                    marginRight: "-20px",
+                    marginRight: "-15px",
                   }}>
-                    <img src="/angel.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
-                    <span style={{
-                      fontFamily: "'Cinzel', serif",
-                      color: "#999",
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      flexShrink: 0,
-                      marginTop: "-34px",
-                      marginRight: "40px",
-                      zIndex: 1,
-                    }}>Upvote</span>
+                    <img src="/angel_upvote.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   </div>
                 )}
 
@@ -1208,11 +1195,10 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Demon — below the card, aligned left edge (hidden during guest prompt) */}
+                {/* Demon+Downvote composite — below the card, aligned left edge (hidden during guest prompt) */}
                 {!showGuestLoginPrompt && (
                   <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "flex-start",
                     alignSelf: "flex-start",
@@ -1223,21 +1209,9 @@ export default function Vote() {
                     flex: "1 1 0",
                     minHeight: 0,
                     maxHeight: "220px",
-                    marginLeft: "-20px",
+                    marginLeft: "-15px",
                   }}>
-                    <span style={{
-                      fontFamily: "'Cinzel', serif",
-                      color: "#999",
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      flexShrink: 0,
-                      marginBottom: "-16px",
-                      marginLeft: "50px",
-                      zIndex: 1,
-                    }}>Downvote</span>
-                    <img src="/demon.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                    <img src="/demon_downvote.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                   </div>
                 )}
 

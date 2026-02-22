@@ -179,9 +179,9 @@ export default function Home() {
       rafId = requestAnimationFrame(updateWheel);
     };
 
-    // Set bottom spacer — small so scrolling stops once last commandment is fully visible
+    // Set bottom spacer — enough so last commandment can scroll above the fade zone
     const bottomSpacer = container.querySelector('.wheel-spacer-bottom') as HTMLElement;
-    if (bottomSpacer) bottomSpacer.style.height = '0px';
+    if (bottomSpacer) bottomSpacer.style.height = `${container.clientHeight * 0.2}px`;
 
     container.addEventListener('scroll', onScroll, { passive: true });
 
