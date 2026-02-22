@@ -556,6 +556,7 @@ export default function Comments() {
               fontSize: "12px",
             }}
           >
+            {user && (
             <button
               onClick={() => handleVote(comment.id, "up")}
               style={{
@@ -571,6 +572,7 @@ export default function Comments() {
             >
               ▲
             </button>
+            )}
             <span
               style={{
                 color: "#d1b97b",
@@ -581,6 +583,7 @@ export default function Comments() {
             >
               {comment.votes}
             </span>
+            {user && (
             <button
               onClick={() => handleVote(comment.id, "down")}
               style={{
@@ -596,6 +599,7 @@ export default function Comments() {
             >
               ▼
             </button>
+            )}
             {depth < maxDepth && (
               <button
                 onClick={() => {

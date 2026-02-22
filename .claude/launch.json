@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dynamodb",
+      "runtimeExecutable": "C:\\jdk\\bin\\java.exe",
+      "runtimeArgs": [
+        "-Djava.library.path=C:\\DynamoDB\\DynamoDBLocal_lib",
+        "-jar", "C:\\DynamoDB\\DynamoDBLocal.jar",
+        "-sharedDb", "-port", "8000"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["../node_modules/vite/bin/vite.js", "--port", "1573"],
+      "port": 1573,
+      "cwd": "frontend"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["../node_modules/tsx/dist/cli.mjs", "src/server.ts"],
+      "port": 3001,
+      "cwd": "backend"
+    }
+  ]
+}

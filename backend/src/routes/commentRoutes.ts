@@ -146,7 +146,11 @@ router.post("/:postId", async (req: Request, res: Response) => {
 // POST /api/comments/:postId/:commentId/vote
 router.post("/:postId/:commentId/vote", async (req: Request, res: Response) => {
   const { postId, commentId } = req.params;
-  const { direction, userId = "guest" } = req.body;
+  const { direction, userId } = req.body;
+
+  if (!userId || userId === "guest" || userId.startsWith("guest_")) {
+    return res.status(403).json({ error: "Guests cannot vote on comments. Please log in." });
+  }
 
   if (!direction || !["up", "down"].includes(direction)) {
     return res.status(400).json({ error: "Invalid direction" });

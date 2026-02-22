@@ -193,13 +193,7 @@ app.post("/posts/:id/vote", async (req, res) => {
       return res.json({ id, votes, userVotes });
     }
 
-    if (!previousVote) {
-      votes += direction === "up" ? 1 : -1;
-    } else if (previousVote === "up" && direction === "down") {
-      votes -= 2;
-    } else if (previousVote === "down" && direction === "up") {
-      votes += 2;
-    }
+    votes += direction === "up" ? 1 : -1;
 
     userVotes[userId] = newVoteState;
 
