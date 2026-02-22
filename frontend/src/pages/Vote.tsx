@@ -81,6 +81,14 @@ export default function Vote() {
     parseInt(localStorage.getItem("guestSwipeCount") || "0", 10)
   );
   const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(false);
+  // Persistent guest voter ID so guest votes are tracked per-device
+  const guestVoterId = useRef<string>((() => {
+    const stored = localStorage.getItem("guestVoterId");
+    if (stored) return stored;
+    const id = `guest_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem("guestVoterId", id);
+    return id;
+  })());
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
@@ -447,7 +455,9 @@ export default function Vote() {
 
     setUserVotes((prev) => ({ ...prev, [pid]: direction }));
 
-    voteOnPost(pid, direction, user)
+    // Persist to backend — use real user ID or guest voter ID
+    const voterId = user || guestVoterId.current;
+    voteOnPost(pid, direction, voterId)
       .then((updated) => {
         setPosts((prev) =>
           prev.map((p) =>
@@ -506,9 +516,14 @@ export default function Vote() {
       setShowGuestLoginPrompt(false);
       guestSwipeCount.current = 0;
       localStorage.removeItem("guestSwipeCount");
-      advanceSwipeCard();
+      if (sortOption === "swipe") {
+        advanceSwipeCard();
+      } else {
+        // Desktop: reinitialize card slots so voting resumes
+        initializeSlots();
+      }
     }
-  }, [user, showGuestLoginPrompt, advanceSwipeCard]);
+  }, [user, showGuestLoginPrompt, advanceSwipeCard, sortOption, initializeSlots]);
 
   // On mount: if guest already hit the limit (persisted), show prompt immediately
   useEffect(() => {
@@ -532,27 +547,26 @@ export default function Vote() {
     const newTotal = currentVotes + delta;
 
     // Always apply a fresh +1/-1 vote (users can re-vote when looping through commandments)
-    if (user) {
-      // Optimistic update — always add/subtract 1
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (String(p.id) !== currentPid) return p;
-          return { ...p, votes: (p.votes ?? 0) + delta };
-        })
-      );
-      // Fire API call
-      voteOnPost(currentPid, direction, user)
-        .then((updated) => {
-          setPosts((prev) =>
-            prev.map((p) =>
-              String(p.id) === String(updated.id)
-                ? { ...p, votes: updated.votes, userVotes: updated.userVotes }
-                : p
-            )
-          );
-        })
-        .catch((err) => console.error("Vote failed:", err));
-    }
+    // Optimistic update — always add/subtract 1
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (String(p.id) !== currentPid) return p;
+        return { ...p, votes: (p.votes ?? 0) + delta };
+      })
+    );
+    // Fire API call — use real user ID or guest voter ID
+    const voterId = user || guestVoterId.current;
+    voteOnPost(currentPid, direction, voterId)
+      .then((updated) => {
+        setPosts((prev) =>
+          prev.map((p) =>
+            String(p.id) === String(updated.id)
+              ? { ...p, votes: updated.votes, userVotes: updated.userVotes }
+              : p
+          )
+        );
+      })
+      .catch((err) => console.error("Vote failed:", err));
     // Store exit direction in ref so it's available during AnimatePresence exit animation
     swipeExitDirectionRef.current = direction;
     setSwipeResult({ direction, delta, newTotal });
@@ -576,16 +590,27 @@ export default function Vote() {
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
-    if (!requireLogin()) return;
+    // Block if guest has already hit the limit
+    if (!user && showGuestLoginPrompt) return;
 
     const pid = String(postId);
     const post = posts.find((p) => String(p.id) === pid);
-    if (post?.username === user) return;
+    if (user && post?.username === user) return;
 
     const prevVote = userVotes[pid];
     if (prevVote === direction) return;
 
     handleVoteOptimistic(pid, direction);
+
+    // Guest half-limit: after voting on half the commandments, prompt login
+    if (!user) {
+      guestSwipeCount.current += 1;
+      localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
+      const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
+      if (guestSwipeCount.current >= halfPosts) {
+        setShowGuestLoginPrompt(true);
+      }
+    }
 
     // Immediately show "voted" state, then start fade-out after brief flash
     setVisibleSlots((prev) =>
@@ -1427,7 +1452,7 @@ export default function Vote() {
             {/* ===== DESKTOP 4-CARD GRID MODE ===== */}
             {posts.length > 0 && (
               <>
-                {visibleSlots.length === 0 && posts.length > 0 && (
+                {visibleSlots.length === 0 && posts.length > 0 && !showGuestLoginPrompt && (
                   <div style={{ textAlign: "center", padding: "2rem 0" }}>
                     <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
                       You've seen all commandments!
@@ -1435,6 +1460,44 @@ export default function Vote() {
                     <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
                       Submit a new one or change the sort order.
                     </p>
+                  </div>
+                )}
+
+                {/* Desktop guest login prompt — shown after voting on half the commandments */}
+                {!user && showGuestLoginPrompt && (
+                  <div style={{
+                    textAlign: "center",
+                    padding: "2.5rem 1rem",
+                    border: "2px solid #d4af37",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(212, 175, 55, 0.05)",
+                    boxShadow: "0 0 20px rgba(212, 175, 55, 0.15)",
+                    marginBottom: "1rem",
+                  }}>
+                    <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 12px 0", fontWeight: 700 }}>
+                      Create an account to keep voting!
+                    </p>
+                    <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 24px 0", fontFamily: "'Cinzel', serif" }}>
+                      Log in to make your votes count and see all commandments.
+                    </p>
+                    <button
+                      onClick={() => { openLoginModal(); }}
+                      style={{
+                        fontFamily: "'Cinzel', serif",
+                        fontSize: "1.1rem",
+                        fontWeight: 700,
+                        color: "#fdf8e6",
+                        backgroundColor: "#b79b3d",
+                        border: "2px solid #d4af37",
+                        borderRadius: "10px",
+                        padding: "14px 32px",
+                        cursor: "pointer",
+                        textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+                        boxShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
+                      }}
+                    >
+                      Log In / Sign Up
+                    </button>
                   </div>
                 )}
 
