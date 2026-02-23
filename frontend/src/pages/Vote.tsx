@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { getPosts, voteOnPost, createPost, getComments } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
@@ -66,9 +66,6 @@ export default function Vote() {
   const [swipeResult, setSwipeResult] = useState<{ direction: "up" | "down"; delta: number; newTotal: number } | null>(null);
   const [swipeCardKey, setSwipeCardKey] = useState(0);
   const [swipeCurrentPostId, setSwipeCurrentPostId] = useState<string | null>(null);
-  const [swipeDragX, setSwipeDragX] = useState(0);
-  const dragX = useMotionValue(0);
-  const cardRotation = useTransform(dragX, [-200, 0, 200], [-12, 0, 12]);
   // Ref for exit animation direction — survives across renders so AnimatePresence can read it
   const swipeExitDirectionRef = useRef<"up" | "down" | null>(null);
   // Emoji feedback after swipe vote
@@ -238,7 +235,6 @@ export default function Vote() {
       setSwipeResult(null);
       setSwipeEmoji(null);
       swipeExitDirectionRef.current = null;
-      setSwipeDragX(0);
       return;
     }
     // Reset swipe state when leaving swipe mode
@@ -246,7 +242,6 @@ export default function Vote() {
     setSwipeResult(null);
     setSwipeEmoji(null);
     swipeExitDirectionRef.current = null;
-    setSwipeDragX(0);
 
     // Prefer unvoted posts for initial slots; fill remaining with voted posts
     const unvoted = currentSorted.filter((p) => !votes[String(p.id)]);
@@ -580,11 +575,12 @@ export default function Vote() {
     }
   }, [user, showGuestLoginPrompt, advanceSwipeCard, sortOption, initializeSlots]);
 
+  const GUEST_VOTE_LIMIT = 10;
+
   // On mount: if guest already hit the limit (persisted), show prompt immediately
   useEffect(() => {
     if (!user && posts.length > 0) {
-      const halfPosts = Math.ceil(posts.length / 2);
-      if (guestSwipeCount.current >= halfPosts) {
+      if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
         setShowGuestLoginPrompt(true);
         setSwipeCurrentPostId(null);
       }
@@ -646,8 +642,7 @@ export default function Vote() {
     if (!user) {
       guestSwipeCount.current += 1;
       localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
-      const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
-      if (guestSwipeCount.current >= halfPosts) {
+      if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
         setShowGuestLoginPrompt(true);
         setSwipeCurrentPostId(null);
         return;
@@ -674,8 +669,7 @@ export default function Vote() {
     if (!user) {
       guestSwipeCount.current += 1;
       localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
-      const halfPosts = Math.ceil(sortedPostsRef.current.length / 2);
-      if (guestSwipeCount.current >= halfPosts) {
+      if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
         setShowGuestLoginPrompt(true);
       }
     }
@@ -1023,45 +1017,65 @@ export default function Vote() {
               </div>
             )}
 
-            {/* SWIPE TAB */}
+            {/* VOTE TAB */}
             {mobileTab === "swipe" && posts.length > 0 && (
               <div className="swipe-mode-active" style={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: "stretch",
+                justifyContent: "flex-start",
                 flex: 1,
                 minHeight: 0,
                 position: "relative",
                 width: "100%",
-                gap: "0px",
                 padding: "0",
                 overflow: "hidden",
               }}>
-                {/* Angel+Upvote composite — above the card, aligned right edge (hidden during guest prompt) */}
-                {!showGuestLoginPrompt && (
-                  <div className={swipeDragX > 50 ? "swipe-arrow-active-angel" : ""} style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    alignSelf: "flex-end",
-                    opacity: swipeDragX > 20 ? 1 : 0.85,
-                    transition: "opacity 0.2s ease",
-                    pointerEvents: "none",
-                    overflow: "visible",
-                    flex: "1 1 0",
-                    minHeight: 0,
-                    maxHeight: "220px",
-                    marginRight: "-15px",
-                  }}>
-                    <img src="/angel_upvote.png" alt="Upvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
+                {/* Top row: Angel + Upvote button — full width */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  width: "100%",
+                  height: "160px",
+                  flexShrink: 0,
+                }}>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <img src="/angel_upvote.png" alt="Angel" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   </div>
-                )}
+                  <button
+                    onClick={() => !showGuestLoginPrompt && handleSwipeVote("up")}
+                    disabled={showGuestLoginPrompt}
+                    style={{
+                      flex: 1,
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "linear-gradient(180deg, rgba(138, 180, 122, 0.25) 0%, rgba(90, 138, 74, 0.15) 100%)",
+                      border: "2px solid rgba(138, 180, 122, 0.5)",
+                      borderRadius: "10px",
+                      cursor: showGuestLoginPrompt ? "default" : "pointer",
+                      fontSize: "4rem",
+                      lineHeight: 1,
+                      fontFamily: "monospace",
+                      color: "#8ab47a",
+                      opacity: showGuestLoginPrompt ? 0.3 : 1,
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 0 10px rgba(138, 180, 122, 0.2)",
+                    }}
+                    onMouseDown={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+                    onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                    onTouchStart={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+                    onTouchEnd={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                  >
+                    ↑
+                  </button>
+                </div>
 
                 {/* Card area */}
-                <div style={{ position: "relative", width: "100%", padding: "0 32px", flexShrink: 0, flexGrow: 0 }}>
+                <div style={{ position: "relative", padding: "6px 12px", flexShrink: 0 }}>
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
-                    {swipeCurrentPostId && (() => {
+                    {swipeCurrentPostId && !showGuestLoginPrompt && (() => {
                       const post = getPost(swipeCurrentPostId);
                       if (!post) return null;
 
@@ -1070,51 +1084,33 @@ export default function Vote() {
                           key={swipeCardKey}
                           className="swipe-card"
                           custom={swipeExitDirectionRef.current}
-                          drag="x"
-                          dragConstraints={{ left: 0, right: 0 }}
-                          dragElastic={0.9}
-                          onDrag={(_: any, info: any) => setSwipeDragX(info.offset.x)}
-                          onDragEnd={(_: any, info: any) => {
-                            const threshold = 100;
-                            if (info.offset.x > threshold) {
-                              handleSwipeVote("up");
-                            } else if (info.offset.x < -threshold) {
-                              handleSwipeVote("down");
-                            }
-                            setSwipeDragX(0);
-                          }}
                           initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          animate={{ opacity: 1, scale: 1 }}
                           exit={(dir: any) => ({
                             opacity: 0,
-                            x: (dir ?? swipeExitDirectionRef.current) === "up" ? 300 : -300,
-                            rotate: (dir ?? swipeExitDirectionRef.current) === "up" ? 15 : -15,
+                            x: (dir ?? swipeExitDirectionRef.current) === "up" ? 200 : -200,
+                            rotate: (dir ?? swipeExitDirectionRef.current) === "up" ? 10 : -10,
                           })}
                           transition={{ type: "spring", stiffness: 300, damping: 25 }}
                           style={{
-                            x: dragX,
-                            rotate: cardRotation,
                             border: "2px solid #d4af37",
                             padding: "20px 10px",
                             borderRadius: "12px",
                             backgroundColor: "rgba(255,255,255,0.05)",
                             boxShadow: "0 0 12px rgba(212, 175, 55, 0.15)",
-                            cursor: "grab",
                             textAlign: "center",
                           }}
-                          whileDrag={{ cursor: "grabbing" }}
                         >
                           <h2 style={{
                             fontWeight: 700,
                             color: "#fdf8e6",
-                            fontSize: "1.4rem",
+                            fontSize: "1.2rem",
                             margin: "0 0 10px 0",
                             lineHeight: 1.4,
                             wordBreak: "break-word",
                           }}>
                             {post.title || post.content}
                           </h2>
-
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "14px", color: "#888", fontStyle: "italic" }}>
                               — {post.username || "unknown"}
@@ -1130,10 +1126,7 @@ export default function Vote() {
                     {swipeEmoji && (
                       <div style={{
                         position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
+                        top: 0, left: 0, right: 0, bottom: 0,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1146,11 +1139,7 @@ export default function Vote() {
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 1.8 }}
                           transition={{ duration: 0.3 }}
-                          style={{
-                            fontSize: "8rem",
-                            lineHeight: 1,
-                            filter: "drop-shadow(0 0 30px rgba(0,0,0,0.6))",
-                          }}
+                          style={{ fontSize: "6rem", lineHeight: 1, filter: "drop-shadow(0 0 30px rgba(0,0,0,0.6))" }}
                         >
                           {swipeEmoji === "down" ? "\uD83D\uDD25" : "\uD83D\uDE4F"}
                         </motion.div>
@@ -1158,38 +1147,33 @@ export default function Vote() {
                     )}
                   </AnimatePresence>
 
-                  {/* Guest login prompt — shown after swiping half the commandments */}
+                  {/* Guest login prompt */}
                   {showGuestLoginPrompt && (
                     <div style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       textAlign: "center",
-                      padding: "2rem 1rem",
+                      padding: "1.5rem 0.5rem",
                     }}>
-                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.3rem", margin: "0 0 12px 0", fontWeight: 700 }}>
+                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 10px 0", fontWeight: 700 }}>
                         Create an account to keep voting!
                       </p>
-                      <p style={{ color: "#c8b070", fontSize: "0.9rem", margin: "0 0 20px 0", fontFamily: "'Cinzel', serif" }}>
-                        Log in to make your votes count and see all commandments.
+                      <p style={{ color: "#c8b070", fontSize: "0.8rem", margin: "0 0 16px 0", fontFamily: "'Cinzel', serif" }}>
+                        Log in to make your votes count.
                       </p>
                       <button
                         onClick={() => { openLoginModal(); }}
                         style={{
                           fontFamily: "'Cinzel', serif",
-                          fontSize: "1.1rem",
+                          fontSize: "0.95rem",
                           fontWeight: 700,
                           color: "#fdf8e6",
                           backgroundColor: "#b79b3d",
                           border: "2px solid #d4af37",
                           borderRadius: "10px",
-                          padding: "14px 32px",
+                          padding: "12px 24px",
                           cursor: "pointer",
                           textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
                           boxShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
@@ -1203,7 +1187,7 @@ export default function Vote() {
                   {/* No more cards */}
                   {!swipeCurrentPostId && !showGuestLoginPrompt && (
                     <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
+                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 8px 0" }}>
                         You've seen all commandments!
                       </p>
                       <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
@@ -1213,25 +1197,46 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Demon+Downvote composite — below the card, aligned left edge (hidden during guest prompt) */}
-                {!showGuestLoginPrompt && (
-                  <div className={swipeDragX < -50 ? "swipe-arrow-active-demon" : ""} style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-start",
-                    alignSelf: "flex-start",
-                    opacity: swipeDragX < -20 ? 1 : 0.85,
-                    transition: "opacity 0.2s ease",
-                    pointerEvents: "none",
-                    overflow: "visible",
-                    flex: "1 1 0",
-                    minHeight: 0,
-                    maxHeight: "220px",
-                    marginLeft: "-15px",
-                  }}>
-                    <img src="/demon_downvote.png" alt="Downvote" style={{ maxHeight: "100%", height: "auto", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                {/* Bottom row: Downvote button + Demon — full width */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  width: "100%",
+                  height: "160px",
+                  flexShrink: 0,
+                }}>
+                  <button
+                    onClick={() => !showGuestLoginPrompt && handleSwipeVote("down")}
+                    disabled={showGuestLoginPrompt}
+                    style={{
+                      flex: 1,
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "linear-gradient(180deg, rgba(200, 90, 74, 0.25) 0%, rgba(138, 58, 42, 0.15) 100%)",
+                      border: "2px solid rgba(200, 90, 74, 0.5)",
+                      borderRadius: "10px",
+                      cursor: showGuestLoginPrompt ? "default" : "pointer",
+                      fontSize: "4rem",
+                      lineHeight: 1,
+                      fontFamily: "monospace",
+                      color: "#c85a4a",
+                      opacity: showGuestLoginPrompt ? 0.3 : 1,
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 0 10px rgba(200, 90, 74, 0.2)",
+                    }}
+                    onMouseDown={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+                    onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                    onTouchStart={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+                    onTouchEnd={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                  >
+                    ↓
+                  </button>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <img src="/demon_downvote.png" alt="Demon" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                   </div>
-                )}
+                </div>
 
               </div>
             )}
