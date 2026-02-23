@@ -91,6 +91,71 @@ app.get("/posts", async (req, res) => {
   }
 });
 
+// === Vote cooldown — server-side enforcement (works across devices) ===
+const VOTE_COOLDOWN_SECONDS = 5 * 60; // 5 minutes
+
+const getVoteCooldown = async (userId: string): Promise<number | null> => {
+  const result = await client.send(
+    new GetItemCommand({
+      TableName: TABLE_NAME,
+      Key: marshall({ PK: `USER#${userId}`, SK: "VOTE_COOLDOWN" }),
+    })
+  );
+  if (!result.Item) return null;
+  const item = unmarshall(result.Item);
+  const end = Number(item.cooldownEnd ?? 0);
+  return end > Date.now() ? end : null;
+};
+
+const setVoteCooldown = async (userId: string) => {
+  const end = Date.now() + VOTE_COOLDOWN_SECONDS * 1000;
+  await client.send(
+    new PutItemCommand({
+      TableName: TABLE_NAME,
+      Item: marshall({
+        PK: `USER#${userId}`,
+        SK: "VOTE_COOLDOWN",
+        cooldownEnd: end,
+        createdAt: new Date().toISOString(),
+      }),
+    })
+  );
+  return end;
+};
+
+// GET /api/vote-cooldown/:userId — check if a user has an active cooldown
+app.get("/api/vote-cooldown/:userId", async (req, res) => {
+  try {
+    const end = await getVoteCooldown(req.params.userId);
+    if (end) {
+      const remaining = Math.ceil((end - Date.now()) / 1000);
+      return res.json({ cooldown: true, cooldownEnd: end, remaining });
+    }
+    res.json({ cooldown: false });
+  } catch (err) {
+    console.error("❌ Cooldown check failed:", err);
+    res.status(500).json({ error: "Failed to check cooldown" });
+  }
+});
+
+// POST /api/vote-cooldown — set a cooldown for a user (called when frontend detects exhaustion)
+app.post("/api/vote-cooldown", async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  try {
+    // Only set if not already active
+    const existing = await getVoteCooldown(userId);
+    if (existing) {
+      return res.json({ cooldownEnd: existing, remaining: Math.ceil((existing - Date.now()) / 1000) });
+    }
+    const end = await setVoteCooldown(userId);
+    res.json({ cooldownEnd: end, remaining: VOTE_COOLDOWN_SECONDS });
+  } catch (err) {
+    console.error("❌ Cooldown set failed:", err);
+    res.status(500).json({ error: "Failed to set cooldown" });
+  }
+});
+
 const DAILY_SUBMISSION_LIMIT = 15;
 
 // === Helper: Get how many commandments a user has submitted today ===
@@ -175,6 +240,15 @@ app.post("/posts/:id/vote", async (req, res) => {
   }
 
   try {
+    // Check server-side vote cooldown (cross-device enforcement)
+    if (userId !== "guest") {
+      const cooldownEnd = await getVoteCooldown(userId);
+      if (cooldownEnd) {
+        const remaining = Math.ceil((cooldownEnd - Date.now()) / 1000);
+        return res.status(429).json({ error: "Vote cooldown active", cooldownEnd, remaining });
+      }
+    }
+
     // Fetch current post
     const getRes = await client.send(
       new GetItemCommand({

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { getPosts, voteOnPost, createPost, getComments } from "../utils/api";
+import { getPosts, voteOnPost, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -508,7 +508,17 @@ export default function Vote() {
           )
         );
       })
-      .catch((err) => console.error("Vote failed:", err));
+      .catch((err) => {
+        // If server returns cooldown (429), activate it locally
+        if (err?.response?.status === 429 && err?.response?.data?.cooldownEnd) {
+          const serverEnd = err.response.data.cooldownEnd;
+          setCooldownEnd(serverEnd);
+          setCooldownRemaining(Math.max(0, Math.ceil((serverEnd - Date.now()) / 1000)));
+          cooldownTriggered.current = true;
+          localStorage.setItem(getCooldownKey(user), String(serverEnd));
+        }
+        console.error("Vote failed:", err);
+      });
   };
 
   // Ref to always access latest swipeCurrentPostId inside timeouts
@@ -607,6 +617,8 @@ export default function Vote() {
   const prevUserRef = useRef(user);
 
   // Reload cooldown when user changes (login/logout)
+  // Checks both localStorage (for guests) and the server (for logged-in users,
+  // enabling cross-device cooldown enforcement).
   useEffect(() => {
     const prevUser = prevUserRef.current;
     prevUserRef.current = user;
@@ -625,28 +637,55 @@ export default function Vote() {
       }
     }
 
+    // Helper to apply a found cooldown
+    const applyCooldown = (end: number) => {
+      setCooldownEnd(end);
+      setCooldownRemaining(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+      cooldownTriggered.current = true;
+      // Also sync to localStorage
+      localStorage.setItem(getCooldownKey(user), String(end));
+    };
+
+    // Helper to clear cooldown and re-init
+    const clearAndReinit = () => {
+      setCooldownEnd(null);
+      setCooldownRemaining(0);
+      cooldownTriggered.current = false;
+      slotsInitialized.current = false;
+      shownPostIds.current = new Set();
+      setShuffleTrigger((t) => t + 1);
+    };
+
+    // Check localStorage first (fast, works for guests too)
     const key = getCooldownKey(user);
     const stored = localStorage.getItem(key);
     if (stored) {
       const end = parseInt(stored, 10);
       if (end > Date.now()) {
-        setCooldownEnd(end);
-        setCooldownRemaining(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
-        cooldownTriggered.current = true;
+        applyCooldown(end);
         return;
       }
       localStorage.removeItem(key);
     }
-    // No active cooldown for this user — clear any leftover state
-    setCooldownEnd(null);
-    setCooldownRemaining(0);
-    cooldownTriggered.current = false;
-    slotsInitialized.current = false;
-    // Reset shown tracking and force slot re-initialization so the new
-    // user/guest gets a fresh card queue instead of inheriting the
-    // previous user's exhausted state (which would falsely trigger cooldown).
-    shownPostIds.current = new Set();
-    setShuffleTrigger((t) => t + 1);
+
+    // For logged-in users, also check server (cross-device enforcement)
+    if (user) {
+      checkVoteCooldown(user)
+        .then((data) => {
+          if (data.cooldown && data.cooldownEnd > Date.now()) {
+            applyCooldown(data.cooldownEnd);
+          } else {
+            clearAndReinit();
+          }
+        })
+        .catch(() => {
+          // Server check failed — fall through to no cooldown
+          clearAndReinit();
+        });
+    } else {
+      // Guest — no server check, just clear and re-init
+      clearAndReinit();
+    }
   }, [user]);
 
   // Mark slots as initialized only after the state updates from initializeSlots
@@ -676,8 +715,11 @@ export default function Vote() {
       const end = Date.now() + COOLDOWN_SECONDS * 1000;
       setCooldownEnd(end);
       setCooldownRemaining(COOLDOWN_SECONDS);
-      // Persist per-account
+      // Persist per-account locally
       localStorage.setItem(getCooldownKey(user), String(end));
+      // Also persist server-side for cross-device enforcement
+      const voterId = user || guestVoterId.current;
+      apiSetVoteCooldown(voterId).catch(() => {});
     }
   }, [swipeCurrentPostId, visibleSlots.length, posts.length, sortOption, cooldownEnd, showGuestLoginPrompt, COOLDOWN_SECONDS, user]);
 
@@ -1638,7 +1680,15 @@ export default function Vote() {
                 {posts.length > 0 && (
                   <>
                     {visibleSlots.length === 0 && posts.length > 0 && !showGuestLoginPrompt && (
-                      <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+                      <div style={{
+                        textAlign: "center",
+                        padding: "2.5rem 1.5rem",
+                        width: "100%",
+                        boxSizing: "border-box",
+                        border: "2px solid #d4af37",
+                        borderRadius: "12px",
+                        backgroundColor: "rgba(255,255,255,0.03)",
+                      }}>
                         <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 10px 0", fontWeight: 700 }}>
                           You've judged all commandments!
                         </p>

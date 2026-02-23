@@ -21,6 +21,18 @@ export const createPost = async (content: string, authorId?: string) => {
   return res.data;
 };
 
+// === Vote Cooldown API (server-side, cross-device) ===
+
+export const checkVoteCooldown = async (userId: string) => {
+  const res = await axios.get(`${API_BASE}/api/vote-cooldown/${userId}`);
+  return res.data;
+};
+
+export const setVoteCooldown = async (userId: string) => {
+  const res = await axios.post(`${API_BASE}/api/vote-cooldown`, { userId });
+  return res.data;
+};
+
 // === Donor API ===
 
 export const getDonorStatus = async (username: string) => {

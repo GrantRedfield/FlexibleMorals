@@ -73,7 +73,14 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
   useImperativeHandle(ref, () => ({
-    expand: () => setMobileExpanded(true),
+    expand: () => {
+      setMobileExpanded(true);
+      // Always force scroll to absolute bottom, even if already expanded.
+      // Multiple attempts handle images/GIFs that shift layout after load.
+      requestAnimationFrame(() => scrollToBottom(false));
+      setTimeout(() => scrollToBottom(false), 100);
+      setTimeout(() => scrollToBottom(false), 300);
+    },
   }));
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -345,8 +352,10 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
   // Scroll to bottom when mobile chat is expanded
   useEffect(() => {
     if (mobileExpanded) {
-      // Wait a frame for the layout to settle, then instant-scroll
+      // Multiple attempts to handle layout settling and lazy-loaded images
       requestAnimationFrame(() => scrollToBottom(false));
+      setTimeout(() => scrollToBottom(false), 150);
+      setTimeout(() => scrollToBottom(false), 400);
     }
   }, [mobileExpanded, scrollToBottom]);
 
