@@ -35,6 +35,42 @@ interface VisibleSlot {
 
 const VISIBLE_COUNT = 4;
 
+const ANGEL_PHRASES = [
+  "Bless you, child!",
+  "A righteous decree!",
+  "The heavens approve!",
+  "Divine wisdom!",
+  "Hallelujah!",
+  "Most holy!",
+  "The angels sing!",
+  "Heaven smiles upon thee!",
+  "A blessed choice!",
+  "Virtue rewarded!",
+  "Grace be with you!",
+  "So it is written!",
+  "Amen to that!",
+  "Truly inspired!",
+  "The light shines!",
+];
+
+const DEMON_PHRASES = [
+  "Deliciously wicked...",
+  "Yes, yessss!",
+  "Chaos reigns!",
+  "How sinfully good...",
+  "I approve...",
+  "Mwahahaha!",
+  "Embrace the dark!",
+  "A soul after my own...",
+  "Wicked choice!",
+  "Burn it all!",
+  "Sweet corruption...",
+  "Diabolically good!",
+  "Feed the flames!",
+  "The abyss applauds!",
+  "Perfectly evil...",
+];
+
 export default function Vote() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +106,25 @@ export default function Vote() {
   const swipeExitDirectionRef = useRef<"up" | "down" | null>(null);
   // Emoji feedback after swipe vote
   const [swipeEmoji, setSwipeEmoji] = useState<"up" | "down" | null>(null);
+  // Speech bubble state for angel/demon quips
+  const [speechBubble, setSpeechBubble] = useState<{ text: string; type: "angel" | "demon" } | null>(null);
+  // Consecutive vote streak tracking
+  const voteStreakRef = useRef<{ direction: "up" | "down"; count: number }>({ direction: "up", count: 0 });
+  const [showStreakPopup, setShowStreakPopup] = useState<"up" | "down" | null>(null);
+  // Cooldown pulse — triggered when user tries to vote during cooldown
+  const [cooldownPulse, setCooldownPulse] = useState(false);
+  // Bulk vote animation state
+  const [bulkVoteAnim, setBulkVoteAnim] = useState<{ type: "up" | "down"; emojiCount: number } | null>(null);
+  const bulkVoteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Stable random positions for bulk vote emoji flood (generated once)
+  const bulkEmojiPositions = useRef(
+    Array.from({ length: 250 }, () => ({
+      x: Math.random() * 96 + 1,   // 1%–97% left
+      y: Math.random() * 96 + 1,   // 1%–97% top
+      size: 14 + Math.random() * 24, // 14–38px
+      delay: Math.random() * 1.0,
+    }))
+  );
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
   const shownPostIds = useRef<Set<string>>(new Set());
@@ -435,6 +490,7 @@ export default function Vote() {
   const handleMobileTabChange = useCallback((tab: MobileTab) => {
     setMobileTab(tab);
     setMobileVisibleCount(10);
+    setBulkVoteAnim(null);
     if (tab === "swipe") {
       setSortOption(isMobile ? "swipe" : "random");
       setShuffleTrigger((t) => t + 1);
@@ -520,6 +576,69 @@ export default function Vote() {
         console.error("Vote failed:", err);
       });
   };
+
+  // === Bulk vote all remaining posts ===
+  const handleBulkVote = useCallback((direction: "up" | "down") => {
+    const currentUser = user;
+    const voterId = currentUser || guestVoterId.current;
+    const votes = userVotesRef.current;
+    const allPosts = sortedPostsRef.current;
+
+    // Find all unvoted posts (excluding own)
+    const unvoted = allPosts.filter(
+      (p) => !votes[String(p.id)] && p.username !== currentUser
+    );
+
+    // Fire all votes to backend
+    const newVotes: Record<string, "up" | "down"> = {};
+    for (const post of unvoted) {
+      const pid = String(post.id);
+      newVotes[pid] = direction;
+      voteOnPost(pid, direction, voterId).catch((err) => console.error("Bulk vote failed:", err));
+    }
+
+    // Optimistic update
+    setUserVotes((prev) => ({ ...prev, ...newVotes }));
+    setPosts((prev) =>
+      prev.map((p) => {
+        const pid = String(p.id);
+        if (!newVotes[pid]) return p;
+        const current = p.votes ?? 0;
+        return { ...p, votes: current + (direction === "up" ? 1 : -1) };
+      })
+    );
+
+    // Clear current card
+    setSwipeCurrentPostId(null);
+
+    // Start emoji flood animation — 250 emojis fill the screen, then slowly clear
+    const TOTAL_EMOJIS = 250;
+    setBulkVoteAnim({ type: direction, emojiCount: TOTAL_EMOJIS });
+
+    // After a brief flood pause, start clearing emojis one by one
+    const clearDelay = setTimeout(() => {
+      const interval = setInterval(() => {
+        setBulkVoteAnim((prev) => {
+          if (!prev || prev.emojiCount <= 2) {
+            clearInterval(interval);
+            bulkVoteTimerRef.current = null;
+            return prev ? { ...prev, emojiCount: 0 } : null;
+          }
+          return { ...prev, emojiCount: prev.emojiCount - 2 };
+        });
+      }, 30);
+      bulkVoteTimerRef.current = interval;
+    }, 1500);
+
+    return () => { clearTimeout(clearDelay); };
+  }, [user]);
+
+  // Clean up bulk vote timer on unmount
+  useEffect(() => {
+    return () => {
+      if (bulkVoteTimerRef.current) clearInterval(bulkVoteTimerRef.current);
+    };
+  }, []);
 
   // Ref to always access latest swipeCurrentPostId inside timeouts
   const swipeCurrentPostIdRef = useRef(swipeCurrentPostId);
@@ -761,8 +880,12 @@ export default function Vote() {
 
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
-    // Block voting during cooldown
-    if (cooldownEnd && cooldownEnd > Date.now()) return;
+    // Block voting during cooldown — pulsate the timer
+    if (cooldownEnd && cooldownEnd > Date.now()) {
+      setCooldownPulse(true);
+      setTimeout(() => setCooldownPulse(false), 600);
+      return;
+    }
 
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
@@ -803,6 +926,24 @@ export default function Vote() {
     setSwipeEmoji(direction);
     setTimeout(() => setSwipeEmoji(null), 700);
 
+    // Occasionally show a speech bubble from the angel or demon (~35% chance)
+    if (Math.random() < 0.35) {
+      const phrases = direction === "up" ? ANGEL_PHRASES : DEMON_PHRASES;
+      const text = phrases[Math.floor(Math.random() * phrases.length)];
+      setSpeechBubble({ text, type: direction === "up" ? "angel" : "demon" });
+      setTimeout(() => setSpeechBubble(null), 2000);
+    }
+
+    // Track consecutive same-direction votes and show streak popup at 10
+    if (voteStreakRef.current.direction === direction) {
+      voteStreakRef.current.count += 1;
+    } else {
+      voteStreakRef.current = { direction, count: 1 };
+    }
+    if (voteStreakRef.current.count === 10) {
+      setShowStreakPopup(direction);
+    }
+
     // Guest half-limit: after swiping through half the commandments, prompt login
     if (!user) {
       guestSwipeCount.current += 1;
@@ -818,8 +959,12 @@ export default function Vote() {
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
-    // Block voting during cooldown
-    if (cooldownEnd && cooldownEnd > Date.now()) return;
+    // Block voting during cooldown — pulsate the timer
+    if (cooldownEnd && cooldownEnd > Date.now()) {
+      setCooldownPulse(true);
+      setTimeout(() => setCooldownPulse(false), 600);
+      return;
+    }
     // Block if guest has already hit the limit
     if (!user && showGuestLoginPrompt) return;
 
@@ -828,6 +973,16 @@ export default function Vote() {
     if (user && post?.username === user) return;
 
     handleVoteOptimistic(pid, direction);
+
+    // Track consecutive same-direction votes and show streak popup at 10 (desktop)
+    if (voteStreakRef.current.direction === direction) {
+      voteStreakRef.current.count += 1;
+    } else {
+      voteStreakRef.current = { direction, count: 1 };
+    }
+    if (voteStreakRef.current.count === 10) {
+      setShowStreakPopup(direction);
+    }
 
     // Guest half-limit: after voting on half the commandments, prompt login
     if (!user) {
@@ -1014,45 +1169,83 @@ export default function Vote() {
           overflow: isMobile ? "hidden" : undefined,
         }}
       >
-        {/* Navigation — hamburger on mobile, login button on desktop */}
+        {/* Navigation — hamburger on mobile, inline buttons on desktop */}
         {isMobile ? (
-          <HamburgerMenu
-            onOfferingClick={() => setShowDonationPopup(true)}
-            onMerchClick={() => setShowMerchPopup(true)}
-            onCharterClick={() => setShowInfoPopup(true)}
-          />
+          <>
+            <HamburgerMenu
+              onOfferingClick={() => setShowDonationPopup(true)}
+              onMerchClick={() => setShowMerchPopup(true)}
+              onCharterClick={() => setShowInfoPopup(true)}
+            />
+            {/* Mobile Home Button — fixed top-right */}
+            <button
+              onClick={() => navigate("/")}
+              style={{
+                position: "fixed",
+                top: "0.5rem",
+                right: "0.5rem",
+                zIndex: 1000,
+                backgroundColor: "rgba(20, 15, 5, 0.85)",
+                border: "2px solid #d4af37",
+                borderRadius: "7px",
+                padding: "12px 13px",
+                boxShadow: "0 0 8px rgba(212, 175, 55, 0.2)",
+                color: "#d4af37",
+                fontFamily: "'Cinzel', serif",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+                minWidth: "50px",
+                minHeight: "50px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              Home
+            </button>
+          </>
         ) : (
-          <LoginButton />
-        )}
-
-        {/* Home Button — fixed top-right */}
-        <button
-          onClick={() => navigate("/")}
-          style={{
-            position: "fixed",
-            top: isMobile ? "0.5rem" : "1rem",
-            right: isMobile ? "0.5rem" : "1rem",
-            zIndex: 1000,
-            backgroundColor: "rgba(20, 15, 5, 0.85)",
-            border: "2px solid #d4af37",
-            borderRadius: "7px",
-            padding: isMobile ? "12px 13px" : "0.5rem 1rem",
-            boxShadow: "0 0 8px rgba(212, 175, 55, 0.2)",
-            color: "#d4af37",
-            fontFamily: "'Cinzel', serif",
-            fontWeight: 700,
-            fontSize: isMobile ? "0.85rem" : "1rem",
-            cursor: "pointer",
-            letterSpacing: "0.06em",
-            minWidth: isMobile ? "50px" : undefined,
-            minHeight: isMobile ? "50px" : undefined,
+          <div style={{
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          Home
-        </button>
+            width: "100%",
+            marginBottom: "0.25rem",
+          }}>
+            <div className="login-inline-wrapper">
+              <LoginButton />
+            </div>
+            <button
+              onClick={() => navigate("/")}
+              style={{
+                backgroundColor: "transparent",
+                border: "2px solid #d4af37",
+                borderRadius: "8px",
+                padding: "10px 24px",
+                boxShadow: "0 0 10px rgba(212, 175, 55, 0.2)",
+                color: "#d4af37",
+                fontFamily: "'Cinzel', serif",
+                fontWeight: 700,
+                fontSize: "1.15rem",
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
+                e.currentTarget.style.boxShadow = "0 0 16px rgba(212, 175, 55, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.boxShadow = "0 0 10px rgba(212, 175, 55, 0.2)";
+              }}
+            >
+              Home
+            </button>
+          </div>
+        )}
 
         <h1
           style={{
@@ -1195,6 +1388,120 @@ export default function Vote() {
                 padding: "0",
                 overflow: "visible",
               }}>
+                {/* === Bulk vote emoji flood === */}
+                {bulkVoteAnim ? (
+                  <div style={{
+                    position: "relative",
+                    flex: 1,
+                    width: "100%",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(0,0,0,0.92)",
+                    borderRadius: "12px",
+                  }}>
+                    {/* Emoji flood layer */}
+                    {bulkEmojiPositions.current.slice(0, bulkVoteAnim.emojiCount).map((pos, i) => (
+                      <motion.span
+                        key={i}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        transition={{ duration: 0.3, delay: pos.delay }}
+                        style={{
+                          position: "absolute",
+                          left: `${pos.x}%`,
+                          top: `${pos.y}%`,
+                          fontSize: `${pos.size}px`,
+                          lineHeight: 1,
+                          pointerEvents: "none",
+                          filter: "drop-shadow(0 0 4px rgba(0,0,0,0.5))",
+                        }}
+                      >
+                        {bulkVoteAnim.type === "up" ? "\uD83D\uDE4F" : "\uD83D\uDD25"}
+                      </motion.span>
+                    ))}
+                    {/* Revealed message underneath */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: bulkVoteAnim.emojiCount <= 20 ? 1 : 0 }}
+                      transition={{ duration: 0.6 }}
+                      style={{
+                        textAlign: "center",
+                        padding: "1.5rem 1rem",
+                        zIndex: 1,
+                      }}
+                    >
+                      <p style={{
+                        color: "#d4af37",
+                        fontFamily: "'Cinzel', serif",
+                        fontSize: "1.1rem",
+                        fontWeight: 700,
+                        margin: "0 0 8px 0",
+                        lineHeight: 1.4,
+                      }}>
+                        You've judged all commandments!
+                      </p>
+                      <p style={{
+                        color: "#c8b070",
+                        fontFamily: "'Cinzel', serif",
+                        fontSize: "0.85rem",
+                        margin: "0 0 6px 0",
+                      }}>
+                        {bulkVoteAnim.type === "up"
+                          ? "The heavens rejoice at your mercy."
+                          : "The abyss welcomes your wrath."}
+                      </p>
+                      {cooldownEnd && cooldownRemaining > 0 ? (
+                        <>
+                          <p className={cooldownPulse ? "cooldown-pulse" : ""} style={{
+                            color: "#fdf8e6",
+                            fontFamily: "'Cinzel', serif",
+                            fontSize: "2rem",
+                            fontWeight: 900,
+                            margin: "12px 0",
+                            textShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
+                          }}>
+                            {formatTime(cooldownRemaining)}
+                          </p>
+                          <p style={{ color: "#c8b070", fontSize: "0.85rem", margin: "0 0 6px 0", fontFamily: "'Cinzel', serif", lineHeight: 1.5 }}>
+                            Voting reopens soon. In the meantime...
+                          </p>
+                          <p style={{ color: "#d4af37", fontSize: "0.9rem", margin: "8px 0", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+                            Declare a commandment of your own!
+                          </p>
+                        </>
+                      ) : (
+                        <p style={{ color: "#c8b070", fontSize: "0.85rem", margin: "8px 0 0 0", fontFamily: "'Cinzel', serif" }}>
+                          Declare a commandment of your own!
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleMobileTabChange("declare")}
+                        style={{
+                          fontFamily: "'Cinzel', serif",
+                          fontSize: "0.95rem",
+                          fontWeight: 700,
+                          color: "#fdf8e6",
+                          backgroundColor: "#b79b3d",
+                          border: "2px solid #d4af37",
+                          borderRadius: "10px",
+                          padding: "12px 24px",
+                          cursor: "pointer",
+                          boxShadow: "0 0 12px rgba(212, 175, 55, 0.25)",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        Declare
+                      </button>
+                      <p style={{ color: "#888", fontSize: "0.8rem", margin: "8px 0 0 0", fontStyle: "italic" }}>
+                        Or perhaps... go touch some grass.
+                      </p>
+                    </motion.div>
+                  </div>
+                ) : (
+                <>
                 {/* Top row: Angel + Upvote button — full width */}
                 <div style={{
                   display: "flex",
@@ -1203,8 +1510,21 @@ export default function Vote() {
                   flex: 1,
                   minHeight: 0,
                 }}>
-                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
                     <img src="/angel.png" alt="Angel" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
+                    <AnimatePresence>
+                      {speechBubble?.type === "angel" && (
+                        <motion.div
+                          className="speech-bubble speech-bubble-angel"
+                          initial={{ opacity: 0, scale: 0.7 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.7 }}
+                          transition={{ duration: 0.25 }}
+                        >
+                          {speechBubble.text}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                   <button
                     onClick={() => !showGuestLoginPrompt && handleSwipeVote("up")}
@@ -1334,6 +1654,80 @@ export default function Vote() {
                     )}
                   </AnimatePresence>
 
+                  {/* Streak popup — 10 consecutive same-direction votes */}
+                  <AnimatePresence>
+                    {showStreakPopup && (
+                      <motion.div
+                        key="streak-popup"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.3 }}
+                        style={{
+                          position: "absolute",
+                          top: 0, left: 0, right: 0, bottom: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 20,
+                          background: "rgba(0,0,0,0.95)",
+                          border: "2px solid #d4af37",
+                          borderRadius: "12px",
+                          padding: "1rem",
+                          textAlign: "center",
+                        }}
+                      >
+                        <p style={{
+                          color: showStreakPopup === "up" ? "#8ab47a" : "#c85a4a",
+                          fontFamily: "'Cinzel', serif",
+                          fontSize: "1rem",
+                          fontWeight: 700,
+                          margin: "0 0 14px 0",
+                          lineHeight: 1.4,
+                        }}>
+                          {showStreakPopup === "up"
+                            ? "Do you just want to upvote every single commandment?"
+                            : "Do you just want to downvote every single commandment?"}
+                        </p>
+                        <div style={{ display: "flex", gap: "12px" }}>
+                          <button
+                            onClick={() => { const dir = showStreakPopup!; setShowStreakPopup(null); handleBulkVote(dir); }}
+                            style={{
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "0.85rem",
+                              fontWeight: 700,
+                              color: "#fdf8e6",
+                              backgroundColor: showStreakPopup === "up" ? "#5a8a4a" : "#8a3a2a",
+                              border: `2px solid ${showStreakPopup === "up" ? "#8ab47a" : "#c85a4a"}`,
+                              borderRadius: "8px",
+                              padding: "8px 20px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {showStreakPopup === "up" ? "Bless All" : "Banish All"}
+                          </button>
+                          <button
+                            onClick={() => { setShowStreakPopup(null); voteStreakRef.current = { direction: showStreakPopup!, count: 0 }; }}
+                            style={{
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "0.85rem",
+                              fontWeight: 700,
+                              color: "#fdf8e6",
+                              backgroundColor: "rgba(255,255,255,0.1)",
+                              border: "2px solid rgba(255,255,255,0.3)",
+                              borderRadius: "8px",
+                              padding: "8px 20px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            No
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Guest login prompt */}
                   {showGuestLoginPrompt && (
                     <div style={{
@@ -1379,7 +1773,7 @@ export default function Vote() {
                       </p>
                       {cooldownEnd && cooldownRemaining > 0 ? (
                         <>
-                          <p style={{
+                          <p className={cooldownPulse ? "cooldown-pulse" : ""} style={{
                             color: "#fdf8e6",
                             fontFamily: "'Cinzel', serif",
                             fontSize: "2rem",
@@ -1463,11 +1857,26 @@ export default function Vote() {
                     <span style={{ fontSize: "clamp(0.7rem, 2vh, 1.4rem)", fontFamily: "'Cinzel', serif", fontWeight: 700, color: "#c85a4a", letterSpacing: "0.08em" }}>Downvote</span>
                     <span style={{ fontSize: "clamp(3rem, 12vh, 10rem)", lineHeight: 0.7, fontFamily: "monospace", color: "#c85a4a" }}>↓</span>
                   </button>
-                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
                     <img src="/demon.png" alt="Demon" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                    <AnimatePresence>
+                      {speechBubble?.type === "demon" && (
+                        <motion.div
+                          className="speech-bubble speech-bubble-demon"
+                          initial={{ opacity: 0, scale: 0.7 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.7 }}
+                          transition={{ duration: 0.25 }}
+                        >
+                          {speechBubble.text}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
+                </>
+                )}
               </div>
             )}
 
@@ -1679,6 +2088,99 @@ export default function Vote() {
 
                 {posts.length > 0 && (
                   <>
+                    {/* Desktop bulk vote emoji flood */}
+                    {bulkVoteAnim ? (
+                      <div style={{
+                        position: "relative",
+                        width: "100%",
+                        minHeight: "400px",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "rgba(0,0,0,0.92)",
+                        borderRadius: "12px",
+                        border: "2px solid #d4af37",
+                      }}>
+                        {bulkEmojiPositions.current.slice(0, bulkVoteAnim.emojiCount).map((pos, i) => (
+                          <motion.span
+                            key={i}
+                            initial={{ opacity: 0, scale: 0 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.3, delay: pos.delay }}
+                            style={{
+                              position: "absolute",
+                              left: `${pos.x}%`,
+                              top: `${pos.y}%`,
+                              fontSize: `${pos.size + 4}px`,
+                              lineHeight: 1,
+                              pointerEvents: "none",
+                              filter: "drop-shadow(0 0 4px rgba(0,0,0,0.5))",
+                            }}
+                          >
+                            {bulkVoteAnim.type === "up" ? "\uD83D\uDE4F" : "\uD83D\uDD25"}
+                          </motion.span>
+                        ))}
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: bulkVoteAnim.emojiCount <= 20 ? 1 : 0 }}
+                          transition={{ duration: 0.6 }}
+                          style={{ textAlign: "center", padding: "2rem", zIndex: 1 }}
+                        >
+                          <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", fontWeight: 700, margin: "0 0 8px 0" }}>
+                            You've judged all commandments!
+                          </p>
+                          <p style={{ color: "#c8b070", fontFamily: "'Cinzel', serif", fontSize: "1rem", margin: "0 0 8px 0" }}>
+                            {bulkVoteAnim.type === "up"
+                              ? "The heavens rejoice at your mercy."
+                              : "The abyss welcomes your wrath."}
+                          </p>
+                          {cooldownEnd && cooldownRemaining > 0 ? (
+                            <>
+                              <p className={cooldownPulse ? "cooldown-pulse" : ""} style={{
+                                color: "#fdf8e6",
+                                fontFamily: "'Cinzel', serif",
+                                fontSize: "2.5rem",
+                                fontWeight: 900,
+                                margin: "16px 0",
+                                textShadow: "0 0 14px rgba(212, 175, 55, 0.4)",
+                              }}>
+                                {formatTime(cooldownRemaining)}
+                              </p>
+                              <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif" }}>
+                                Voting reopens soon. In the meantime...
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ color: "#c8b070", fontSize: "1rem", margin: "10px 0", fontFamily: "'Cinzel', serif" }}>
+                              Declare a commandment of your own!
+                            </p>
+                          )}
+                          <button
+                            onClick={() => handleMobileTabChange("declare")}
+                            style={{
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "1.05rem",
+                              fontWeight: 700,
+                              color: "#fdf8e6",
+                              backgroundColor: "#b79b3d",
+                              border: "2px solid #d4af37",
+                              borderRadius: "10px",
+                              padding: "14px 32px",
+                              cursor: "pointer",
+                              boxShadow: "0 0 12px rgba(212, 175, 55, 0.25)",
+                              marginBottom: "14px",
+                            }}
+                          >
+                            Declare
+                          </button>
+                          <p style={{ color: "#888", fontSize: "0.9rem", margin: "10px 0 0 0", fontStyle: "italic" }}>
+                            Or perhaps... go touch some grass.
+                          </p>
+                        </motion.div>
+                      </div>
+                    ) : (
+                    <>
                     {visibleSlots.length === 0 && posts.length > 0 && !showGuestLoginPrompt && (
                       <div style={{
                         textAlign: "center",
@@ -1694,7 +2196,7 @@ export default function Vote() {
                         </p>
                         {cooldownEnd && cooldownRemaining > 0 ? (
                           <>
-                            <p style={{
+                            <p className={cooldownPulse ? "cooldown-pulse" : ""} style={{
                               color: "#fdf8e6",
                               fontFamily: "'Cinzel', serif",
                               fontSize: "2.5rem",
@@ -1919,6 +2421,92 @@ export default function Vote() {
                         );
                       })}
                     </div>
+
+                    {/* Desktop streak popup — 10 consecutive same-direction votes */}
+                    <AnimatePresence>
+                      {showStreakPopup && (
+                        <motion.div
+                          key="desktop-streak-popup"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ duration: 0.3 }}
+                          style={{
+                            position: "fixed",
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            zIndex: 1000,
+                            background: "rgba(0,0,0,0.92)",
+                          }}
+                          onClick={() => { setShowStreakPopup(null); voteStreakRef.current = { direction: showStreakPopup!, count: 0 }; }}
+                        >
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              background: "rgba(20, 15, 5, 0.95)",
+                              border: "2px solid #d4af37",
+                              borderRadius: "16px",
+                              padding: "2rem 3rem",
+                              textAlign: "center",
+                              boxShadow: "0 0 30px rgba(212, 175, 55, 0.3)",
+                              maxWidth: "500px",
+                            }}
+                          >
+                            <p style={{
+                              color: showStreakPopup === "up" ? "#8ab47a" : "#c85a4a",
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "1.2rem",
+                              fontWeight: 700,
+                              margin: "0 0 20px 0",
+                              lineHeight: 1.4,
+                            }}>
+                              {showStreakPopup === "up"
+                                ? "Do you just want to upvote every single commandment?"
+                                : "Do you just want to downvote every single commandment?"}
+                            </p>
+                            <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+                              <button
+                                onClick={() => { const dir = showStreakPopup!; setShowStreakPopup(null); handleBulkVote(dir); }}
+                                style={{
+                                  fontFamily: "'Cinzel', serif",
+                                  fontSize: "1rem",
+                                  fontWeight: 700,
+                                  color: "#fdf8e6",
+                                  backgroundColor: showStreakPopup === "up" ? "#5a8a4a" : "#8a3a2a",
+                                  border: `2px solid ${showStreakPopup === "up" ? "#8ab47a" : "#c85a4a"}`,
+                                  borderRadius: "10px",
+                                  padding: "12px 28px",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {showStreakPopup === "up" ? "Bless All" : "Banish All"}
+                              </button>
+                              <button
+                                onClick={() => { setShowStreakPopup(null); voteStreakRef.current = { direction: showStreakPopup!, count: 0 }; }}
+                                style={{
+                                  fontFamily: "'Cinzel', serif",
+                                  fontSize: "1rem",
+                                  fontWeight: 700,
+                                  color: "#fdf8e6",
+                                  backgroundColor: "rgba(255,255,255,0.1)",
+                                  border: "2px solid rgba(255,255,255,0.3)",
+                                  borderRadius: "10px",
+                                  padding: "12px 28px",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                  )}
                   </>
                 )}
               </>

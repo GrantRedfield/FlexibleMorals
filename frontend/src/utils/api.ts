@@ -80,6 +80,11 @@ export const sendChatMessage = async (username: string, message: string) => {
   return res.data;
 };
 
+export const reportChatMessage = async (messageId: string, reporterUsername: string) => {
+  const res = await axios.post(`${API_BASE}/api/chat/report`, { messageId, reporterUsername });
+  return res.data;
+};
+
 // === Comments API ===
 
 export const getComments = async (postId: string) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
-import { getChatMessages, sendChatMessage, getPosts } from "../utils/api";
+import { getChatMessages, sendChatMessage, reportChatMessage, getPosts } from "../utils/api";
 import { replaceEmoticons, CUSTOM_EMOJIS, STANDARD_EMOJIS } from "../utils/emoji";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import DonorBadge from "./DonorBadge";
@@ -95,6 +95,16 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
   const inputRef = useRef<HTMLInputElement>(null);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ username: string; message: string } | null>(null);
+  // Track message IDs this user has reported (hidden locally immediately)
+  const [reportedIds, setReportedIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("fm_reported_messages");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  // Ref stays in sync so polling closure always sees latest reported IDs
+  const reportedIdsRef = useRef(reportedIds);
+  reportedIdsRef.current = reportedIds;
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifSearch, setGifSearch] = useState("");
   const [gifResults, setGifResults] = useState<GiphyGif[]>([]);
@@ -290,8 +300,9 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
     const fetchInitial = async () => {
       try {
         const data = await getChatMessages();
-        setMessages(data.messages || []);
-        const msgs = data.messages || [];
+        const allMsgs: ChatMessage[] = (data.messages || []).filter((m: ChatMessage) => !reportedIdsRef.current.has(m.id));
+        setMessages(allMsgs);
+        const msgs = allMsgs;
         if (msgs.length > 0) {
           lastTimestampRef.current = msgs[msgs.length - 1].createdAt;
         }
@@ -317,7 +328,7 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
           let addedCount = 0;
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => m.id));
-            const filtered = newMsgs.filter((m) => !existingIds.has(m.id));
+            const filtered = newMsgs.filter((m) => !existingIds.has(m.id) && !reportedIdsRef.current.has(m.id));
             if (filtered.length === 0) return prev;
             addedCount = filtered.length;
             const combined = [...prev, ...filtered];
@@ -482,6 +493,41 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
     });
   };
 
+  const handleReport = async (msg: ChatMessage) => {
+    if (!user) {
+      openLoginModal();
+      return;
+    }
+    // Can't report own messages
+    if (msg.username === user) return;
+    // Already reported
+    if (reportedIds.has(msg.id)) return;
+
+    // Hide immediately for this user
+    const newReported = new Set(reportedIds);
+    newReported.add(msg.id);
+    setReportedIds(newReported);
+    localStorage.setItem("fm_reported_messages", JSON.stringify([...newReported]));
+
+    // Remove from local messages list and show confirmation
+    setMessages((prev) => [
+      ...prev.filter((m) => m.id !== msg.id),
+      {
+        id: `report-${Date.now()}`,
+        username: "⚠️ System",
+        message: "Message reported and hidden. Thank you for keeping the discourse sacred.",
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    requestAnimationFrame(() => scrollToBottom());
+
+    try {
+      await reportChatMessage(msg.id, user);
+    } catch (err) {
+      console.error("Failed to report message:", err);
+    }
+  };
+
   const handlePaste = (e: React.ClipboardEvent) => {
     const clipboardData = e.clipboardData;
 
@@ -593,6 +639,8 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
         )}
         {messages.map((msg) => {
           const donorStatus = getDonorStatus(msg.username);
+          const isOwnMessage = msg.username === user;
+          const isSystem = msg.username === "⚠️ System";
           return (
             <div
               className="chat-message"
@@ -614,6 +662,15 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
                 <DonorBadge tier={donorStatus.tier} size="small" />
               )}
               {renderMessageContent(msg.message)}
+              {!isOwnMessage && !isSystem && (
+                <button
+                  className="chat-report-btn"
+                  onClick={(e) => { e.stopPropagation(); handleReport(msg); }}
+                  title="Report message"
+                >
+                  ⚑
+                </button>
+              )}
             </div>
           );
         })}

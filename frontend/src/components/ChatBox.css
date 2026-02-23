@@ -69,6 +69,7 @@
 }
 
 .chat-message {
+  position: relative;
   padding: 4px 8px;
   border-radius: 6px;
   background-color: rgba(212, 175, 55, 0.08);
@@ -80,6 +81,37 @@
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* Report button — subtle, always visible */
+.chat-report-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(200, 90, 74, 0.3);
+  border-radius: 4px;
+  color: rgba(200, 90, 74, 0.5);
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  line-height: 1;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.chat-message:hover .chat-report-btn {
+  opacity: 1;
+}
+
+.chat-report-btn:hover,
+.chat-report-btn:active {
+  opacity: 1;
+  background: rgba(200, 90, 74, 0.3);
+  color: #c85a4a;
+  border-color: #c85a4a;
 }
 
 .chat-username {
@@ -595,6 +627,18 @@
     padding: 8px 12px;
     max-width: 100%;
     min-width: 0;
+  }
+
+  /* On mobile, always visible and touch-friendly */
+  .chat-box.chat-mobile-expanded .chat-report-btn {
+    opacity: 0.5;
+    min-height: 32px;
+    min-width: 32px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
   }
 
   .chat-box.chat-mobile-expanded .chat-username {

@@ -869,9 +869,19 @@
 /* Inline login button override (e.g. inside comments page header) */
 .login-inline-wrapper .login-button-container {
   position: static;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.65rem;
-  box-shadow: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.login-inline-wrapper .login-btn {
+  font-size: 1.15rem;
+  padding: 10px 24px;
+}
+
+.login-inline-wrapper .logout-btn {
+  font-size: 0.9rem;
+  padding: 6px 16px;
 }
 
 .login-btn {

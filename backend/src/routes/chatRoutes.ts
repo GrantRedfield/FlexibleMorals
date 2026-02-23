@@ -4,6 +4,8 @@ const { Router } = express;
 import {
   PutItemCommand,
   QueryCommand,
+  DeleteItemCommand,
+  GetItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { nanoid } from "nanoid";
@@ -29,6 +31,20 @@ const STRIKE_RESET_MS = 24 * 60 * 60 * 1000; // 24 hours to reset strikes
 // Set CHAT_TTL_DAYS env var to enable auto-cleanup (e.g. 7 for one week)
 const CHAT_TTL_DAYS = parseInt(process.env.CHAT_TTL_DAYS || "0", 10);
 const CHAT_TTL_SECONDS = CHAT_TTL_DAYS * 24 * 60 * 60;
+
+// === Report & Ban moderation system ===
+// In-memory tracking — reports per messageId, and banned usernames with expiry
+const REPORT_THRESHOLD = 5;       // Reports needed to auto-delete a message
+const BAN_DURATION_MS = 20 * 60 * 1000; // 20-minute chat ban
+
+// messageId -> Set of usernames who reported it
+const messageReports: Record<string, Set<string>> = {};
+// messageId -> SK (needed to delete from DynamoDB)
+const messageSkCache: Record<string, string> = {};
+// Set of deleted message IDs (so they stay hidden after deletion)
+const deletedMessageIds = new Set<string>();
+// username -> ban expiry timestamp
+const chatBans: Record<string, number> = {};
 
 // Whitelist of allowed GIF hosting domains (must match frontend isAllowedGifUrl)
 // These are dedicated media CDNs — domain match alone is sufficient, no extension check needed
@@ -75,15 +91,19 @@ router.get("/messages", async (req: Request, res: Response) => {
         })
       );
 
-      const messages = (result.Items || []).map((item) => {
-        const record = unmarshall(item);
-        return {
-          id: record.messageId,
-          username: record.username,
-          message: record.message,
-          createdAt: record.createdAt,
-        };
-      });
+      const messages = (result.Items || [])
+        .map((item) => {
+          const record = unmarshall(item);
+          // Cache SK for potential deletion
+          messageSkCache[record.messageId] = record.SK;
+          return {
+            id: record.messageId,
+            username: record.username,
+            message: record.message,
+            createdAt: record.createdAt,
+          };
+        })
+        .filter((m) => !deletedMessageIds.has(m.id));
 
       return res.json({ messages });
     } else {
@@ -104,6 +124,8 @@ router.get("/messages", async (req: Request, res: Response) => {
       const messages = (result.Items || [])
         .map((item) => {
           const record = unmarshall(item);
+          // Cache SK for potential deletion
+          messageSkCache[record.messageId] = record.SK;
           return {
             id: record.messageId,
             username: record.username,
@@ -111,6 +133,7 @@ router.get("/messages", async (req: Request, res: Response) => {
             createdAt: record.createdAt,
           };
         })
+        .filter((m) => !deletedMessageIds.has(m.id))
         .reverse(); // Chronological order
 
       return res.json({ messages });
@@ -156,6 +179,17 @@ router.post("/messages", async (req: Request, res: Response) => {
   // Reset strikes if 24 hours have passed since last strike
   if (state.strikes > 0 && now - state.lastStrikeTime > STRIKE_RESET_MS) {
     state.strikes = 0;
+  }
+
+  // Check if user is banned from reports
+  if (chatBans[trimmedUser] && chatBans[trimmedUser] > now) {
+    const remaining = Math.ceil((chatBans[trimmedUser] - now) / 1000);
+    return res.status(429).json({
+      error: `You are temporarily banned from chat. ${Math.ceil(remaining / 60)} minute(s) remaining.`,
+      cooldown: remaining,
+      muted: true,
+      banned: true,
+    });
   }
 
   // Check if user is currently muted (from previous spam)
@@ -213,6 +247,9 @@ router.post("/messages", async (req: Request, res: Response) => {
       })
     );
 
+    // Cache SK for report/deletion lookup
+    messageSkCache[messageId] = `MSG#${createdAt}#${messageId}`;
+
     return res.json({
       id: messageId,
       username: username.trim(),
@@ -223,6 +260,85 @@ router.post("/messages", async (req: Request, res: Response) => {
     console.error("Failed to send chat message:", err);
     return res.status(500).json({ error: "Failed to send message" });
   }
+});
+
+// POST /api/chat/report — report a message
+// When 5+ unique users report the same message, it's deleted and the author gets a 20-min ban
+router.post("/report", async (req: Request, res: Response) => {
+  const { messageId, reporterUsername } = req.body;
+
+  if (!messageId || !reporterUsername?.trim()) {
+    return res.status(400).json({ error: "messageId and reporterUsername are required" });
+  }
+
+  const reporter = reporterUsername.trim();
+
+  // Can't report if the message is already deleted
+  if (deletedMessageIds.has(messageId)) {
+    return res.json({ reported: true, deleted: true });
+  }
+
+  // Initialize report set for this message
+  if (!messageReports[messageId]) {
+    messageReports[messageId] = new Set();
+  }
+
+  // Prevent duplicate reports from same user
+  if (messageReports[messageId].has(reporter)) {
+    return res.json({ reported: true, alreadyReported: true, reportCount: messageReports[messageId].size });
+  }
+
+  messageReports[messageId].add(reporter);
+  const reportCount = messageReports[messageId].size;
+
+  console.log(`[REPORT] Message "${messageId}" reported by "${reporter}" — ${reportCount}/${REPORT_THRESHOLD} reports`);
+
+  // Check if threshold reached
+  if (reportCount >= REPORT_THRESHOLD) {
+    const sk = messageSkCache[messageId];
+
+    // Look up the message author BEFORE deleting, then ban them
+    if (sk) {
+      try {
+        const result = await client.send(
+          new GetItemCommand({
+            TableName: TABLE_NAME,
+            Key: marshall({ PK: "CHAT#global", SK: sk }),
+          })
+        );
+        if (result.Item) {
+          const record = unmarshall(result.Item);
+          const bannedUser = record.username;
+          if (bannedUser) {
+            chatBans[bannedUser] = Date.now() + BAN_DURATION_MS;
+            console.log(`[MODERATION] User "${bannedUser}" banned from chat for 20 minutes`);
+          }
+        }
+      } catch (err) {
+        console.error("[MODERATION] Failed to look up message author for ban:", err);
+      }
+
+      // Now delete the message from DynamoDB
+      try {
+        await client.send(
+          new DeleteItemCommand({
+            TableName: TABLE_NAME,
+            Key: marshall({ PK: "CHAT#global", SK: sk }),
+          })
+        );
+        console.log(`[MODERATION] Message "${messageId}" deleted from DynamoDB`);
+      } catch (err) {
+        console.error(`[MODERATION] Failed to delete message "${messageId}":`, err);
+      }
+    }
+
+    // Mark as deleted in memory so it's filtered from future fetches
+    deletedMessageIds.add(messageId);
+
+    return res.json({ reported: true, deleted: true, reportCount });
+  }
+
+  return res.json({ reported: true, reportCount });
 });
 
 export default router;
