@@ -87,6 +87,34 @@ export default function Vote() {
     return id;
   })());
 
+  // Cooldown timer state — per-account, persisted in localStorage
+  const COOLDOWN_SECONDS = 5 * 60; // 5 minutes
+  // Build the per-account cooldown localStorage key.
+  // When called from effects, pass the React `user` state so we never read a
+  // stale fm_username from localStorage (logout clears it asynchronously).
+  // The no-arg form reads localStorage and is only used in the useState
+  // initializer (before React state is available).
+  const getCooldownKey = (currentUser?: string | null) => {
+    const identity = currentUser !== undefined
+      ? (currentUser || guestVoterId.current)
+      : (localStorage.getItem("fm_username") || guestVoterId.current);
+    return `voteCooldownEnd_${identity}`;
+  };
+  const [cooldownEnd, setCooldownEnd] = useState<number | null>(() => {
+    const key = getCooldownKey();
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const end = parseInt(stored, 10);
+      if (end > Date.now()) return end;
+      localStorage.removeItem(key);
+    }
+    return null;
+  });
+  const [cooldownRemaining, setCooldownRemaining] = useState(() => {
+    if (cooldownEnd) return Math.max(0, Math.ceil((cooldownEnd - Date.now()) / 1000));
+    return 0;
+  });
+
   // Sorting logic
   const sortedPosts = useMemo(() => {
     const sorted = [...posts];
@@ -158,8 +186,8 @@ export default function Vote() {
   );
 
   // Get the next post to show (in sort order), excluding currently visible ones.
-  // Voted posts are deprioritized — unvoted posts shown first. Once all unvoted
-  // posts are exhausted, voted posts cycle back in.
+  // Voted posts are deprioritized — unvoted posts shown first. Once all posts
+  // have been shown once, return null so the cooldown timer kicks in.
   const getNextPost = useCallback(
     (currentVisibleIds: Set<string>): Post | null => {
       const votes = userVotesRef.current;
@@ -193,14 +221,7 @@ export default function Vote() {
         }
       }
 
-      // Phase 4: voted posts, full cycle reset fallback
-      for (const post of sortedPosts) {
-        const pid = String(post.id);
-        if (!currentVisibleIds.has(pid)) {
-          return post;
-        }
-      }
-
+      // All posts shown — return null so cooldown timer triggers
       return null;
     },
     [sortedPosts]
@@ -214,8 +235,15 @@ export default function Vote() {
   const sortedPostsRef = useRef(sortedPosts);
   useEffect(() => { sortedPostsRef.current = sortedPosts; }, [sortedPosts]);
 
+  // Ref to always access latest cooldownEnd inside callbacks
+  const cooldownEndRef = useRef(cooldownEnd);
+  useEffect(() => { cooldownEndRef.current = cooldownEnd; }, [cooldownEnd]);
+
   // Initialize visible slots when posts load or sort changes
   const initializeSlots = useCallback(() => {
+    // Don't populate cards during active cooldown
+    if (cooldownEndRef.current && cooldownEndRef.current > Date.now()) return;
+
     const currentSorted = sortedPostsRef.current;
     const votes = userVotesRef.current;
 
@@ -322,6 +350,18 @@ export default function Vote() {
     [posts]
   );
 
+  // Compute earliest post date for a user (used as "Disciple since")
+  const getMemberSince = useCallback(
+    (username: string): string | null => {
+      const userPosts = posts.filter((p) => p.username === username && p.createdAt);
+      if (userPosts.length === 0) return null;
+      return userPosts.reduce((earliest, p) =>
+        new Date(p.createdAt!).getTime() < new Date(earliest.createdAt!).getTime() ? p : earliest
+      ).createdAt!;
+    },
+    [posts]
+  );
+
   // Re-load votes from localStorage + server when user changes (e.g. login after page load)
   useEffect(() => {
     if (posts.length === 0) return;
@@ -408,26 +448,11 @@ export default function Vote() {
     return false;
   };
 
-  // === Check if user already submitted today ===
-  const hasSubmittedToday = (): boolean => {
-    if (!user) return false;
-    const lastSubmission = localStorage.getItem(`lastSubmission_${user}`);
-    if (!lastSubmission) return false;
-    const lastDate = new Date(lastSubmission).toDateString();
-    const today = new Date().toDateString();
-    return lastDate === today;
-  };
-
   // === Handle new post submission ===
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requireLogin()) return;
     if (!newCommandment.trim()) return;
-
-    if (hasSubmittedToday()) {
-      setShowLimitPopup(true);
-      return;
-    }
 
     try {
       const newPost = await createPost(newCommandment.trim(), user);
@@ -435,7 +460,6 @@ export default function Vote() {
       if (!newPost.createdAt) newPost.createdAt = new Date().toISOString();
       setPosts((prev) => [...prev, newPost]);
       setNewCommandment("");
-      localStorage.setItem(`lastSubmission_${user}`, new Date().toISOString());
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 4000);
       // Switch to Comments tab with "new" filter so user sees their post
@@ -536,17 +560,7 @@ export default function Vote() {
             break;
           }
         }
-        // Phase 4: all voted shown too — full reset and loop
-        if (!nextPost) {
-          shownPostIds.current = new Set();
-          for (const post of allPosts) {
-            const pid = String(post.id);
-            if (!currentVisibleIds.has(pid) && post.username !== currentUser) {
-              nextPost = post;
-              break;
-            }
-          }
-        }
+        // All posts shown — nextPost stays null so cooldown timer triggers
       }
     }
 
@@ -587,23 +601,132 @@ export default function Vote() {
     }
   }, [user, posts.length]);
 
+  // === Cooldown timer: start when all commandments exhausted ===
+  const cooldownTriggered = useRef(false);
+  const slotsInitialized = useRef(false);
+  const prevUserRef = useRef(user);
+
+  // Reload cooldown when user changes (login/logout)
+  useEffect(() => {
+    const prevUser = prevUserRef.current;
+    prevUserRef.current = user;
+
+    // Logout detected (was logged in, now guest): if the logged-in user had
+    // an active cooldown, carry it over to the guest so they can't bypass it.
+    if (prevUser && !user) {
+      const prevKey = getCooldownKey(prevUser);
+      const prevStored = localStorage.getItem(prevKey);
+      if (prevStored) {
+        const prevEnd = parseInt(prevStored, 10);
+        if (prevEnd > Date.now()) {
+          const guestKey = getCooldownKey(null);
+          localStorage.setItem(guestKey, String(prevEnd));
+        }
+      }
+    }
+
+    const key = getCooldownKey(user);
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const end = parseInt(stored, 10);
+      if (end > Date.now()) {
+        setCooldownEnd(end);
+        setCooldownRemaining(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+        cooldownTriggered.current = true;
+        return;
+      }
+      localStorage.removeItem(key);
+    }
+    // No active cooldown for this user — clear any leftover state
+    setCooldownEnd(null);
+    setCooldownRemaining(0);
+    cooldownTriggered.current = false;
+    slotsInitialized.current = false;
+    // Reset shown tracking and force slot re-initialization so the new
+    // user/guest gets a fresh card queue instead of inheriting the
+    // previous user's exhausted state (which would falsely trigger cooldown).
+    shownPostIds.current = new Set();
+    setShuffleTrigger((t) => t + 1);
+  }, [user]);
+
+  // Mark slots as initialized only after the state updates from initializeSlots
+  // have actually been applied. This must run BEFORE the exhaustion detector
+  // (declared earlier = runs first) to prevent a race where slotsInitialized is
+  // true but swipeCurrentPostId is still null from a deferred setState.
+  useEffect(() => {
+    if (slotsInitialized.current || !postsLoaded) return;
+    const hasCards = sortOption === "swipe"
+      ? !!swipeCurrentPostId
+      : visibleSlots.length > 0;
+    if (hasCards) {
+      slotsInitialized.current = true;
+    }
+  }, [postsLoaded, sortOption, swipeCurrentPostId, visibleSlots.length]);
+
+  // Detect exhaustion — mobile (swipeCurrentPostId null) or desktop (visibleSlots empty)
+  useEffect(() => {
+    if (posts.length === 0 || showGuestLoginPrompt) return;
+    // Don't trigger until cards have been initialized at least once
+    if (!slotsInitialized.current) return;
+    const allExhausted =
+      (sortOption === "swipe" && !swipeCurrentPostId) ||
+      (sortOption !== "swipe" && visibleSlots.length === 0);
+    if (allExhausted && !cooldownEnd && !cooldownTriggered.current) {
+      cooldownTriggered.current = true;
+      const end = Date.now() + COOLDOWN_SECONDS * 1000;
+      setCooldownEnd(end);
+      setCooldownRemaining(COOLDOWN_SECONDS);
+      // Persist per-account
+      localStorage.setItem(getCooldownKey(user), String(end));
+    }
+  }, [swipeCurrentPostId, visibleSlots.length, posts.length, sortOption, cooldownEnd, showGuestLoginPrompt, COOLDOWN_SECONDS, user]);
+
+  // When cooldown is active, clear cards/swipe so the timer message shows
+  useEffect(() => {
+    if (cooldownEnd && cooldownEnd > Date.now()) {
+      setSwipeCurrentPostId(null);
+      setVisibleSlots([]);
+    }
+  }, [cooldownEnd]);
+
+  // Tick the countdown every second
+  useEffect(() => {
+    if (!cooldownEnd) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((cooldownEnd - Date.now()) / 1000));
+      setCooldownRemaining(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        // Reset cooldown and re-enable voting
+        setCooldownEnd(null);
+        cooldownTriggered.current = false;
+        localStorage.removeItem(getCooldownKey(user));
+        shownPostIds.current = new Set();
+        setShuffleTrigger((t) => t + 1);
+        // Re-initialize slots so cards/swipe start fresh
+        setTimeout(() => initializeSlots(), 50);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownEnd, initializeSlots, user]);
+
+  // Format seconds as M:SS
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
+    // Block voting during cooldown
+    if (cooldownEnd && cooldownEnd > Date.now()) return;
+
     const currentPid = swipeCurrentPostIdRef.current;
     if (!currentPid) return;
     const post = posts.find((p) => String(p.id) === currentPid);
     if (!post) return;
 
-    // Compute correct optimistic delta based on previous vote, matching backend logic.
-    const prevVote = userVotesRef.current[currentPid];
-    if (prevVote === direction) {
-      // Same direction — backend will no-op; just advance the card with no count change.
-      swipeExitDirectionRef.current = direction;
-      setSwipeEmoji(direction);
-      setTimeout(() => setSwipeEmoji(null), 700);
-      advanceSwipeCard();
-      return;
-    }
     const delta = direction === "up" ? 1 : -1;
     const newTotal = (post.votes ?? 0) + delta;
 
@@ -649,19 +772,18 @@ export default function Vote() {
       }
     }
     advanceSwipeCard();
-  }, [posts, user, advanceSwipeCard]);
+  }, [posts, user, advanceSwipeCard, cooldownEnd]);
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
+    // Block voting during cooldown
+    if (cooldownEnd && cooldownEnd > Date.now()) return;
     // Block if guest has already hit the limit
     if (!user && showGuestLoginPrompt) return;
 
     const pid = String(postId);
     const post = posts.find((p) => String(p.id) === pid);
     if (user && post?.username === user) return;
-
-    const prevVote = userVotes[pid];
-    if (prevVote === direction) return;
 
     handleVoteOptimistic(pid, direction);
 
@@ -1023,42 +1145,42 @@ export default function Vote() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "stretch",
-                justifyContent: "flex-start",
+                justifyContent: "center",
                 flex: 1,
                 minHeight: 0,
                 position: "relative",
                 width: "100%",
                 padding: "0",
-                overflow: "hidden",
+                overflow: "visible",
               }}>
                 {/* Top row: Angel + Upvote button — full width */}
                 <div style={{
                   display: "flex",
                   flexDirection: "row",
                   width: "100%",
-                  height: "160px",
-                  flexShrink: 0,
+                  flex: 1,
+                  minHeight: 0,
                 }}>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                    <img src="/angel_upvote.png" alt="Angel" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <img src="/angel.png" alt="Angel" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                   </div>
                   <button
                     onClick={() => !showGuestLoginPrompt && handleSwipeVote("up")}
                     disabled={showGuestLoginPrompt}
                     style={{
-                      flex: 1,
+                      flex: "1 1 50%",
+                      minWidth: 0,
                       height: "100%",
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
+                      gap: "4px",
+                      overflow: "hidden",
                       background: "linear-gradient(180deg, rgba(138, 180, 122, 0.25) 0%, rgba(90, 138, 74, 0.15) 100%)",
                       border: "2px solid rgba(138, 180, 122, 0.5)",
                       borderRadius: "10px",
                       cursor: showGuestLoginPrompt ? "default" : "pointer",
-                      fontSize: "4rem",
-                      lineHeight: 1,
-                      fontFamily: "monospace",
-                      color: "#8ab47a",
                       opacity: showGuestLoginPrompt ? 0.3 : 1,
                       transition: "all 0.15s ease",
                       boxShadow: "0 0 10px rgba(138, 180, 122, 0.2)",
@@ -1068,12 +1190,13 @@ export default function Vote() {
                     onTouchStart={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
                     onTouchEnd={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
                   >
-                    ↑
+                    <span style={{ fontSize: "clamp(3rem, 12vh, 10rem)", lineHeight: 0.7, fontFamily: "monospace", color: "#8ab47a" }}>↑</span>
+                    <span style={{ fontSize: "clamp(0.7rem, 2vh, 1.4rem)", fontFamily: "'Cinzel', serif", fontWeight: 700, color: "#8ab47a", letterSpacing: "0.08em" }}>Upvote</span>
                   </button>
                 </div>
 
                 {/* Card area */}
-                <div style={{ position: "relative", padding: "6px 12px", flexShrink: 0 }}>
+                <div style={{ position: "relative", padding: "6px 12px", flexShrink: 0, overflow: "visible" }}>
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
                     {swipeCurrentPostId && !showGuestLoginPrompt && (() => {
                       const post = getPost(swipeCurrentPostId);
@@ -1084,13 +1207,24 @@ export default function Vote() {
                           key={swipeCardKey}
                           className="swipe-card"
                           custom={swipeExitDirectionRef.current}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={(dir: any) => ({
-                            opacity: 0,
-                            x: (dir ?? swipeExitDirectionRef.current) === "up" ? 200 : -200,
-                            rotate: (dir ?? swipeExitDirectionRef.current) === "up" ? 10 : -10,
-                          })}
+                          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1, scaleX: 1, x: 0 }}
+                          exit={(dir: any) => {
+                            const d = dir ?? swipeExitDirectionRef.current;
+                            const xShift = d === "up" ? "25%" : "-25%";
+                            return {
+                              // Stay fully visible during squeeze + most of the flight, fade only at end
+                              opacity: [1, 1, 1, 0],
+                              scaleX: [1, 0.5, 0.5, 0.5],
+                              x: ["0%", xShift, xShift, xShift],
+                              y: d === "up" ? [0, 0, -500, -700] : [0, 0, 500, 700],
+                              transition: {
+                                duration: 0.7,
+                                times: [0, 0.3, 0.75, 1],
+                                ease: [0.4, 0, 0.2, 1],
+                              },
+                            };
+                          }}
                           transition={{ type: "spring", stiffness: 300, damping: 25 }}
                           style={{
                             border: "2px solid #d4af37",
@@ -1112,8 +1246,19 @@ export default function Vote() {
                             {post.title || post.content}
                           </h2>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "14px", color: "#888", fontStyle: "italic" }}>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (post.username && post.username !== "unknown") {
+                                  setProfilePopup({ username: post.username, x: e.clientX, y: e.clientY });
+                                }
+                              }}
+                              style={{ fontSize: "14px", color: "#d4af37", fontStyle: "italic", cursor: "pointer", textDecoration: "underline", textDecorationColor: "rgba(212, 175, 55, 0.4)", textUnderlineOffset: "3px" }}
+                            >
                               — {post.username || "unknown"}
+                              {getDonorStatus(post.username || "")?.tier && (
+                                <DonorBadge tier={getDonorStatus(post.username || "")!.tier} size="small" />
+                              )}
                             </span>
                           </div>
                         </motion.div>
@@ -1184,15 +1329,57 @@ export default function Vote() {
                     </div>
                   )}
 
-                  {/* No more cards */}
+                  {/* No more cards — cooldown timer */}
                   {!swipeCurrentPostId && !showGuestLoginPrompt && (
-                    <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 8px 0" }}>
-                        You've seen all commandments!
+                    <div style={{ textAlign: "center", padding: "1.5rem 0.5rem" }}>
+                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 8px 0", fontWeight: 700 }}>
+                        You've judged all commandments!
                       </p>
-                      <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                        Submit a new one or switch tabs.
-                      </p>
+                      {cooldownEnd && cooldownRemaining > 0 ? (
+                        <>
+                          <p style={{
+                            color: "#fdf8e6",
+                            fontFamily: "'Cinzel', serif",
+                            fontSize: "2rem",
+                            fontWeight: 900,
+                            margin: "12px 0",
+                            textShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
+                          }}>
+                            {formatTime(cooldownRemaining)}
+                          </p>
+                          <p style={{ color: "#c8b070", fontSize: "0.85rem", margin: "0 0 6px 0", fontFamily: "'Cinzel', serif", lineHeight: 1.5 }}>
+                            Voting reopens soon. In the meantime...
+                          </p>
+                          <p style={{ color: "#d4af37", fontSize: "0.9rem", margin: "8px 0", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+                            Declare a commandment of your own!
+                          </p>
+                          <button
+                            onClick={() => handleMobileTabChange("declare")}
+                            style={{
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "0.95rem",
+                              fontWeight: 700,
+                              color: "#fdf8e6",
+                              backgroundColor: "#b79b3d",
+                              border: "2px solid #d4af37",
+                              borderRadius: "10px",
+                              padding: "12px 24px",
+                              cursor: "pointer",
+                              boxShadow: "0 0 12px rgba(212, 175, 55, 0.25)",
+                              marginBottom: "12px",
+                            }}
+                          >
+                            Declare
+                          </button>
+                          <p style={{ color: "#888", fontSize: "0.8rem", margin: "8px 0 0 0", fontStyle: "italic" }}>
+                            Or perhaps... go touch some grass.
+                          </p>
+                        </>
+                      ) : (
+                        <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                          Submit a new one or switch tabs.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1202,26 +1389,26 @@ export default function Vote() {
                   display: "flex",
                   flexDirection: "row",
                   width: "100%",
-                  height: "160px",
-                  flexShrink: 0,
+                  flex: 1,
+                  minHeight: 0,
                 }}>
                   <button
                     onClick={() => !showGuestLoginPrompt && handleSwipeVote("down")}
                     disabled={showGuestLoginPrompt}
                     style={{
-                      flex: 1,
+                      flex: "1 1 50%",
+                      minWidth: 0,
                       height: "100%",
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
+                      gap: "4px",
+                      overflow: "hidden",
                       background: "linear-gradient(180deg, rgba(200, 90, 74, 0.25) 0%, rgba(138, 58, 42, 0.15) 100%)",
                       border: "2px solid rgba(200, 90, 74, 0.5)",
                       borderRadius: "10px",
                       cursor: showGuestLoginPrompt ? "default" : "pointer",
-                      fontSize: "4rem",
-                      lineHeight: 1,
-                      fontFamily: "monospace",
-                      color: "#c85a4a",
                       opacity: showGuestLoginPrompt ? 0.3 : 1,
                       transition: "all 0.15s ease",
                       boxShadow: "0 0 10px rgba(200, 90, 74, 0.2)",
@@ -1231,10 +1418,11 @@ export default function Vote() {
                     onTouchStart={(e) => { if (!showGuestLoginPrompt) (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
                     onTouchEnd={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
                   >
-                    ↓
+                    <span style={{ fontSize: "clamp(0.7rem, 2vh, 1.4rem)", fontFamily: "'Cinzel', serif", fontWeight: 700, color: "#c85a4a", letterSpacing: "0.08em" }}>Downvote</span>
+                    <span style={{ fontSize: "clamp(3rem, 12vh, 10rem)", lineHeight: 0.7, fontFamily: "monospace", color: "#c85a4a" }}>↓</span>
                   </button>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                    <img src="/demon_downvote.png" alt="Demon" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <img src="/demon.png" alt="Demon" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                   </div>
                 </div>
 
@@ -1392,9 +1580,9 @@ export default function Vote() {
                   }}>
                     <span style={{
                       fontSize: "13px",
-                      color: newCommandment.length >= 50 ? "#e07050" : "#999",
+                      color: newCommandment.length >= 65 ? "#e07050" : "#999",
                     }}>
-                      {newCommandment.length}/60
+                      {newCommandment.length}/80
                     </span>
                     <button
                       type="submit"
@@ -1450,13 +1638,55 @@ export default function Vote() {
                 {posts.length > 0 && (
                   <>
                     {visibleSlots.length === 0 && posts.length > 0 && !showGuestLoginPrompt && (
-                      <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                        <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.2rem", margin: "0 0 8px 0" }}>
-                          You've seen all commandments!
+                      <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+                        <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.4rem", margin: "0 0 10px 0", fontWeight: 700 }}>
+                          You've judged all commandments!
                         </p>
-                        <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                          Switch to the Declare tab to submit a new one.
-                        </p>
+                        {cooldownEnd && cooldownRemaining > 0 ? (
+                          <>
+                            <p style={{
+                              color: "#fdf8e6",
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "2.5rem",
+                              fontWeight: 900,
+                              margin: "16px 0",
+                              textShadow: "0 0 14px rgba(212, 175, 55, 0.4)",
+                            }}>
+                              {formatTime(cooldownRemaining)}
+                            </p>
+                            <p style={{ color: "#c8b070", fontSize: "1rem", margin: "0 0 8px 0", fontFamily: "'Cinzel', serif", lineHeight: 1.6 }}>
+                              Voting reopens soon. In the meantime...
+                            </p>
+                            <p style={{ color: "#d4af37", fontSize: "1.05rem", margin: "10px 0", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+                              Declare a commandment of your own!
+                            </p>
+                            <button
+                              onClick={() => handleMobileTabChange("declare")}
+                              style={{
+                                fontFamily: "'Cinzel', serif",
+                                fontSize: "1.05rem",
+                                fontWeight: 700,
+                                color: "#fdf8e6",
+                                backgroundColor: "#b79b3d",
+                                border: "2px solid #d4af37",
+                                borderRadius: "10px",
+                                padding: "14px 32px",
+                                cursor: "pointer",
+                                boxShadow: "0 0 12px rgba(212, 175, 55, 0.25)",
+                                marginBottom: "14px",
+                              }}
+                            >
+                              Declare
+                            </button>
+                            <p style={{ color: "#888", fontSize: "0.9rem", margin: "10px 0 0 0", fontStyle: "italic" }}>
+                              Or perhaps... go touch some grass.
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                            Switch to the Declare tab to submit a new one.
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -1799,9 +2029,9 @@ export default function Vote() {
                   }}>
                     <span style={{
                       fontSize: "13px",
-                      color: newCommandment.length >= 50 ? "#e07050" : "#999",
+                      color: newCommandment.length >= 65 ? "#e07050" : "#999",
                     }}>
-                      {newCommandment.length}/60
+                      {newCommandment.length}/80
                     </span>
                     <button
                       type="submit"
@@ -1844,6 +2074,7 @@ export default function Vote() {
           username={profilePopup.username}
           blessings={getBlessings(profilePopup.username)}
           donorTier={getDonorStatus(profilePopup.username)?.tier}
+          memberSince={getMemberSince(profilePopup.username)}
           position={{ x: profilePopup.x, y: profilePopup.y }}
           onClose={() => setProfilePopup(null)}
         />
@@ -1898,7 +2129,7 @@ export default function Vote() {
               lineHeight: 1.6,
               margin: "0 0 1.25rem 0",
             }}>
-              You may only inscribe one commandment per day. Return tomorrow to share new wisdom with the collective.
+              You may only inscribe 15 commandments per day. Return tomorrow to share new wisdom with the collective.
             </p>
             <button
               onClick={() => setShowLimitPopup(false)}

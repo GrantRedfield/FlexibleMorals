@@ -34,9 +34,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await authLogin(username, password);
     setUser(result.username);
     setAuthProv(result.authProvider);
+    // Refresh the page so all vote state, cooldowns, etc. reload for this account
+    window.location.reload();
   }, []);
 
   const logout = useCallback(() => {
+    // Clear username from localStorage immediately so React effects that fire
+    // from setUser(null) don't read a stale fm_username (authLogout is async
+    // and clears tokens only after the server call completes).
+    localStorage.removeItem("fm_username");
     authLogout();
     setUser(null);
     setAuthProv(null);

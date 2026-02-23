@@ -91,8 +91,10 @@ app.get("/posts", async (req, res) => {
   }
 });
 
-// === Helper: Check if user submitted today ===
-const hasUserSubmittedToday = async (authorId: string): Promise<boolean> => {
+const DAILY_SUBMISSION_LIMIT = 15;
+
+// === Helper: Get how many commandments a user has submitted today ===
+const getSubmissionCount = async (authorId: string): Promise<number> => {
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const result = await client.send(
     new GetItemCommand({
@@ -100,20 +102,21 @@ const hasUserSubmittedToday = async (authorId: string): Promise<boolean> => {
       Key: marshall({ PK: `USER#${authorId}`, SK: `SUBMISSION#${today}` }),
     })
   );
-  return !!result.Item;
+  if (!result.Item) return 0;
+  const item = unmarshall(result.Item);
+  return typeof item.count === "number" ? item.count : 1; // legacy items without count = 1
 };
 
-// === Helper: Record user submission for today ===
+// === Helper: Increment submission count for today ===
 const recordUserSubmission = async (authorId: string) => {
   const today = new Date().toISOString().split("T")[0];
   await client.send(
-    new PutItemCommand({
+    new UpdateItemCommand({
       TableName: TABLE_NAME,
-      Item: marshall({
-        PK: `USER#${authorId}`,
-        SK: `SUBMISSION#${today}`,
-        submittedAt: new Date().toISOString(),
-      }),
+      Key: marshall({ PK: `USER#${authorId}`, SK: `SUBMISSION#${today}` }),
+      UpdateExpression: "SET #cnt = if_not_exists(#cnt, :zero) + :one, submittedAt = :now",
+      ExpressionAttributeNames: { "#cnt": "count" },
+      ExpressionAttributeValues: marshall({ ":one": 1, ":zero": 0, ":now": new Date().toISOString() }),
     })
   );
 };
@@ -125,9 +128,10 @@ app.post("/posts", async (req, res) => {
   if (content.length > 80) return res.status(400).json({ error: "Commandment too long (max 80 characters)" });
 
   try {
-    // Check if user already submitted today
-    if (await hasUserSubmittedToday(authorId)) {
-      return res.status(429).json({ error: "You can only submit one commandment per day" });
+    // Check daily submission limit
+    const submissionCount = await getSubmissionCount(authorId);
+    if (submissionCount >= DAILY_SUBMISSION_LIMIT) {
+      return res.status(429).json({ error: `You can only submit ${DAILY_SUBMISSION_LIMIT} commandments per day` });
     }
 
     const newId = Date.now().toString();
@@ -185,13 +189,7 @@ app.post("/posts/:id/vote", async (req, res) => {
     let votes = Number(post.votes ?? 0);
     let userVotes = post.userVotes || {};
 
-    const previousVote = userVotes[userId];
     let newVoteState = direction;
-
-    if (previousVote === direction) {
-      console.log(`User ${userId} repeated same vote on post ${id}`);
-      return res.json({ id, votes, userVotes });
-    }
 
     votes += direction === "up" ? 1 : -1;
 
