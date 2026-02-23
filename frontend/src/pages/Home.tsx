@@ -167,7 +167,7 @@ export default function Home() {
       const containerHeight = containerRect.height;
       // Only bottom fade zone — items at top are fully visible, bottom 20% fades out.
       // Items that scroll above the container are clipped by overflow + CSS mask.
-      const bottomFade = containerHeight * 0.30;
+      const bottomFade = containerHeight * 0.18;
       const safeBottom = containerRect.bottom - bottomFade;
 
       items.forEach((item) => {
@@ -179,10 +179,10 @@ export default function Home() {
           t = Math.min((itemCenter - safeBottom) / bottomFade, 1);
         }
 
-        const scale = 1 - t * 0.3;
-        const opacity = 1 - t * 0.95;
+        const scale = 1 - t * 0.2;
+        const opacity = 1 - t * 0.65;
         item.style.transform = `scale(${scale})`;
-        item.style.opacity = `${Math.max(opacity, 0.03)}`;
+        item.style.opacity = `${Math.max(opacity, 0.25)}`;
       });
     };
 

@@ -1123,8 +1123,8 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
     /* Mask: items visible at top, fade to invisible at bottom edge */
-    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 85%, transparent 100%);
-    mask-image: linear-gradient(to bottom, black 0%, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 93%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0%, black 93%, transparent 100%);
   }
 
   .mobile-tablet-overlay::-webkit-scrollbar {
