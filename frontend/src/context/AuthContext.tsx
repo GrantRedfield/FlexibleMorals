@@ -34,8 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await authLogin(username, password);
     setUser(result.username);
     setAuthProv(result.authProvider);
-    // Refresh the page so all vote state, cooldowns, etc. reload for this account
-    window.location.reload();
   }, []);
 
   const logout = useCallback(() => {
