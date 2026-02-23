@@ -2284,19 +2284,10 @@ export default function Vote() {
               OUR CHARTER
             </h1>
             <p>
-              Flexible Morals was founded by two individuals looking for a framework of morality that would proactively evolve with the times. Our goal is to create an ad-free, bot-free space to serve as a forum for what the internet believes to be the present day ten commandments for living a moral life. Will the internet reinforce human principles like not murdering others, or will it reward timely meme-like reactions to inform our moral code?
+              Flexible Morals was founded to create a collaborative, ad-free, bot-free space where people can actively shape a modern moral framework inspired by timeless principles. Readers and future disciples are invited to participate in the <strong style={{ color: "#d4af37", backgroundColor: "rgba(0, 0, 0, 0.7)", padding: "2px 6px", borderRadius: "3px" }}>World's First Democratic Religion</strong> by sharing opinions, helping guide daily commandments, and voting monthly to determine the top ten moral standards.
             </p>
             <p style={{ marginTop: isMobile ? "0.6rem" : "1rem" }}>
-              You, dear reader and future disciple, can voice your opinion in the <strong style={{ color: "#d4af37", backgroundColor: "rgba(0, 0, 0, 0.7)", padding: "2px 6px", borderRadius: "3px" }}>world's first democratic religion</strong>. Share the daily commandment guiding your life, and vote on the commandments of others. The collective will decide our top ten commandments, with voting resetting every month.
-            </p>
-            <p style={{ marginTop: isMobile ? "0.6rem" : "1rem" }}>
-              If you are compelled by the mission of navigating morality through the flexible nature of culture and time, please consider making an offering to support keeping this website alive, ad-free, and bot-free.
-            </p>
-            <p style={{ marginTop: isMobile ? "0.6rem" : "1rem" }}>
-              If you would like to spread the word, share the website with your friends or consider buying our merchandise to represent the good word.
-            </p>
-            <p style={{ marginTop: isMobile ? "0.6rem" : "1rem" }}>
-              Our objective is not to make a profit, but to facilitate a movement. One inflexible principle of our founding is that we will donate to Save the Children, in support of those providing hope and care for humanity's future.
+              The mission is to foster thoughtful dialogue across cultures and generations, sustain the platform through optional support, and build a movement focused not on profit, but on making a positive impact—supporting meaningful causes and promoting hope and care for humanity's future.
             </p>
             <button onClick={() => setShowInfoPopup(false)} className="popup-close" style={{ marginTop: isMobile ? "0.6rem" : undefined }}>
               Close
