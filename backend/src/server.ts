@@ -272,8 +272,12 @@ app.post("/posts/bulk-vote", async (req, res) => {
         if (!getRes.Item) continue;
 
         const post = unmarshall(getRes.Item);
-        const votes = Number(post.votes ?? 0) + inc;
         const userVotes = post.userVotes || {};
+
+        // Skip if user already voted on this post
+        if (userVotes[userId]) continue;
+
+        const votes = Number(post.votes ?? 0) + inc;
         userVotes[userId] = direction;
 
         await client.send(

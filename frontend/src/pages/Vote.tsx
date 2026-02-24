@@ -940,12 +940,16 @@ export default function Vote() {
         // Reset cooldown and re-enable voting
         setCooldownEnd(null);
         cooldownEndRef.current = null; // Clear ref immediately so initializeSlots doesn't bail out
-        cooldownTriggered.current = false;
+        // NOTE: keep cooldownTriggered true until AFTER initializeSlots sets a new card,
+        // otherwise the exhaustion detection re-triggers a new cooldown immediately
         localStorage.removeItem(getCooldownKey(user));
         resetShownPostIds();
         setShuffleTrigger((t) => t + 1);
-        // Re-initialize slots so cards/swipe start fresh
-        setTimeout(() => { if (!guestAtLimitRef.current) initializeSlots(); }, 50);
+        // Re-initialize slots so cards/swipe start fresh, then allow future cooldowns
+        setTimeout(() => {
+          if (!guestAtLimitRef.current) initializeSlots();
+          cooldownTriggered.current = false;
+        }, 50);
       }
     }, 1000);
     return () => clearInterval(interval);
