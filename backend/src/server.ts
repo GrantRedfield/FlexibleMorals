@@ -230,6 +230,68 @@ app.post("/posts", async (req, res) => {
   }
 });
 
+// === POST /posts/bulk-vote — efficient bulk vote for "Bless All" / "Banish All" ===
+app.post("/posts/bulk-vote", async (req, res) => {
+  const { postIds, direction, userId = "guest" } = req.body;
+
+  if (!Array.isArray(postIds) || postIds.length === 0) {
+    return res.status(400).json({ error: "Missing postIds array" });
+  }
+  if (!direction || !["up", "down"].includes(direction)) {
+    return res.status(400).json({ error: "Invalid direction" });
+  }
+
+  try {
+    // Single cooldown check for the whole batch
+    if (userId !== "guest") {
+      const cooldownEnd = await getVoteCooldown(userId);
+      if (cooldownEnd) {
+        const remaining = Math.ceil((cooldownEnd - Date.now()) / 1000);
+        return res.status(429).json({ error: "Vote cooldown active", cooldownEnd, remaining });
+      }
+    }
+
+    const inc = direction === "up" ? 1 : -1;
+    let succeeded = 0;
+
+    // Process votes sequentially to avoid DynamoDB throttling
+    for (const id of postIds) {
+      try {
+        const getRes = await client.send(
+          new GetItemCommand({
+            TableName: TABLE_NAME,
+            Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
+          })
+        );
+        if (!getRes.Item) continue;
+
+        const post = unmarshall(getRes.Item);
+        const votes = Number(post.votes ?? 0) + inc;
+        const userVotes = post.userVotes || {};
+        userVotes[userId] = direction;
+
+        await client.send(
+          new UpdateItemCommand({
+            TableName: TABLE_NAME,
+            Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
+            UpdateExpression: "SET votes = :v, userVotes = :u",
+            ExpressionAttributeValues: marshall({ ":v": votes, ":u": userVotes }),
+          })
+        );
+        succeeded++;
+      } catch (err) {
+        console.error(`❌ Bulk vote failed for post ${id}:`, err);
+      }
+    }
+
+    console.log(`✅ Bulk vote: ${succeeded}/${postIds.length} posts ${direction}voted by ${userId}`);
+    res.json({ succeeded, total: postIds.length, direction });
+  } catch (err) {
+    console.error("❌ Bulk vote failed:", err);
+    res.status(500).json({ error: "Bulk vote failed" });
+  }
+});
+
 // === POST /posts/:id/vote ===
 app.post("/posts/:id/vote", async (req, res) => {
   const { id } = req.params;

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { getPosts, voteOnPost, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown } from "../utils/api";
+import { getPosts, voteOnPost, bulkVoteOnPosts, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -34,6 +34,7 @@ interface VisibleSlot {
 }
 
 const VISIBLE_COUNT = 4;
+const GUEST_VOTE_LIMIT = 5;
 
 const ANGEL_PHRASES = [
   "Bless you, child!",
@@ -84,6 +85,13 @@ export default function Vote() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showLimitPopup, setShowLimitPopup] = useState(false);
   const { user, openLoginModal } = useAuth();
+  // Computed on every render — reads localStorage directly, impossible to be stale
+  const guestCountRaw = localStorage.getItem("guestSwipeCount");
+  const guestCountNum = parseInt(guestCountRaw || "0", 10);
+  const guestAtLimit = !user && guestCountNum >= GUEST_VOTE_LIMIT;
+  // Ref stays in sync every render so useCallback closures always read the latest value
+  const guestAtLimitRef = useRef(guestAtLimit);
+  guestAtLimitRef.current = guestAtLimit;
   const navigate = useNavigate();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -132,7 +140,12 @@ export default function Vote() {
   const guestSwipeCount = useRef(
     parseInt(localStorage.getItem("guestSwipeCount") || "0", 10)
   );
-  const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(false);
+  const [showGuestLoginPrompt, setShowGuestLoginPrompt] = useState(() => {
+    // Initialize from localStorage so prompt shows immediately on remount (no race condition)
+    if (user) return false;
+    const count = parseInt(localStorage.getItem("guestSwipeCount") || "0", 10);
+    return count >= GUEST_VOTE_LIMIT;
+  });
   // Persistent guest voter ID so guest votes are tracked per-device
   const guestVoterId = useRef<string>((() => {
     const stored = localStorage.getItem("guestVoterId");
@@ -298,6 +311,14 @@ export default function Vote() {
   const initializeSlots = useCallback(() => {
     // Don't populate cards during active cooldown
     if (cooldownEndRef.current && cooldownEndRef.current > Date.now()) return;
+    // Don't populate cards if guest has hit the vote limit
+    // Read from ref to avoid stale closure (useCallback may not re-create)
+    if (guestAtLimitRef.current) {
+      setShowGuestLoginPrompt(true);
+      setSwipeCurrentPostId(null);
+      setVisibleSlots([]);
+      return;
+    }
 
     const currentSorted = sortedPostsRef.current;
     const votes = userVotesRef.current;
@@ -452,9 +473,15 @@ export default function Vote() {
 
   useEffect(() => {
     if (postsLoaded) {
+      if (guestAtLimit) {
+        setShowGuestLoginPrompt(true);
+        setSwipeCurrentPostId(null);
+        setVisibleSlots([]);
+        return;
+      }
       initializeSlots();
     }
-  }, [postsLoaded, sortOption, shuffleTrigger]);
+  }, [postsLoaded, sortOption, shuffleTrigger, guestAtLimit]);
 
   // Mobile: initialize swipe mode on first load
   useEffect(() => {
@@ -589,13 +616,17 @@ export default function Vote() {
       (p) => !votes[String(p.id)] && p.username !== currentUser
     );
 
-    // Fire all votes to backend
+    // Build vote map and post ID list
     const newVotes: Record<string, "up" | "down"> = {};
+    const postIds: string[] = [];
     for (const post of unvoted) {
       const pid = String(post.id);
       newVotes[pid] = direction;
-      voteOnPost(pid, direction, voterId).catch((err) => console.error("Bulk vote failed:", err));
+      postIds.push(pid);
     }
+
+    // Single bulk API call
+    bulkVoteOnPosts(postIds, direction, voterId).catch((err) => console.error("Bulk vote failed:", err));
 
     // Optimistic update
     setUserVotes((prev) => ({ ...prev, ...newVotes }));
@@ -648,6 +679,12 @@ export default function Vote() {
   // Voted posts are deprioritized — unvoted posts shown first. Once all unvoted
   // posts are exhausted, voted posts cycle back in for re-voting.
   const advanceSwipeCard = useCallback(() => {
+    // Don't advance if guest has hit the vote limit (ref avoids stale closure)
+    if (guestAtLimitRef.current) {
+      setShowGuestLoginPrompt(true);
+      setSwipeCurrentPostId(null);
+      return;
+    }
     const currentPid = swipeCurrentPostIdRef.current;
     const currentVisibleIds = new Set(currentPid ? [currentPid] : []);
     const allPosts = sortedPostsRef.current;
@@ -718,14 +755,13 @@ export default function Vote() {
     }
   }, [user, showGuestLoginPrompt, advanceSwipeCard, sortOption, initializeSlots]);
 
-  const GUEST_VOTE_LIMIT = 10;
-
   // On mount: if guest already hit the limit (persisted), show prompt immediately
   useEffect(() => {
     if (!user && posts.length > 0) {
       if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
         setShowGuestLoginPrompt(true);
         setSwipeCurrentPostId(null);
+        setVisibleSlots([]);
       }
     }
   }, [user, posts.length]);
@@ -864,8 +900,8 @@ export default function Vote() {
         localStorage.removeItem(getCooldownKey(user));
         shownPostIds.current = new Set();
         setShuffleTrigger((t) => t + 1);
-        // Re-initialize slots so cards/swipe start fresh
-        setTimeout(() => initializeSlots(), 50);
+        // Re-initialize slots so cards/swipe start fresh (skip if guest at limit)
+        setTimeout(() => { if (!guestAtLimitRef.current) initializeSlots(); }, 50);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -880,10 +916,24 @@ export default function Vote() {
 
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
+    // ABSOLUTE GUARD: read localStorage directly — no closure, no ref, no state
+    const rawGuestCount = parseInt(localStorage.getItem("guestSwipeCount") || "0", 10);
+    const rawUsername = localStorage.getItem("fm_username");
+    if (!rawUsername && rawGuestCount >= GUEST_VOTE_LIMIT) {
+      setShowGuestLoginPrompt(true);
+      setSwipeCurrentPostId(null);
+      return;
+    }
     // Block voting during cooldown — pulsate the timer
     if (cooldownEnd && cooldownEnd > Date.now()) {
       setCooldownPulse(true);
       setTimeout(() => setCooldownPulse(false), 600);
+      return;
+    }
+    // Hard block: guest already at vote limit (ref avoids stale closure)
+    if (guestAtLimitRef.current) {
+      setShowGuestLoginPrompt(true);
+      setSwipeCurrentPostId(null);
       return;
     }
 
@@ -919,6 +969,20 @@ export default function Vote() {
         );
       })
       .catch((err) => console.error("Vote failed:", err));
+
+    // Guest limit: increment count and check BEFORE showing animations
+    if (!user) {
+      guestSwipeCount.current += 1;
+      localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
+      if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
+        // Immediately update ref so all callbacks see the new limit
+        guestAtLimitRef.current = true;
+        setShowGuestLoginPrompt(true);
+        setSwipeCurrentPostId(null);
+        return;
+      }
+    }
+
     // Store exit direction in ref so it's available during AnimatePresence exit animation
     swipeExitDirectionRef.current = direction;
     setSwipeResult({ direction, delta, newTotal });
@@ -944,16 +1008,6 @@ export default function Vote() {
       setShowStreakPopup(direction);
     }
 
-    // Guest half-limit: after swiping through half the commandments, prompt login
-    if (!user) {
-      guestSwipeCount.current += 1;
-      localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
-      if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
-        setShowGuestLoginPrompt(true);
-        setSwipeCurrentPostId(null);
-        return;
-      }
-    }
     advanceSwipeCard();
   }, [posts, user, advanceSwipeCard, cooldownEnd]);
 
@@ -965,8 +1019,12 @@ export default function Vote() {
       setTimeout(() => setCooldownPulse(false), 600);
       return;
     }
-    // Block if guest has already hit the limit
-    if (!user && showGuestLoginPrompt) return;
+    // Hard block: guest already at vote limit (ref avoids stale closure)
+    if (guestAtLimitRef.current) {
+      setShowGuestLoginPrompt(true);
+      setVisibleSlots([]);
+      return;
+    }
 
     const pid = String(postId);
     const post = posts.find((p) => String(p.id) === pid);
@@ -984,12 +1042,15 @@ export default function Vote() {
       setShowStreakPopup(direction);
     }
 
-    // Guest half-limit: after voting on half the commandments, prompt login
+    // Guest limit: after 5 votes, prompt login
     if (!user) {
       guestSwipeCount.current += 1;
       localStorage.setItem("guestSwipeCount", String(guestSwipeCount.current));
       if (guestSwipeCount.current >= GUEST_VOTE_LIMIT) {
+        guestAtLimitRef.current = true;
         setShowGuestLoginPrompt(true);
+        setVisibleSlots([]);
+        return;
       }
     }
 
@@ -1500,6 +1561,41 @@ export default function Vote() {
                       </p>
                     </motion.div>
                   </div>
+                ) : guestAtLimit || showGuestLoginPrompt ? (
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flex: 1,
+                  textAlign: "center",
+                  padding: "2rem 1rem",
+                }}>
+                  <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 10px 0", fontWeight: 700 }}>
+                    Create an account to keep voting!
+                  </p>
+                  <p style={{ color: "#c8b070", fontSize: "0.8rem", margin: "0 0 16px 0", fontFamily: "'Cinzel', serif" }}>
+                    Log in to make your votes count.
+                  </p>
+                  <button
+                    onClick={() => { openLoginModal(); }}
+                    style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: "0.95rem",
+                      fontWeight: 700,
+                      color: "#fdf8e6",
+                      backgroundColor: "#b79b3d",
+                      border: "2px solid #d4af37",
+                      borderRadius: "10px",
+                      padding: "12px 24px",
+                      cursor: "pointer",
+                      textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
+                      boxShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
+                    }}
+                  >
+                    Log In / Sign Up
+                  </button>
+                </div>
                 ) : (
                 <>
                 {/* Top row: Angel + Upvote button — full width */}
@@ -1560,7 +1656,7 @@ export default function Vote() {
                 {/* Card area */}
                 <div style={{ position: "relative", padding: "6px 12px", flexShrink: 0, overflow: "visible" }}>
                   <AnimatePresence mode="wait" custom={swipeExitDirectionRef.current} onExitComplete={() => { setSwipeResult(null); swipeExitDirectionRef.current = null; }}>
-                    {swipeCurrentPostId && !showGuestLoginPrompt && (() => {
+                    {swipeCurrentPostId && !guestAtLimit && !showGuestLoginPrompt && (() => {
                       const post = getPost(swipeCurrentPostId);
                       if (!post) return null;
 
@@ -1727,43 +1823,6 @@ export default function Vote() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-
-                  {/* Guest login prompt */}
-                  {showGuestLoginPrompt && (
-                    <div style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: "1.5rem 0.5rem",
-                    }}>
-                      <p style={{ color: "#d4af37", fontFamily: "'Cinzel', serif", fontSize: "1.1rem", margin: "0 0 10px 0", fontWeight: 700 }}>
-                        Create an account to keep voting!
-                      </p>
-                      <p style={{ color: "#c8b070", fontSize: "0.8rem", margin: "0 0 16px 0", fontFamily: "'Cinzel', serif" }}>
-                        Log in to make your votes count.
-                      </p>
-                      <button
-                        onClick={() => { openLoginModal(); }}
-                        style={{
-                          fontFamily: "'Cinzel', serif",
-                          fontSize: "0.95rem",
-                          fontWeight: 700,
-                          color: "#fdf8e6",
-                          backgroundColor: "#b79b3d",
-                          border: "2px solid #d4af37",
-                          borderRadius: "10px",
-                          padding: "12px 24px",
-                          cursor: "pointer",
-                          textShadow: "1px 1px 2px rgba(0,0,0,0.5)",
-                          boxShadow: "0 0 12px rgba(212, 175, 55, 0.4)",
-                        }}
-                      >
-                        Log In / Sign Up
-                      </button>
-                    </div>
-                  )}
 
                   {/* No more cards — cooldown timer */}
                   {!swipeCurrentPostId && !showGuestLoginPrompt && (
@@ -2243,7 +2302,7 @@ export default function Vote() {
                     )}
 
                     {/* Desktop guest login prompt */}
-                    {!user && showGuestLoginPrompt && (
+                    {(guestAtLimit || (!user && showGuestLoginPrompt)) && (
                       <div style={{
                         textAlign: "center",
                         padding: "2.5rem 1rem",
@@ -2280,7 +2339,7 @@ export default function Vote() {
                       </div>
                     )}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
+                    {!guestAtLimit && !showGuestLoginPrompt && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
                       {visibleSlots.map((slot) => {
                         const post = getPost(slot.postId);
                         if (!post) return null;
@@ -2420,7 +2479,7 @@ export default function Vote() {
                           </div>
                         );
                       })}
-                    </div>
+                    </div>}
 
                     {/* Desktop streak popup — 10 consecutive same-direction votes */}
                     <AnimatePresence>

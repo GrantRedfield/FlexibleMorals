@@ -6,12 +6,19 @@ import axios from "axios";
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
 export const getPosts = async () => {
-  const res = await axios.get(`${API_BASE}/posts`);
+  const res = await axios.get(`${API_BASE}/posts`, {
+    params: { _t: Date.now() },
+  });
   return res.data;
 };
 
 export const voteOnPost = async (id: string | number, direction: "up" | "down", userId?: string) => {
   const res = await axios.post(`${API_BASE}/posts/${id}/vote`, { direction, userId });
+  return res.data;
+};
+
+export const bulkVoteOnPosts = async (postIds: string[], direction: "up" | "down", userId?: string) => {
+  const res = await axios.post(`${API_BASE}/posts/bulk-vote`, { postIds, direction, userId });
   return res.data;
 };
 
