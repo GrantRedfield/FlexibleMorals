@@ -1657,7 +1657,7 @@ export default function Vote() {
                   flex: 1,
                   minHeight: 0,
                 }}>
-                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible", position: "relative" }}>
                     <img src="/angel.png" alt="Angel" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(138, 180, 122, 0.6))" }} />
                     <AnimatePresence>
                       {speechBubble?.type === "angel" && (
@@ -1969,7 +1969,7 @@ export default function Vote() {
                     <span style={{ fontSize: "clamp(0.7rem, 2vh, 1.4rem)", fontFamily: "'Cinzel', serif", fontWeight: 700, color: "#c85a4a", letterSpacing: "0.08em" }}>Downvote</span>
                     <span style={{ fontSize: "clamp(3rem, 12vh, 10rem)", lineHeight: 0.7, fontFamily: "monospace", color: "#c85a4a" }}>↓</span>
                   </button>
-                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
+                  <div style={{ flex: "1 1 50%", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible", position: "relative" }}>
                     <img src="/demon.png" alt="Demon" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 0 14px rgba(200, 90, 74, 0.6))" }} />
                     <AnimatePresence>
                       {speechBubble?.type === "demon" && (
