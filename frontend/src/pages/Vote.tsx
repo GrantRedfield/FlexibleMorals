@@ -652,8 +652,10 @@ export default function Vote() {
       postIds.push(pid);
     }
 
-    // Single bulk API call
-    bulkVoteOnPosts(postIds, direction, voterId).catch((err) => console.error("Bulk vote failed:", err));
+    // Single bulk API call (skip if nothing to vote on)
+    if (postIds.length > 0) {
+      bulkVoteOnPosts(postIds, direction, voterId).catch((err) => console.error("Bulk vote failed:", err));
+    }
 
     // Optimistic update
     setUserVotes((prev) => ({ ...prev, ...newVotes }));
