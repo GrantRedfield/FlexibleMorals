@@ -1111,7 +1111,7 @@
     position: absolute;
     z-index: 10;
     top: 32%;
-    bottom: 20%;
+    bottom: 14%;
     left: 14%;
     right: 14%;
     padding: 4px 0;
@@ -1122,9 +1122,9 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    /* Mask: fade edges to hint more content above/below */
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 82%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 82%, transparent 100%);
+    /* Mask: fade bottom edge only to hint more content below */
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0%, black 80%, transparent 100%);
   }
 
   .mobile-tablet-overlay::-webkit-scrollbar {

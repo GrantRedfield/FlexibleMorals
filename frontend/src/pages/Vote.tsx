@@ -1648,7 +1648,8 @@ export default function Vote() {
                 </div>
                 ) : (
                 <>
-                {/* Top row: Angel + Upvote button — full width */}
+                {/* Top row: Angel + Upvote button — full width (hidden during cooldown) */}
+                {swipeCurrentPostId && (
                 <div style={{
                   display: "flex",
                   flexDirection: "row",
@@ -1702,6 +1703,7 @@ export default function Vote() {
                     <span style={{ fontSize: "clamp(0.7rem, 2vh, 1.4rem)", fontFamily: "'Cinzel', serif", fontWeight: 700, color: "#8ab47a", letterSpacing: "0.08em" }}>Upvote</span>
                   </button>
                 </div>
+                )}
 
                 {/* Card area */}
                 <div style={{ position: "relative", padding: "6px 12px", flexShrink: 0, overflow: "visible" }}>
@@ -1929,7 +1931,8 @@ export default function Vote() {
                   )}
                 </div>
 
-                {/* Bottom row: Downvote button + Demon — full width */}
+                {/* Bottom row: Downvote button + Demon — full width (hidden during cooldown) */}
+                {swipeCurrentPostId && (
                 <div style={{
                   display: "flex",
                   flexDirection: "row",
@@ -1983,6 +1986,7 @@ export default function Vote() {
                     </AnimatePresence>
                   </div>
                 </div>
+                )}
 
                 </>
                 )}

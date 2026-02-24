@@ -96,6 +96,7 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ username: string; message: string } | null>(null);
   // Track message IDs this user has reported (hidden locally immediately)
+  const [confirmReportId, setConfirmReportId] = useState<string | null>(null);
   const [reportedIds, setReportedIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem("fm_reported_messages");
@@ -473,6 +474,8 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
   };
 
   const handleReply = (msg: ChatMessage) => {
+    // Don't allow replies to system messages
+    if (msg.username === "⚠️ System" || msg.username === "SYSTEM") return;
     if (!user) {
       openLoginModal();
       return;
@@ -493,15 +496,20 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
     });
   };
 
-  const handleReport = async (msg: ChatMessage) => {
+  const handleReportClick = (msg: ChatMessage) => {
     if (!user) {
       openLoginModal();
       return;
     }
-    // Can't report own messages
     if (msg.username === user) return;
-    // Already reported
     if (reportedIds.has(msg.id)) return;
+    setConfirmReportId(msg.id);
+  };
+
+  const handleReportConfirm = async (msgId: string) => {
+    setConfirmReportId(null);
+    const msg = messages.find((m) => m.id === msgId);
+    if (!msg) return;
 
     // Hide immediately for this user
     const newReported = new Set(reportedIds);
@@ -645,8 +653,8 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
             <div
               className="chat-message"
               key={msg.id}
-              onClick={() => handleReply(msg)}
-              style={{ cursor: "pointer" }}
+              onClick={() => !isSystem && handleReply(msg)}
+              style={{ cursor: isSystem ? "default" : "pointer" }}
             >
               <span
                 className="chat-username"
@@ -662,14 +670,66 @@ const ChatBox = forwardRef<ChatBoxHandle, ChatBoxProps>(function ChatBox({ hideM
                 <DonorBadge tier={donorStatus.tier} size="small" />
               )}
               {renderMessageContent(msg.message)}
-              {!isOwnMessage && !isSystem && (
+              {!isOwnMessage && !isSystem && confirmReportId !== msg.id && (
                 <button
                   className="chat-report-btn"
-                  onClick={(e) => { e.stopPropagation(); handleReport(msg); }}
+                  onClick={(e) => { e.stopPropagation(); handleReportClick(msg); }}
                   title="Report message"
                 >
                   ⚑
                 </button>
+              )}
+              {confirmReportId === msg.id && (
+                <div
+                  className="chat-report-confirm"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    background: "rgba(20, 20, 20, 0.95)",
+                    border: "1px solid #c85a4a",
+                    borderRadius: "4px",
+                    padding: "4px 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    zIndex: 10,
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  <span style={{ color: "#ccc" }}>Report?</span>
+                  <button
+                    onClick={() => handleReportConfirm(msg.id)}
+                    style={{
+                      background: "#c85a4a",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "3px",
+                      padding: "2px 8px",
+                      cursor: "pointer",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmReportId(null)}
+                    style={{
+                      background: "transparent",
+                      color: "#999",
+                      border: "1px solid #555",
+                      borderRadius: "3px",
+                      padding: "2px 8px",
+                      cursor: "pointer",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    No
+                  </button>
+                </div>
               )}
             </div>
           );

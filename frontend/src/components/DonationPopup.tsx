@@ -150,7 +150,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
           <h2 style={{ color: "#635bff", marginBottom: isMobile ? "0.4rem" : "0.5rem", fontSize: isMobile ? "1.3rem" : "1.8rem", fontFamily: "'Cinzel', serif" }}>
             Credit Card Donation
           </h2>
-          <p style={{ color: "#aaa", marginBottom: isMobile ? "0.6rem" : "1rem", fontSize: isMobile ? "0.85rem" : "0.95rem" }}>
+          <p style={{ color: "#ccc", marginBottom: isMobile ? "0.6rem" : "1rem", fontSize: isMobile ? "0.85rem" : "0.95rem" }}>
             Choose an amount
           </p>
 
@@ -189,7 +189,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
             gap: "8px",
             marginBottom: isMobile ? "0.6rem" : "1rem",
           }}>
-            <span style={{ color: "#888", fontSize: isMobile ? "1.1rem" : "1.3rem", fontWeight: 700 }}>$</span>
+            <span style={{ color: "#ccc", fontSize: isMobile ? "1.1rem" : "1.3rem", fontWeight: 700 }}>$</span>
             <input
               type="text"
               inputMode="decimal"
@@ -241,7 +241,7 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
                 : "Select an amount"}
           </button>
 
-          <p style={{ color: "#666", fontSize: isMobile ? "0.7rem" : "0.78rem", marginBottom: isMobile ? "0.6rem" : "1rem", textAlign: "center" }}>
+          <p style={{ color: "#999", fontSize: isMobile ? "0.7rem" : "0.78rem", marginBottom: isMobile ? "0.6rem" : "1rem", textAlign: "center" }}>
             You'll be securely redirected to Stripe to complete your payment
           </p>
 
@@ -331,12 +331,12 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
           padding: isMobile ? "6px 10px" : "14px 16px",
           marginBottom: isMobile ? "0.4rem" : "1rem",
         }}>
-          <p style={{ color: "#ccc", fontSize: isMobile ? "0.78rem" : "0.9rem", lineHeight: isMobile ? 1.4 : 1.6, margin: isMobile ? "0 0 3px 0" : "0 0 8px 0" }}>
+          <p style={{ color: "#e0d8c8", fontSize: isMobile ? "0.78rem" : "0.9rem", lineHeight: isMobile ? 1.4 : 1.6, margin: isMobile ? "0 0 3px 0" : "0 0 8px 0" }}>
             Flexible Morals is built and maintained by a <span style={{ color: "#d4af37", fontWeight: 600 }}>single developer</span> with
             a dream of building the world's first crowd-sourced religion. Your offering helps keep the servers running and
             funds new features for our growing congregation.
           </p>
-          <p style={{ color: "#999", fontSize: isMobile ? "0.72rem" : "0.8rem", margin: 0, fontStyle: "italic" }}>
+          <p style={{ color: "#c0b89a", fontSize: isMobile ? "0.72rem" : "0.8rem", margin: 0, fontStyle: "italic" }}>
             Every dollar makes a difference. Thank you for believing.
           </p>
         </div>
@@ -349,32 +349,32 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
           borderRadius: isMobile ? "6px" : "10px",
           border: "1px solid #333",
         }}>
-          <p style={{ color: "#aaa", fontSize: isMobile ? "0.68rem" : "0.8rem", marginBottom: isMobile ? "4px" : "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+          <p style={{ color: "#ccc", fontSize: isMobile ? "0.68rem" : "0.8rem", marginBottom: isMobile ? "4px" : "10px", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
             Donor Flair Tiers
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "2px" : "8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "10px" }}>
               <span style={{ fontSize: isMobile ? "0.95rem" : "1.3rem", textShadow: "0 0 6px rgba(205, 127, 50, 0.6)" }}>⭐</span>
               <span style={{ color: "#cd7f32", fontWeight: 600, fontSize: isMobile ? "0.8rem" : "0.95rem" }}>Supporter</span>
-              <span style={{ color: "#777", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$1+</span>
+              <span style={{ color: "#b0a880", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$1+</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "10px" }}>
               <span style={{ fontSize: isMobile ? "0.95rem" : "1.3rem", textShadow: "0 0 6px rgba(192, 192, 192, 0.6)" }}>🙏</span>
               <span style={{ color: "#c0c0c0", fontWeight: 600, fontSize: isMobile ? "0.8rem" : "0.95rem" }}>Patron</span>
-              <span style={{ color: "#777", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$25+</span>
+              <span style={{ color: "#b0a880", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$25+</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "10px" }}>
               <span style={{ fontSize: isMobile ? "0.95rem" : "1.3rem", textShadow: "0 0 6px rgba(212, 175, 55, 0.8)" }}>👑</span>
               <span style={{ color: "#d4af37", fontWeight: 600, fontSize: isMobile ? "0.8rem" : "0.95rem" }}>Benefactor</span>
-              <span style={{ color: "#777", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$100+</span>
+              <span style={{ color: "#b0a880", fontSize: isMobile ? "0.7rem" : "0.8rem", marginLeft: "auto" }}>$100+</span>
             </div>
           </div>
-          <p style={{ color: "#666", fontSize: isMobile ? "0.65rem" : "0.75rem", margin: isMobile ? "3px 0 0 0" : "10px 0 0 0", fontStyle: "italic" }}>
+          <p style={{ color: "#999", fontSize: isMobile ? "0.65rem" : "0.75rem", margin: isMobile ? "3px 0 0 0" : "10px 0 0 0", fontStyle: "italic" }}>
             Your flair appears next to your name across the site
           </p>
         </div>
 
-        <p style={{ color: "#aaa", marginBottom: isMobile ? "0.3rem" : "0.75rem", fontSize: isMobile ? "0.82rem" : "0.95rem" }}>
+        <p style={{ color: "#ccc", marginBottom: isMobile ? "0.3rem" : "0.75rem", fontSize: isMobile ? "0.82rem" : "0.95rem" }}>
           Choose your preferred method
         </p>
 

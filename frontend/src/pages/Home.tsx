@@ -49,6 +49,18 @@ export default function Home() {
   const [showCoins, setShowCoins] = useState(false);
   const [profilePopup, setProfilePopup] = useState<{ username: string; x: number; y: number } | null>(null);
 
+  // Random mobile background — picked once per page load
+  const MOBILE_BGS = [
+    "/mobile_bg_1.png",
+    "/mobile_bg_2.png",
+    "/mobile_bg_3.png",
+    "/mobile_bg_4.png",
+    "/mobile_bg_5.png",
+    "/mobile_bg_6.png",
+    "/mobile_bg_7.png",
+  ];
+  const [mobileBg] = useState(() => MOBILE_BGS[Math.floor(Math.random() * MOBILE_BGS.length)]);
+
   const chatBoxRef = useRef<ChatBoxHandle>(null);
   const wheelContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -280,7 +292,7 @@ export default function Home() {
     <div className="home-root">
       {/* ✅ Background + overlays wrapper */}
       {isMobile ? (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundImage: "url(/mobile_bg_4.png)", backgroundSize: "100% 100%", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100dvh", overflow: "hidden", backgroundImage: `url(${mobileBg})`, backgroundSize: "100% 100%", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
           {/* Countdown — top right */}
           <div
             style={{
