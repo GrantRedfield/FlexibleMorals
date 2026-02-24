@@ -135,7 +135,29 @@ export default function Vote() {
   );
 
   // Track which posts have been shown to avoid re-showing them before queue exhausts
-  const shownPostIds = useRef<Set<string>>(new Set());
+  // Persisted in localStorage so navigating away doesn't reset the cycle
+  const getShownKey = (u?: string | null) => {
+    const id = u !== undefined ? (u || localStorage.getItem("guestVoterId") || "guest") : (localStorage.getItem("fm_username") || localStorage.getItem("guestVoterId") || "guest");
+    return `shownPostIds_${id}`;
+  };
+  const shownPostIds = useRef<Set<string>>((() => {
+    try {
+      const stored = localStorage.getItem(getShownKey());
+      if (stored) return new Set(JSON.parse(stored) as string[]);
+    } catch {}
+    return new Set<string>();
+  })());
+  // Helper: save shownPostIds to localStorage
+  const saveShownPostIds = () => {
+    try {
+      localStorage.setItem(getShownKey(user), JSON.stringify([...shownPostIds.current]));
+    } catch {}
+  };
+  // Helper: reset shownPostIds and clear localStorage
+  const resetShownPostIds = () => {
+    shownPostIds.current = new Set();
+    try { localStorage.removeItem(getShownKey(user)); } catch {}
+  };
   // Guest swipe tracking — persisted in localStorage so refreshing doesn't reset
   const guestSwipeCount = useRef(
     parseInt(localStorage.getItem("guestSwipeCount") || "0", 10)
@@ -332,7 +354,8 @@ export default function Vote() {
       if (firstPost) {
         const firstPid = String(firstPost.id);
         setSwipeCurrentPostId(firstPid);
-        shownPostIds.current = new Set([firstPid]);
+        shownPostIds.current.add(firstPid);
+        saveShownPostIds();
       } else {
         setSwipeCurrentPostId(null);
       }
@@ -355,7 +378,8 @@ export default function Vote() {
       postId: String(p.id),
       animState: "visible" as AnimState,
     }));
-    shownPostIds.current = new Set(initial.map((s) => s.postId));
+    initial.forEach((s) => shownPostIds.current.add(s.postId));
+    saveShownPostIds();
     setVisibleSlots(initial);
   }, [sortOption, user]);
 
@@ -550,7 +574,7 @@ export default function Vote() {
       setMobileFilter("new");
       setMobileVisibleCount(10);
       // Reset shown tracking so the new post appears in the first batch
-      shownPostIds.current = new Set();
+      resetShownPostIds();
       // Defer shuffle trigger to next tick so sortedPostsRef has the new post
       setTimeout(() => setShuffleTrigger((t) => t + 1), 0);
     } catch (err: any) {
@@ -733,6 +757,7 @@ export default function Vote() {
     if (nextPost) {
       const nextPid = String(nextPost.id);
       shownPostIds.current.add(nextPid);
+      saveShownPostIds();
       setSwipeCurrentPostId(nextPid);
       setSwipeCardKey((k) => k + 1);
     } else {
@@ -807,7 +832,7 @@ export default function Vote() {
       setCooldownRemaining(0);
       cooldownTriggered.current = false;
       slotsInitialized.current = false;
-      shownPostIds.current = new Set();
+      resetShownPostIds();
       setShuffleTrigger((t) => t + 1);
     };
 
@@ -898,7 +923,7 @@ export default function Vote() {
         setCooldownEnd(null);
         cooldownTriggered.current = false;
         localStorage.removeItem(getCooldownKey(user));
-        shownPostIds.current = new Set();
+        resetShownPostIds();
         setShuffleTrigger((t) => t + 1);
         // Re-initialize slots so cards/swipe start fresh (skip if guest at limit)
         setTimeout(() => { if (!guestAtLimitRef.current) initializeSlots(); }, 50);
@@ -1079,6 +1104,7 @@ export default function Vote() {
         if (nextPost) {
           const nextPid = String(nextPost.id);
           shownPostIds.current.add(nextPid);
+          saveShownPostIds();
           return prev.map((slot) =>
             slot.postId === pid
               ? { postId: nextPid, animState: "fadingIn" as AnimState }
@@ -1123,6 +1149,7 @@ export default function Vote() {
         if (nextPost) {
           const nextPid = String(nextPost.id);
           shownPostIds.current.add(nextPid);
+          saveShownPostIds();
           return prev.map((slot) =>
             slot.postId === pid
               ? { postId: nextPid, animState: "fadingIn" as AnimState }
