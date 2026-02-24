@@ -528,12 +528,12 @@ export default function Home() {
           <div
             className="popup-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "900px", width: "90%", padding: "2rem", backgroundColor: "#1a1a1a" }}
+            style={{ maxWidth: "520px", width: "92%", padding: isMobile ? "1rem" : "2rem", backgroundColor: "#1a1a1a", maxHeight: "90vh", overflowY: "auto" }}
           >
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.2rem" : "1.5rem" }}>
               Flexible Morals Tee
             </h2>
-            <p style={{ marginBottom: "1rem", color: "#aaa", fontSize: "0.9rem" }}>
+            <p style={{ marginBottom: isMobile ? "0.5rem" : "1rem", color: "#aaa", fontSize: isMobile ? "0.8rem" : "0.9rem" }}>
               Coming Soon! Each month's top commandments on the back.
             </p>
 
@@ -543,7 +543,6 @@ export default function Home() {
               alt="Flexible Morals Tee - Back with Commandments"
               style={{
                 width: "100%",
-                maxWidth: "800px",
                 borderRadius: "8px",
                 display: "block",
                 margin: "0 auto",
@@ -554,20 +553,19 @@ export default function Home() {
               alt="Flexible Morals Tee - Modeled Front and Back"
               style={{
                 width: "100%",
-                maxWidth: "800px",
                 borderRadius: "8px",
                 display: "block",
-                margin: "1rem auto 0",
+                margin: isMobile ? "0.5rem auto 0" : "1rem auto 0",
               }}
             />
 
-            <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#d4af37", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+            <p style={{ marginTop: isMobile ? "0.5rem" : "1rem", fontSize: isMobile ? "0.75rem" : "0.85rem", color: "#d4af37", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
               Shirts updated with our most recent morals!
             </p>
             <button
               onClick={() => setShowMerchPopup(false)}
               className="popup-close"
-              style={{ marginTop: "1rem" }}
+              style={{ marginTop: isMobile ? "0.5rem" : "1rem" }}
             >
               Close
             </button>

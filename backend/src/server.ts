@@ -12,7 +12,9 @@ import {
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 import { client, TABLE_NAME } from "./lib/dynamodb.ts";
 import { handlePayPalWebhook } from "./webhooks/paypal.ts";
+import { handleStripeWebhook } from "./webhooks/stripe.ts";
 import donorRoutes from "./routes/donorRoutes.ts";
+import stripeRoutes from "./routes/stripeRoutes.ts";
 import chatRoutes from "./routes/chatRoutes.ts";
 import commentRoutes from "./routes/commentRoutes.ts";
 import authRoutes from "./routes/authRoutes.js";
@@ -32,14 +34,18 @@ app.use(cors({
   },
 }));
 
-// PayPal webhook needs raw body for signature verification
+// Webhooks need raw body for signature verification
 // Must be registered before bodyParser.json()
 app.post("/webhooks/paypal", express.raw({ type: "application/json" }), handlePayPalWebhook);
+app.post("/webhooks/stripe", express.raw({ type: "application/json" }), handleStripeWebhook);
 
 app.use(bodyParser.json());
 
 // Donor API routes
 app.use("/api/donor", donorRoutes);
+
+// Stripe API routes
+app.use("/api/stripe", stripeRoutes);
 
 // Chat API routes
 app.use("/api/chat", chatRoutes);

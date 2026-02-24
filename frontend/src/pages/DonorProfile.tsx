@@ -169,7 +169,7 @@ export default function DonorProfile() {
                 </div>
               ) : (
                 <p style={{ color: "#888" }}>
-                  You haven't donated yet. Link your PayPal email below to get started!
+                  You haven't donated yet. Link your donation email below to get started!
                 </p>
               )}
             </div>
@@ -184,10 +184,10 @@ export default function DonorProfile() {
               }}
             >
               <h3 style={{ color: "#d4af37", marginTop: 0, marginBottom: "0.5rem" }}>
-                Link Your PayPal Email
+                Link Your Donation Email
               </h3>
               <p style={{ color: "#888", fontSize: "0.9rem", marginBottom: "1rem" }}>
-                Enter the email you use for PayPal donations to receive your donor flair.
+                Enter the email you use for PayPal or credit card donations to receive your donor flair.
                 Any past donations from this email will be credited to your account.
               </p>
 

@@ -74,6 +74,13 @@ export const getDonorTiers = async () => {
   return res.data;
 };
 
+// === Stripe API ===
+
+export const createStripeCheckout = async (amountCents: number) => {
+  const res = await axios.post(`${API_BASE}/api/stripe/create-checkout-session`, { amount: amountCents });
+  return res.data;
+};
+
 // === Chat API ===
 
 export const getChatMessages = async (since?: string) => {

@@ -2,27 +2,14 @@ import type { Request, Response } from "express";
 import https from "https";
 import crypto from "crypto";
 import {
-  GetItemCommand,
-  PutItemCommand,
-  UpdateItemCommand,
-  QueryCommand,
-} from "@aws-sdk/client-dynamodb";
-import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
-import { client, TABLE_NAME } from "../lib/dynamodb.ts";
-
-// Tier thresholds in cents
-const TIER_THRESHOLDS = {
-  benefactor: 10000, // $100+
-  patron: 2500,      // $25+
-  supporter: 100,    // $1+
-};
-
-function calculateTier(totalCents: number): string {
-  if (totalCents >= TIER_THRESHOLDS.benefactor) return "benefactor";
-  if (totalCents >= TIER_THRESHOLDS.patron) return "patron";
-  if (totalCents >= TIER_THRESHOLDS.supporter) return "supporter";
-  return "none";
-}
+  TIER_THRESHOLDS,
+  calculateTier,
+  getDonationRecord,
+  createDonationRecord,
+  getDonorRecord,
+  updateDonorStatus,
+  getLinkedUsername,
+} from "../lib/donationHelpers.ts";
 
 // Fetch PayPal certificate for signature verification
 async function fetchPayPalCert(certUrl: string): Promise<string> {
@@ -79,117 +66,16 @@ async function verifyWebhookSignature(
     console.error("Webhook signature verification failed:", err);
     // In development, we might want to skip verification
     if (process.env.PAYPAL_MODE === "sandbox") {
-      console.warn("⚠️ Skipping signature verification in sandbox mode");
+      console.warn("Skipping signature verification in sandbox mode");
       return true;
     }
     return false;
   }
 }
 
-// Get linked username for a PayPal email
-async function getLinkedUsername(paypalEmail: string): Promise<string | null> {
-  try {
-    const result = await client.send(
-      new GetItemCommand({
-        TableName: TABLE_NAME,
-        Key: marshall({ PK: `PAYPAL#${paypalEmail.toLowerCase()}`, SK: "LINK" }),
-      })
-    );
-    if (result.Item) {
-      const data = unmarshall(result.Item);
-      return data.username || null;
-    }
-    return null;
-  } catch (err) {
-    console.error("Error getting linked username:", err);
-    return null;
-  }
-}
-
-// Check if donation already processed (idempotency)
-async function getDonationRecord(transactionId: string): Promise<any | null> {
-  try {
-    const result = await client.send(
-      new GetItemCommand({
-        TableName: TABLE_NAME,
-        Key: marshall({ PK: `DONATION#${transactionId}`, SK: "RECORD" }),
-      })
-    );
-    return result.Item ? unmarshall(result.Item) : null;
-  } catch (err) {
-    console.error("Error getting donation record:", err);
-    return null;
-  }
-}
-
-// Create donation record
-async function createDonationRecord(data: {
-  transactionId: string;
-  paypalEmail: string;
-  username: string | null;
-  amount: number;
-  currency: string;
-  status: string;
-}) {
-  await client.send(
-    new PutItemCommand({
-      TableName: TABLE_NAME,
-      Item: marshall({
-        PK: `DONATION#${data.transactionId}`,
-        SK: "RECORD",
-        ...data,
-        webhookReceivedAt: new Date().toISOString(),
-        processedAt: data.username ? new Date().toISOString() : null,
-      }),
-    })
-  );
-}
-
-// Get current donor record
-async function getDonorRecord(username: string): Promise<any | null> {
-  try {
-    const result = await client.send(
-      new GetItemCommand({
-        TableName: TABLE_NAME,
-        Key: marshall({ PK: `DONOR#${username}`, SK: "STATUS" }),
-      })
-    );
-    return result.Item ? unmarshall(result.Item) : null;
-  } catch (err) {
-    console.error("Error getting donor record:", err);
-    return null;
-  }
-}
-
-// Update donor status after receiving donation
-async function updateDonorStatus(username: string, newAmount: number, paypalEmail: string) {
-  const current = await getDonorRecord(username);
-  const newTotal = (current?.totalDonated || 0) + newAmount;
-  const tier = calculateTier(newTotal);
-  const now = new Date().toISOString();
-
-  await client.send(
-    new PutItemCommand({
-      TableName: TABLE_NAME,
-      Item: marshall({
-        PK: `DONOR#${username}`,
-        SK: "STATUS",
-        username,
-        totalDonated: newTotal,
-        tier,
-        firstDonationAt: current?.firstDonationAt || now,
-        lastDonationAt: now,
-        paypalEmail: paypalEmail.toLowerCase(),
-      }),
-    })
-  );
-
-  console.log(`✅ Updated donor status for ${username}: tier=${tier}, total=$${newTotal / 100}`);
-}
-
 // Main webhook handler
 export async function handlePayPalWebhook(req: Request, res: Response) {
-  console.log("📨 Received PayPal webhook");
+  console.log("Received PayPal webhook");
 
   // Always respond 200 to acknowledge receipt
   // PayPal will retry if we don't respond quickly
@@ -207,15 +93,15 @@ export async function handlePayPalWebhook(req: Request, res: Response) {
         webhookId
       );
       if (!isValid) {
-        console.error("❌ Invalid webhook signature");
+        console.error("Invalid webhook signature");
         return;
       }
     } else {
-      console.warn("⚠️ PAYPAL_WEBHOOK_ID not set, skipping signature verification");
+      console.warn("PAYPAL_WEBHOOK_ID not set, skipping signature verification");
     }
 
     const event = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    console.log(`📌 Event type: ${event.event_type}`);
+    console.log(`Event type: ${event.event_type}`);
 
     // Handle payment completed events
     if (
@@ -239,12 +125,12 @@ export async function handlePayPalWebhook(req: Request, res: Response) {
       const amountCents = amount ? Math.round(parseFloat(amount) * 100) : 0;
       const currency = resource.amount?.currency || resource.amount?.currency_code || "USD";
 
-      console.log(`💰 Payment: $${amountCents / 100} ${currency} from ${payerEmail}`);
+      console.log(`Payment: $${amountCents / 100} ${currency} from ${payerEmail}`);
 
       // Check idempotency
       const existing = await getDonationRecord(transactionId);
       if (existing) {
-        console.log(`⏭️ Transaction ${transactionId} already processed`);
+        console.log(`Transaction ${transactionId} already processed`);
         return;
       }
 
@@ -261,7 +147,7 @@ export async function handlePayPalWebhook(req: Request, res: Response) {
         status: "completed",
       });
 
-      console.log(`📝 Donation recorded: ${transactionId}, linked to: ${linkedUsername || "unclaimed"}`);
+      console.log(`Donation recorded: ${transactionId}, linked to: ${linkedUsername || "unclaimed"}`);
 
       // If linked, update donor status
       if (linkedUsername && payerEmail) {
@@ -269,11 +155,11 @@ export async function handlePayPalWebhook(req: Request, res: Response) {
       }
     }
   } catch (err) {
-    console.error("❌ Error processing webhook:", err);
+    console.error("Error processing webhook:", err);
   }
 }
 
-// Export helper functions for use in donor routes
+// Re-export helper functions for backward compat (donorRoutes.ts imports from here)
 export {
   getDonorRecord,
   updateDonorStatus,

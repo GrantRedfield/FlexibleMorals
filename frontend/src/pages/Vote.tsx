@@ -119,6 +119,7 @@ export default function Vote() {
   // Consecutive vote streak tracking
   const voteStreakRef = useRef<{ direction: "up" | "down"; count: number }>({ direction: "up", count: 0 });
   const [showStreakPopup, setShowStreakPopup] = useState<"up" | "down" | null>(null);
+  const showStreakPopupRef = useRef<"up" | "down" | null>(null);
   // Cooldown pulse — triggered when user tries to vote during cooldown
   const [cooldownPulse, setCooldownPulse] = useState(false);
   // Bulk vote animation state
@@ -328,6 +329,8 @@ export default function Vote() {
   // Ref to always access latest cooldownEnd inside callbacks
   const cooldownEndRef = useRef(cooldownEnd);
   useEffect(() => { cooldownEndRef.current = cooldownEnd; }, [cooldownEnd]);
+  // Ref to block voting while Bless All / Banish All popup is showing
+  useEffect(() => { showStreakPopupRef.current = showStreakPopup; }, [showStreakPopup]);
 
   // Initialize visible slots when posts load or sort changes
   const initializeSlots = useCallback(() => {
@@ -663,8 +666,21 @@ export default function Vote() {
       })
     );
 
-    // Clear current card
+    // Clear current card / desktop slots
     setSwipeCurrentPostId(null);
+    setVisibleSlots([]);
+
+    // Trigger cooldown immediately — all posts are now voted
+    if (!cooldownTriggered.current) {
+      cooldownTriggered.current = true;
+      const end = Date.now() + COOLDOWN_SECONDS * 1000;
+      setCooldownEnd(end);
+      setCooldownRemaining(COOLDOWN_SECONDS);
+      cooldownEndRef.current = end; // Update ref immediately so initializeSlots won't refill
+      localStorage.setItem(getCooldownKey(user), String(end));
+      const voterId2 = user || guestVoterId.current;
+      apiSetVoteCooldown(voterId2).catch(() => {});
+    }
 
     // Start emoji flood animation — 250 emojis fill the screen, then slowly clear
     const TOTAL_EMOJIS = 250;
@@ -921,11 +937,12 @@ export default function Vote() {
         clearInterval(interval);
         // Reset cooldown and re-enable voting
         setCooldownEnd(null);
+        cooldownEndRef.current = null; // Clear ref immediately so initializeSlots doesn't bail out
         cooldownTriggered.current = false;
         localStorage.removeItem(getCooldownKey(user));
         resetShownPostIds();
         setShuffleTrigger((t) => t + 1);
-        // Re-initialize slots so cards/swipe start fresh (skip if guest at limit)
+        // Re-initialize slots so cards/swipe start fresh
         setTimeout(() => { if (!guestAtLimitRef.current) initializeSlots(); }, 50);
       }
     }, 1000);
@@ -941,6 +958,8 @@ export default function Vote() {
 
   // === Swipe mode: handle swipe vote ===
   const handleSwipeVote = useCallback((direction: "up" | "down") => {
+    // Block voting while Bless All / Banish All popup is showing
+    if (showStreakPopupRef.current) return;
     // ABSOLUTE GUARD: read localStorage directly — no closure, no ref, no state
     const rawGuestCount = parseInt(localStorage.getItem("guestSwipeCount") || "0", 10);
     const rawUsername = localStorage.getItem("fm_username");
@@ -1038,6 +1057,8 @@ export default function Vote() {
 
   // === Handle vote with fade animation (4-card mode) ===
   const handleVote = (postId: string | number, direction: "up" | "down") => {
+    // Block voting while Bless All / Banish All popup is showing
+    if (showStreakPopup) return;
     // Block voting during cooldown — pulsate the timer
     if (cooldownEnd && cooldownEnd > Date.now()) {
       setCooldownPulse(true);
@@ -2888,28 +2909,28 @@ export default function Vote() {
           <div
             className="popup-box"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "900px", width: "90%", padding: "2rem", backgroundColor: "#1a1a1a" }}
+            style={{ maxWidth: "520px", width: "92%", padding: isMobile ? "1rem" : "2rem", backgroundColor: "#1a1a1a", maxHeight: "90vh", overflowY: "auto" }}
           >
-            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "#d4af37", marginBottom: "0.5rem", fontSize: isMobile ? "1.2rem" : "1.5rem" }}>
               Flexible Morals Tee
             </h2>
-            <p style={{ marginBottom: "1rem", color: "#aaa", fontSize: "0.9rem" }}>
+            <p style={{ marginBottom: isMobile ? "0.5rem" : "1rem", color: "#aaa", fontSize: isMobile ? "0.8rem" : "0.9rem" }}>
               Coming Soon! Each month's top commandments on the back.
             </p>
             <img
               src="/merch_tee_back.png"
               alt="Flexible Morals Tee - Back with Commandments"
-              style={{ width: "100%", maxWidth: "800px", borderRadius: "8px", display: "block", margin: "0 auto" }}
+              style={{ width: "100%", borderRadius: "8px", display: "block", margin: "0 auto" }}
             />
             <img
               src="/merch_tee_2.png"
               alt="Flexible Morals Tee - Modeled Front and Back"
-              style={{ width: "100%", maxWidth: "800px", borderRadius: "8px", display: "block", margin: "1rem auto 0" }}
+              style={{ width: "100%", borderRadius: "8px", display: "block", margin: isMobile ? "0.5rem auto 0" : "1rem auto 0" }}
             />
-            <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#d4af37", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
+            <p style={{ marginTop: isMobile ? "0.5rem" : "1rem", fontSize: isMobile ? "0.75rem" : "0.85rem", color: "#d4af37", fontFamily: "'Cinzel', serif", fontWeight: 600 }}>
               Shirts updated with our most recent morals!
             </p>
-            <button onClick={() => setShowMerchPopup(false)} className="popup-close" style={{ marginTop: "1rem" }}>
+            <button onClick={() => setShowMerchPopup(false)} className="popup-close" style={{ marginTop: isMobile ? "0.5rem" : "1rem" }}>
               Close
             </button>
           </div>
