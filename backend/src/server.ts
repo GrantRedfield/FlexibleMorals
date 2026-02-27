@@ -273,11 +273,18 @@ app.post("/posts/bulk-vote", async (req, res) => {
 
         const post = unmarshall(getRes.Item);
         const userVotes = post.userVotes || {};
+        const previousVote = userVotes[userId];
 
-        // Skip if user already voted on this post
-        if (userVotes[userId]) continue;
+        // Skip if user already voted the same direction
+        if (previousVote === direction) continue;
 
-        const votes = Number(post.votes ?? 0) + inc;
+        // Calculate delta: undo previous vote if changing direction
+        let delta = inc;
+        if (previousVote) {
+          delta = direction === "up" ? 2 : -2;
+        }
+
+        const votes = Number(post.votes ?? 0) + delta;
         userVotes[userId] = direction;
 
         await client.send(
