@@ -10,6 +10,21 @@ import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import HamburgerMenu from "../components/HamburgerMenu";
 import DonationPopup from "../components/DonationPopup";
+import {
+  getNextUnvotedPost,
+  getNextSwipePost,
+  calculateVoteDelta,
+  filterByDownvoteThreshold,
+  getBulkVoteTargets,
+  shouldTriggerExhaustion,
+  updateVoteStreak,
+  getCooldownStorageKey,
+  isGuestAtLimit,
+  getInitialSlots,
+  VISIBLE_COUNT,
+  GUEST_VOTE_LIMIT,
+  DOWNVOTE_THRESHOLD,
+} from "../utils/votingLogic";
 import "../App.css";
 import "./Vote.css";
 
@@ -32,9 +47,6 @@ interface VisibleSlot {
   postId: string;
   animState: AnimState;
 }
-
-const VISIBLE_COUNT = 4;
-const GUEST_VOTE_LIMIT = 5;
 
 const ANGEL_PHRASES = [
   "Bless you, child!",
@@ -89,7 +101,7 @@ export default function Vote() {
   // Computed on every render — reads localStorage directly, impossible to be stale
   const guestCountRaw = localStorage.getItem("guestSwipeCount");
   const guestCountNum = parseInt(guestCountRaw || "0", 10);
-  const guestAtLimit = !user && guestCountNum >= GUEST_VOTE_LIMIT;
+  const guestAtLimit = isGuestAtLimit(user, guestCountNum);
   // Ref stays in sync every render so useCallback closures always read the latest value
   const guestAtLimitRef = useRef(guestAtLimit);
   guestAtLimitRef.current = guestAtLimit;
@@ -102,7 +114,6 @@ export default function Vote() {
   const [showDonationPopup, setShowDonationPopup] = useState(false);
 
   // Hide-downvoted toggle — hides posts below -5 votes (default ON, persisted in localStorage)
-  const DOWNVOTE_THRESHOLD = -5;
   const [hideDownvoted, setHideDownvoted] = useState<boolean>(() => {
     const stored = localStorage.getItem("hideDownvoted");
     return stored === null ? true : stored === "true";
@@ -203,10 +214,13 @@ export default function Vote() {
   // The no-arg form reads localStorage and is only used in the useState
   // initializer (before React state is available).
   const getCooldownKey = (currentUser?: string | null) => {
-    const identity = currentUser !== undefined
-      ? (currentUser || guestVoterId.current)
-      : (localStorage.getItem("fm_username") || guestVoterId.current);
-    return `voteCooldownEnd_${identity}`;
+    if (currentUser !== undefined) {
+      return getCooldownStorageKey(currentUser, guestVoterId.current);
+    }
+    return getCooldownStorageKey(
+      undefined,
+      localStorage.getItem("fm_username") || guestVoterId.current
+    );
   };
   const [cooldownEnd, setCooldownEnd] = useState<number | null>(() => {
     const key = getCooldownKey();
@@ -225,7 +239,7 @@ export default function Vote() {
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
-    const base = hideDownvoted ? posts.filter(p => (p.votes ?? 0) >= DOWNVOTE_THRESHOLD) : posts;
+    const base = filterByDownvoteThreshold(posts, hideDownvoted);
     const sorted = [...base];
     switch (sortOption) {
       case "top":
@@ -260,7 +274,7 @@ export default function Vote() {
 
   // Mobile Comments tab: sort posts by mobileFilter (independent of desktop sortOption)
   const mobileFilteredPosts = useMemo(() => {
-    const base = hideDownvoted ? posts.filter(p => (p.votes ?? 0) >= DOWNVOTE_THRESHOLD) : posts;
+    const base = filterByDownvoteThreshold(posts, hideDownvoted);
     const sorted = [...base];
     switch (mobileFilter) {
       case "top":
@@ -300,31 +314,13 @@ export default function Vote() {
   // have been shown once, return null so the cooldown timer kicks in.
   const getNextPost = useCallback(
     (currentVisibleIds: Set<string>): Post | null => {
-      const votes = userVotesRef.current;
-
-      // Phase 1: unvoted, not yet shown this cycle, not currently visible
-      for (const post of sortedPosts) {
-        const pid = String(post.id);
-        if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && !votes[pid]) {
-          return post;
-        }
-      }
-
-      // Phase 2: unvoted, not currently visible (cycle reset for unvoted batch)
-      const anyUnvotedAvailable = sortedPosts.some(
-        (p) => !currentVisibleIds.has(String(p.id)) && !votes[String(p.id)]
+      return getNextUnvotedPost(
+        sortedPosts,
+        currentVisibleIds,
+        shownPostIds.current,
+        userVotesRef.current,
+        user
       );
-      if (anyUnvotedAvailable) {
-        for (const post of sortedPosts) {
-          const pid = String(post.id);
-          if (!currentVisibleIds.has(pid) && !votes[pid]) {
-            return post;
-          }
-        }
-      }
-
-      // All unvoted posts exhausted
-      return null;
     },
     [sortedPosts]
   );
@@ -356,18 +352,19 @@ export default function Vote() {
       return;
     }
 
-    const currentSorted = sortedPostsRef.current;
-    const votes = userVotesRef.current;
+    const { slots, swipePostId } = getInitialSlots(
+      sortedPostsRef.current,
+      userVotesRef.current,
+      VISIBLE_COUNT,
+      user,
+      sortOption
+    );
 
     if (sortOption === "swipe") {
       setVisibleSlots([]);
-      // First unvoted non-own post
-      const firstPost =
-        currentSorted.find((p) => p.username !== user && !votes[String(p.id)]);
-      if (firstPost) {
-        const firstPid = String(firstPost.id);
-        setSwipeCurrentPostId(firstPid);
-        shownPostIds.current.add(firstPid);
+      if (swipePostId) {
+        setSwipeCurrentPostId(swipePostId);
+        shownPostIds.current.add(swipePostId);
         saveShownPostIds();
       } else {
         setSwipeCurrentPostId(null);
@@ -383,17 +380,9 @@ export default function Vote() {
     setSwipeEmoji(null);
     swipeExitDirectionRef.current = null;
 
-    // Prefer unvoted posts for initial slots; fill remaining with voted posts
-    const unvoted = currentSorted.filter((p) => !votes[String(p.id)]);
-    const voted = currentSorted.filter((p) => !!votes[String(p.id)]);
-    const prioritized = [...unvoted, ...voted];
-    const initial = prioritized.slice(0, VISIBLE_COUNT).map((p) => ({
-      postId: String(p.id),
-      animState: "visible" as AnimState,
-    }));
-    initial.forEach((s) => shownPostIds.current.add(s.postId));
+    slots.forEach((s) => shownPostIds.current.add(s.postId));
     saveShownPostIds();
-    setVisibleSlots(initial);
+    setVisibleSlots(slots);
   }, [sortOption, user]);
 
   // === Load Posts ===
@@ -597,10 +586,7 @@ export default function Vote() {
     if (prevVote === direction) return;
 
     // Calculate correct delta: undo previous vote if changing direction
-    let delta = direction === "up" ? 1 : -1;
-    if (prevVote) {
-      delta = direction === "up" ? 2 : -2;
-    }
+    const delta = calculateVoteDelta(prevVote, direction);
 
     setPosts((prev) =>
       prev.map((p) => {
@@ -644,11 +630,7 @@ export default function Vote() {
     const allPosts = sortedPostsRef.current;
 
     // Find all unvoted posts (excluding own, respecting hide-downvoted toggle)
-    const shouldHide = hideDownvotedRef.current;
-    const unvoted = allPosts.filter(
-      (p) => !votes[String(p.id)] && p.username !== currentUser
-        && (!shouldHide || (p.votes ?? 0) >= DOWNVOTE_THRESHOLD)
-    );
+    const unvoted = getBulkVoteTargets(allPosts, votes, currentUser, hideDownvotedRef.current);
 
     // Build vote map and post ID list
     const newVotes: Record<string, "up" | "down"> = {};
@@ -735,39 +717,16 @@ export default function Vote() {
       return;
     }
     const currentPid = swipeCurrentPostIdRef.current;
-    const currentVisibleIds = new Set(currentPid ? [currentPid] : []);
-    const allPosts = sortedPostsRef.current;
-    const currentUser = user;
-    const votes = userVotesRef.current;
-    let nextPost: Post | null = null;
+    const { nextPost, shouldResetShown } = getNextSwipePost(
+      sortedPostsRef.current,
+      currentPid,
+      shownPostIds.current,
+      userVotesRef.current,
+      user
+    );
 
-    // Phase 1: unvoted, not yet shown this cycle, not own
-    for (const post of allPosts) {
-      const pid = String(post.id);
-      if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && !votes[pid] && post.username !== currentUser) {
-        nextPost = post;
-        break;
-      }
-    }
-
-    if (!nextPost) {
-      // Check if any unvoted posts exist at all (not counting current)
-      const anyUnvoted = allPosts.some(
-        (p) => !currentVisibleIds.has(String(p.id)) && !votes[String(p.id)] && p.username !== currentUser
-      );
-
-      if (anyUnvoted) {
-        // Phase 2: unvoted posts exist but all shown this cycle — reset and loop unvoted
-        shownPostIds.current = new Set();
-        for (const post of allPosts) {
-          const pid = String(post.id);
-          if (!currentVisibleIds.has(pid) && !votes[pid] && post.username !== currentUser) {
-            nextPost = post;
-            break;
-          }
-        }
-      }
-      // All posts exhausted — nextPost stays null so cooldown timer triggers
+    if (shouldResetShown) {
+      shownPostIds.current = new Set();
     }
 
     if (nextPost) {
@@ -905,13 +864,16 @@ export default function Vote() {
 
   // Detect exhaustion — mobile (swipeCurrentPostId null) or desktop (visibleSlots empty)
   useEffect(() => {
-    if (posts.length === 0 || showGuestLoginPrompt) return;
-    // Don't trigger until cards have been initialized at least once
-    if (!slotsInitialized.current) return;
-    const allExhausted =
-      (sortOption === "swipe" && !swipeCurrentPostId) ||
-      (sortOption !== "swipe" && visibleSlots.length === 0);
-    if (allExhausted && !cooldownEnd && !cooldownTriggered.current) {
+    if (shouldTriggerExhaustion(
+      sortOption,
+      swipeCurrentPostId,
+      visibleSlots.length,
+      slotsInitialized.current,
+      cooldownEnd,
+      cooldownTriggered.current,
+      posts.length,
+      showGuestLoginPrompt
+    )) {
       cooldownTriggered.current = true;
       voteStreakRef.current = { direction: "up", count: 0 };
       const end = Date.now() + COOLDOWN_SECONDS * 1000;
@@ -1007,10 +969,7 @@ export default function Vote() {
     }
 
     // Calculate correct delta: undo previous vote if changing direction
-    let delta = direction === "up" ? 1 : -1;
-    if (prevSwipeVote) {
-      delta = direction === "up" ? 2 : -2;
-    }
+    const delta = calculateVoteDelta(prevSwipeVote, direction);
     const newTotal = (post.votes ?? 0) + delta;
 
     // Optimistic update — use correctly computed delta so count matches server
@@ -1067,12 +1026,9 @@ export default function Vote() {
     }
 
     // Track consecutive same-direction votes and show streak popup at 10
-    if (voteStreakRef.current.direction === direction) {
-      voteStreakRef.current.count += 1;
-    } else {
-      voteStreakRef.current = { direction, count: 1 };
-    }
-    if (voteStreakRef.current.count === 10) {
+    const { newStreak, triggerPopup } = updateVoteStreak(voteStreakRef.current, direction);
+    voteStreakRef.current = newStreak;
+    if (triggerPopup) {
       setShowStreakPopup(direction);
     }
 
@@ -1103,12 +1059,9 @@ export default function Vote() {
     handleVoteOptimistic(pid, direction);
 
     // Track consecutive same-direction votes and show streak popup at 10 (desktop)
-    if (voteStreakRef.current.direction === direction) {
-      voteStreakRef.current.count += 1;
-    } else {
-      voteStreakRef.current = { direction, count: 1 };
-    }
-    if (voteStreakRef.current.count === 10) {
+    const { newStreak: desktopStreak, triggerPopup: desktopPopup } = updateVoteStreak(voteStreakRef.current, direction);
+    voteStreakRef.current = desktopStreak;
+    if (desktopPopup) {
       setShowStreakPopup(direction);
     }
 
