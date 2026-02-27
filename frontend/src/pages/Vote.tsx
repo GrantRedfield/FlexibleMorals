@@ -510,8 +510,18 @@ export default function Vote() {
     localStorage.setItem(storageKey, JSON.stringify(userVotes));
   }, [userVotes, user]);
 
-  // Voted count
-  const votedCount = Object.keys(userVotes).filter((k) => userVotes[k]).length;
+  // Voted count — use server-side userVotes for accuracy (localStorage can be wiped by cooldown)
+  const votedCount = useMemo(() => {
+    const voterId = user || guestVoterId.current;
+    let count = 0;
+    for (const post of posts) {
+      // Check server-side userVotes first, fall back to local state
+      if (post.userVotes?.[voterId] || userVotes[String(post.id)]) {
+        count++;
+      }
+    }
+    return count;
+  }, [posts, userVotes, user]);
   const totalCount = posts.length;
 
   // === Mobile: infinite scroll handler ===
