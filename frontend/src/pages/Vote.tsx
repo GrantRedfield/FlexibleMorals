@@ -610,6 +610,19 @@ export default function Vote() {
         );
       })
       .catch((err) => {
+        // Revert optimistic update — undo the delta we applied
+        setPosts((prev) =>
+          prev.map((p) => {
+            if (String(p.id) !== pid) return p;
+            return { ...p, votes: (p.votes ?? 0) - delta };
+          })
+        );
+        setUserVotes((prev) => {
+          const next = { ...prev };
+          if (prevVote) { next[pid] = prevVote; }
+          else { delete next[pid]; }
+          return next;
+        });
         // If server returns cooldown (429), activate it locally
         if (err?.response?.status === 429 && err?.response?.data?.cooldownEnd) {
           const serverEnd = err.response.data.cooldownEnd;
@@ -995,7 +1008,33 @@ export default function Vote() {
           )
         );
       })
-      .catch((err) => console.error("Vote failed:", err));
+      .catch((err) => {
+        // Revert optimistic update — undo the delta we applied
+        setPosts((prev) =>
+          prev.map((p) => {
+            if (String(p.id) !== currentPid) return p;
+            return { ...p, votes: (p.votes ?? 0) - delta };
+          })
+        );
+        setUserVotes((prev) => {
+          const next = { ...prev };
+          if (prevSwipeVote) { next[currentPid] = prevSwipeVote; }
+          else { delete next[currentPid]; }
+          return next;
+        });
+        userVotesRef.current = { ...userVotesRef.current };
+        if (prevSwipeVote) { userVotesRef.current[currentPid] = prevSwipeVote; }
+        else { delete userVotesRef.current[currentPid]; }
+        // If server returns cooldown (429), activate it locally
+        if (err?.response?.status === 429 && err?.response?.data?.cooldownEnd) {
+          const serverEnd = err.response.data.cooldownEnd;
+          setCooldownEnd(serverEnd);
+          setCooldownRemaining(Math.max(0, Math.ceil((serverEnd - Date.now()) / 1000)));
+          cooldownTriggered.current = true;
+          localStorage.setItem(getCooldownKey(user), String(serverEnd));
+        }
+        console.error("Vote failed:", err);
+      });
 
     // Guest limit: increment count and check BEFORE showing animations
     if (!user) {
