@@ -70,7 +70,7 @@
 
 .chat-message {
   position: relative;
-  padding: 4px 8px;
+  padding: 4px 26px 4px 8px;
   border-radius: 6px;
   background-color: rgba(212, 175, 55, 0.08);
   border: 1px solid rgba(209, 185, 123, 0.2);
@@ -624,7 +624,7 @@
   }
 
   .chat-box.chat-mobile-expanded .chat-message {
-    padding: 8px 12px;
+    padding: 8px 42px 8px 12px;
     max-width: 100%;
     min-width: 0;
   }
