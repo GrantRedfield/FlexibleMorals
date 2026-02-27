@@ -316,6 +316,7 @@ app.post("/posts/bulk-vote", async (req, res) => {
           new GetItemCommand({
             TableName: TABLE_NAME,
             Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
+            ConsistentRead: true,
           })
         );
         if (!getRes.Item) continue;
@@ -382,6 +383,7 @@ app.post("/posts/:id/vote", async (req, res) => {
       new GetItemCommand({
         TableName: TABLE_NAME,
         Key: marshall({ PK: `POST#${id}`, SK: "META#POST" }),
+        ConsistentRead: true,
       })
     );
 
