@@ -403,26 +403,14 @@ export default function Vote() {
         const data = await getPosts();
         setPosts(data);
 
-        // Merge server-side userVotes with localStorage (scoped per user)
-        // Skip merge after cooldown clears — lets user re-vote on everything
-        if (skipVoteMerge.current) {
-          skipVoteMerge.current = false;
-        } else {
-          const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
-          const savedVotes = localStorage.getItem(storageKey);
-          const localVotes: Record<string, "up" | "down" | null> = savedVotes ? JSON.parse(savedVotes) : {};
-          const merged = { ...localVotes };
-          // Merge server votes for logged-in users (by username) and guests (by guestVoterId).
-          // Server is the source of truth — it overrides stale localStorage values.
-          const serverVoterId = user || guestVoterId.current;
-          data.forEach((p: any) => {
-            const pid = String(p.id);
-            const serverVote = p.userVotes?.[serverVoterId];
-            if (serverVote) {
-              merged[pid] = serverVote;
-            }
-          });
-          setUserVotes(merged);
+        // Load vote state from localStorage only — never from server.
+        // This allows users to re-vote on everything after cooldown expires
+        // (cooldown clears localStorage votes, so all posts appear unvoted).
+        const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+        const savedVotes = localStorage.getItem(storageKey);
+        if (savedVotes) {
+          const localVotes: Record<string, "up" | "down" | null> = JSON.parse(savedVotes);
+          setUserVotes(localVotes);
         }
 
         // Fetch comment counts for all posts
@@ -480,30 +468,15 @@ export default function Vote() {
     [posts]
   );
 
-  // Re-load votes from localStorage + server when user changes (e.g. login after page load)
+  // Re-load votes from localStorage when user changes (e.g. login after page load)
   useEffect(() => {
     if (posts.length === 0) return;
-    // Skip merge after cooldown clears — lets user re-vote on everything
-    if (skipVoteMerge.current) return;
     const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
     const saved = localStorage.getItem(storageKey);
     const fromStorage: Record<string, "up" | "down" | null> = saved ? JSON.parse(saved) : {};
-    const fromServer: Record<string, "up" | "down" | null> = {};
-    // Merge server votes for both logged-in users (by username) and guests (by guestVoterId)
-    const serverVoterId = user || guestVoterId.current;
-    posts.forEach((p: any) => {
-      const pid = String(p.id);
-      const serverVote = p.userVotes?.[serverVoterId];
-      if (serverVote) {
-        fromServer[pid] = serverVote;
-      }
-    });
-    // Merge with current state to preserve optimistic votes
-    // Priority: server > localStorage > existing React state
     setUserVotes((current) => ({
       ...current,
       ...fromStorage,
-      ...fromServer,
     }));
   }, [user, posts]);
 
@@ -836,8 +809,6 @@ export default function Vote() {
 
   // === Cooldown timer: start when all commandments exhausted ===
   const cooldownTriggered = useRef(false);
-  // After cooldown expires, skip merging server votes so the user can re-vote on everything
-  const skipVoteMerge = useRef(false);
   const slotsInitialized = useRef(false);
   const prevUserRef = useRef(user);
 
@@ -879,7 +850,6 @@ export default function Vote() {
       slotsInitialized.current = false;
       resetShownPostIds();
       // Clear local vote memory so all posts appear unvoted (server still has the votes)
-      skipVoteMerge.current = true;
       setUserVotes({});
       userVotesRef.current = {};
       const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
@@ -978,8 +948,8 @@ export default function Vote() {
         resetShownPostIds();
         voteStreakRef.current = { direction: "up", count: 0 };
         cooldownTriggered.current = false;
+        slotsInitialized.current = false; // Prevent exhaustion detector from firing before cards load
         // Clear local vote memory so all posts appear unvoted — lets user re-vote on everything
-        skipVoteMerge.current = true;
         setUserVotes({});
         userVotesRef.current = {};
         const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
