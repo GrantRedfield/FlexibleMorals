@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { getPosts, voteOnPost, bulkVoteOnPosts, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown } from "../utils/api";
+import { getPosts, voteOnPost, bulkVoteOnPosts, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown, clearUserVotes } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -933,6 +933,9 @@ export default function Vote() {
         userVotesRef.current = {};
         const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
         localStorage.removeItem(storageKey);
+        // Clear server-side votes so re-voting actually changes counts
+        const voterId = user || guestVoterId.current;
+        clearUserVotes(voterId).catch(() => {});
         // Re-fetch posts from server to discover new commandments added during cooldown
         setPostsRefreshTrigger((t) => t + 1);
         setShuffleTrigger((t) => t + 1);

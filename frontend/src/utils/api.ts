@@ -40,6 +40,11 @@ export const setVoteCooldown = async (userId: string) => {
   return res.data;
 };
 
+export const clearUserVotes = async (userId: string) => {
+  const res = await axios.post(`${API_BASE}/api/clear-user-votes`, { userId });
+  return res.data;
+};
+
 // === Donor API ===
 
 export const getDonorStatus = async (username: string) => {

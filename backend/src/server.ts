@@ -162,6 +162,55 @@ app.post("/api/vote-cooldown", async (req, res) => {
   }
 });
 
+// POST /api/clear-user-votes — clear a user's votes from all posts after cooldown expiry
+// This undoes their vote counts so they can re-vote fresh after cooldown
+app.post("/api/clear-user-votes", async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  try {
+    // Only allow if no active cooldown (prevents abuse during cooldown)
+    const activeCooldown = await getVoteCooldown(userId);
+    if (activeCooldown) {
+      return res.status(403).json({ error: "Cooldown still active", cooldownEnd: activeCooldown });
+    }
+
+    const posts = await getAllPosts();
+    let cleared = 0;
+
+    for (const post of posts) {
+      const userVotes = post.userVotes || {};
+      const previousVote = userVotes[userId];
+      if (!previousVote) continue;
+
+      // Undo the vote count
+      const delta = previousVote === "up" ? -1 : 1;
+      const newVotes = Number(post.votes ?? 0) + delta;
+
+      // Remove user from userVotes map
+      delete userVotes[userId];
+
+      const pk = post.PK || `POST#${post.id}`;
+      const sk = post.SK || "META#POST";
+
+      await client.send(
+        new UpdateItemCommand({
+          TableName: TABLE_NAME,
+          Key: marshall({ PK: pk, SK: sk }),
+          UpdateExpression: "SET votes = :v, userVotes = :u",
+          ExpressionAttributeValues: marshall({ ":v": newVotes, ":u": userVotes }),
+        })
+      );
+      cleared++;
+    }
+
+    console.log(`🗑️ Cleared ${cleared} votes for user ${userId} after cooldown`);
+    res.json({ cleared });
+  } catch (err) {
+    console.error("❌ Clear user votes failed:", err);
+    res.status(500).json({ error: "Failed to clear votes" });
+  }
+});
+
 const DAILY_SUBMISSION_LIMIT = 1;
 
 // === Helper: Get how many commandments a user has submitted today ===
