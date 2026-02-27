@@ -222,14 +222,15 @@ describe("calculateVoteDelta", () => {
 /*  filterByDownvoteThreshold                                          */
 /* ================================================================== */
 describe("filterByDownvoteThreshold", () => {
-  it("hideDownvoted ON, threshold -5: filters posts below -5", () => {
+  it("hideDownvoted ON, threshold -5: filters posts at or below -5", () => {
     const posts = [
       makePost("p1", { votes: -6 }),
       makePost("p2", { votes: 0 }),
       makePost("p3", { votes: -5 }),
+      makePost("p4", { votes: -4 }),
     ];
     const result = filterByDownvoteThreshold(posts, true, -5);
-    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+    expect(result.map((p) => p.id)).toEqual(["p2", "p4"]);
   });
 
   it("hideDownvoted OFF: returns all posts unchanged", () => {
@@ -241,10 +242,10 @@ describe("filterByDownvoteThreshold", () => {
     expect(result).toEqual(posts);
   });
 
-  it("post at exactly threshold is kept", () => {
+  it("post at exactly threshold is filtered (threshold is exclusive)", () => {
     const posts = [makePost("p1", { votes: -5 })];
     const result = filterByDownvoteThreshold(posts, true, -5);
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(0);
   });
 
   it("post at threshold - 1 is filtered", () => {
@@ -277,9 +278,10 @@ describe("filterByDownvoteThreshold", () => {
     const posts = [
       makePost("p1", { votes: DOWNVOTE_THRESHOLD }),
       makePost("p2", { votes: DOWNVOTE_THRESHOLD - 1 }),
+      makePost("p3", { votes: DOWNVOTE_THRESHOLD + 1 }),
     ];
     const result = filterByDownvoteThreshold(posts, true);
-    expect(result.map((p) => p.id)).toEqual(["p1"]);
+    expect(result.map((p) => p.id)).toEqual(["p3"]);
   });
 
   it("posts with undefined votes treated as 0", () => {

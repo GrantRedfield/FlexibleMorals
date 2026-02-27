@@ -154,7 +154,7 @@ export function filterByDownvoteThreshold(
   threshold: number = DOWNVOTE_THRESHOLD
 ): Post[] {
   if (!hideDownvoted) return posts;
-  return posts.filter((p) => (p.votes ?? 0) >= threshold);
+  return posts.filter((p) => (p.votes ?? 0) > threshold);
 }
 
 /**
@@ -173,7 +173,7 @@ export function getBulkVoteTargets(
     (p) =>
       !userVotes[String(p.id)] &&
       p.username !== currentUser &&
-      (!hideDownvoted || (p.votes ?? 0) >= threshold)
+      (!hideDownvoted || (p.votes ?? 0) > threshold)
   );
 }
 
