@@ -332,12 +332,11 @@ export default function DonationPopup({ isOpen, onClose }: DonationPopupProps) {
           marginBottom: isMobile ? "0.4rem" : "1rem",
         }}>
           <p style={{ color: "#e0d8c8", fontSize: isMobile ? "0.78rem" : "0.9rem", lineHeight: isMobile ? 1.4 : 1.6, margin: isMobile ? "0 0 3px 0" : "0 0 8px 0" }}>
-            Flexible Morals is built and maintained by a <span style={{ color: "#d4af37", fontWeight: 600 }}>single developer</span> with
-            a dream of building the world's first crowd-sourced religion. Your offering helps keep the servers running and
-            funds new features for our growing congregation.
+            Our goal is <span style={{ color: "#d4af37", fontWeight: 600 }}>not to make a profit</span>.
+            Every cent goes directly toward promoting this movement across the world — server costs, outreach, and spreading the word. Nothing else.
           </p>
           <p style={{ color: "#c0b89a", fontSize: isMobile ? "0.72rem" : "0.8rem", margin: 0, fontStyle: "italic" }}>
-            Every dollar makes a difference. Thank you for believing.
+            Your offering fuels a global movement. Thank you for believing.
           </p>
         </div>
 

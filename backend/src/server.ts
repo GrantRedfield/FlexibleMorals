@@ -162,7 +162,7 @@ app.post("/api/vote-cooldown", async (req, res) => {
   }
 });
 
-const DAILY_SUBMISSION_LIMIT = 15;
+const DAILY_SUBMISSION_LIMIT = 1;
 
 // === Helper: Get how many commandments a user has submitted today ===
 const getSubmissionCount = async (authorId: string): Promise<number> => {
@@ -202,7 +202,7 @@ app.post("/posts", async (req, res) => {
     // Check daily submission limit
     const submissionCount = await getSubmissionCount(authorId);
     if (submissionCount >= DAILY_SUBMISSION_LIMIT) {
-      return res.status(429).json({ error: `You can only submit ${DAILY_SUBMISSION_LIMIT} commandments per day` });
+      return res.status(429).json({ error: "You can only submit 1 commandment per day" });
     }
 
     const newId = Date.now().toString();
@@ -335,11 +335,20 @@ app.post("/posts/:id/vote", async (req, res) => {
     let votes = Number(post.votes ?? 0);
     let userVotes = post.userVotes || {};
 
-    let newVoteState = direction;
+    const previousVote = userVotes[userId];
+
+    // Already voted the same direction — no-op
+    if (previousVote === direction) {
+      return res.json({ id, votes, userVotes });
+    }
+
+    // Undo previous vote if changing direction
+    if (previousVote) {
+      votes += previousVote === "up" ? -1 : 1;
+    }
 
     votes += direction === "up" ? 1 : -1;
-
-    userVotes[userId] = newVoteState;
+    userVotes[userId] = direction;
 
     await client.send(
       new UpdateItemCommand({

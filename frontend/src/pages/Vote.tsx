@@ -80,6 +80,7 @@ export default function Vote() {
   const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>({});
   const [sortOption, setSortOption] = useState<SortOption>("random");
   const [shuffleTrigger, setShuffleTrigger] = useState(0);
+  const [postsRefreshTrigger, setPostsRefreshTrigger] = useState(0);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [visibleSlots, setVisibleSlots] = useState<VisibleSlot[]>([]);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -99,6 +100,22 @@ export default function Vote() {
   const [showMerchPopup, setShowMerchPopup] = useState(false);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
+
+  // Hide-downvoted toggle — hides posts below -5 votes (default ON, persisted in localStorage)
+  const DOWNVOTE_THRESHOLD = -5;
+  const [hideDownvoted, setHideDownvoted] = useState<boolean>(() => {
+    const stored = localStorage.getItem("hideDownvoted");
+    return stored === null ? true : stored === "true";
+  });
+  const hideDownvotedRef = useRef(hideDownvoted);
+  useEffect(() => { hideDownvotedRef.current = hideDownvoted; }, [hideDownvoted]);
+  const toggleHideDownvoted = useCallback(() => {
+    setHideDownvoted(prev => {
+      const next = !prev;
+      localStorage.setItem("hideDownvoted", String(next));
+      return next;
+    });
+  }, []);
 
   // Mobile tab state
   const [mobileTab, setMobileTab] = useState<MobileTab>("swipe");
@@ -208,7 +225,8 @@ export default function Vote() {
 
   // Sorting logic
   const sortedPosts = useMemo(() => {
-    const sorted = [...posts];
+    const base = hideDownvoted ? posts.filter(p => (p.votes ?? 0) >= DOWNVOTE_THRESHOLD) : posts;
+    const sorted = [...base];
     switch (sortOption) {
       case "top":
         return sorted.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
@@ -238,11 +256,12 @@ export default function Vote() {
       default:
         return sorted;
     }
-  }, [posts, sortOption, shuffleTrigger]);
+  }, [posts, sortOption, shuffleTrigger, hideDownvoted]);
 
   // Mobile Comments tab: sort posts by mobileFilter (independent of desktop sortOption)
   const mobileFilteredPosts = useMemo(() => {
-    const sorted = [...posts];
+    const base = hideDownvoted ? posts.filter(p => (p.votes ?? 0) >= DOWNVOTE_THRESHOLD) : posts;
+    const sorted = [...base];
     switch (mobileFilter) {
       case "top":
         return sorted.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
@@ -268,7 +287,7 @@ export default function Vote() {
       default:
         return sorted;
     }
-  }, [posts, mobileFilter, shuffleTrigger]);
+  }, [posts, mobileFilter, shuffleTrigger, hideDownvoted]);
 
   // Mobile Comments tab: slice for infinite scroll
   const mobileVisiblePosts = useMemo(
@@ -304,15 +323,7 @@ export default function Vote() {
         }
       }
 
-      // Phase 3: all unvoted exhausted — voted posts not yet shown this cycle
-      for (const post of sortedPosts) {
-        const pid = String(post.id);
-        if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid)) {
-          return post;
-        }
-      }
-
-      // All posts shown — return null so cooldown timer triggers
+      // All unvoted posts exhausted
       return null;
     },
     [sortedPosts]
@@ -350,10 +361,9 @@ export default function Vote() {
 
     if (sortOption === "swipe") {
       setVisibleSlots([]);
-      // Prefer first unvoted non-own post; fall back to any non-own post
+      // First unvoted non-own post
       const firstPost =
-        currentSorted.find((p) => p.username !== user && !votes[String(p.id)]) ||
-        currentSorted.find((p) => p.username !== user);
+        currentSorted.find((p) => p.username !== user && !votes[String(p.id)]);
       if (firstPost) {
         const firstPid = String(firstPost.id);
         setSwipeCurrentPostId(firstPid);
@@ -394,21 +404,26 @@ export default function Vote() {
         setPosts(data);
 
         // Merge server-side userVotes with localStorage (scoped per user)
-        const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
-        const savedVotes = localStorage.getItem(storageKey);
-        const localVotes: Record<string, "up" | "down" | null> = savedVotes ? JSON.parse(savedVotes) : {};
-        const merged = { ...localVotes };
-        // Merge server votes for logged-in users (by username) and guests (by guestVoterId).
-        // Server is the source of truth — it overrides stale localStorage values.
-        const serverVoterId = user || guestVoterId.current;
-        data.forEach((p: any) => {
-          const pid = String(p.id);
-          const serverVote = p.userVotes?.[serverVoterId];
-          if (serverVote) {
-            merged[pid] = serverVote;
-          }
-        });
-        setUserVotes(merged);
+        // Skip merge after cooldown clears — lets user re-vote on everything
+        if (skipVoteMerge.current) {
+          skipVoteMerge.current = false;
+        } else {
+          const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+          const savedVotes = localStorage.getItem(storageKey);
+          const localVotes: Record<string, "up" | "down" | null> = savedVotes ? JSON.parse(savedVotes) : {};
+          const merged = { ...localVotes };
+          // Merge server votes for logged-in users (by username) and guests (by guestVoterId).
+          // Server is the source of truth — it overrides stale localStorage values.
+          const serverVoterId = user || guestVoterId.current;
+          data.forEach((p: any) => {
+            const pid = String(p.id);
+            const serverVote = p.userVotes?.[serverVoterId];
+            if (serverVote) {
+              merged[pid] = serverVote;
+            }
+          });
+          setUserVotes(merged);
+        }
 
         // Fetch comment counts for all posts
         const counts: Record<string, number> = {};
@@ -431,7 +446,7 @@ export default function Vote() {
       }
     };
     load();
-  }, [user]);
+  }, [user, postsRefreshTrigger]);
 
   // Load donor statuses for displayed posts
   useEffect(() => {
@@ -468,6 +483,8 @@ export default function Vote() {
   // Re-load votes from localStorage + server when user changes (e.g. login after page load)
   useEffect(() => {
     if (posts.length === 0) return;
+    // Skip merge after cooldown clears — lets user re-vote on everything
+    if (skipVoteMerge.current) return;
     const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
     const saved = localStorage.getItem(storageKey);
     const fromStorage: Record<string, "up" | "down" | null> = saved ? JSON.parse(saved) : {};
@@ -509,6 +526,14 @@ export default function Vote() {
       initializeSlots();
     }
   }, [postsLoaded, sortOption, shuffleTrigger, guestAtLimit]);
+
+  // Re-initialize slots when hideDownvoted toggle changes
+  useEffect(() => {
+    if (postsLoaded) {
+      resetShownPostIds();
+      setTimeout(() => initializeSlots(), 50);
+    }
+  }, [hideDownvoted]);
 
   // Mobile: initialize swipe mode on first load
   useEffect(() => {
@@ -595,12 +620,19 @@ export default function Vote() {
     const pid = String(postId);
     const prevVote = userVotes[pid];
 
+    // Already voted the same direction — no-op
+    if (prevVote === direction) return;
+
+    // Calculate correct delta: undo previous vote if changing direction
+    let delta = direction === "up" ? 1 : -1;
+    if (prevVote) {
+      delta = direction === "up" ? 2 : -2;
+    }
+
     setPosts((prev) =>
       prev.map((p) => {
         if (String(p.id) !== pid) return p;
-        const current = p.votes ?? 0;
-        const newVotes = current + (direction === "up" ? 1 : -1);
-        return { ...p, votes: newVotes };
+        return { ...p, votes: (p.votes ?? 0) + delta };
       })
     );
 
@@ -638,9 +670,11 @@ export default function Vote() {
     const votes = userVotesRef.current;
     const allPosts = sortedPostsRef.current;
 
-    // Find all unvoted posts (excluding own)
+    // Find all unvoted posts (excluding own, respecting hide-downvoted toggle)
+    const shouldHide = hideDownvotedRef.current;
     const unvoted = allPosts.filter(
       (p) => !votes[String(p.id)] && p.username !== currentUser
+        && (!shouldHide || (p.votes ?? 0) >= DOWNVOTE_THRESHOLD)
     );
 
     // Build vote map and post ID list
@@ -759,17 +793,8 @@ export default function Vote() {
             break;
           }
         }
-      } else {
-        // Phase 3: all unvoted exhausted — show voted posts not yet shown this cycle
-        for (const post of allPosts) {
-          const pid = String(post.id);
-          if (!currentVisibleIds.has(pid) && !shownPostIds.current.has(pid) && post.username !== currentUser) {
-            nextPost = post;
-            break;
-          }
-        }
-        // All posts shown — nextPost stays null so cooldown timer triggers
       }
+      // All posts exhausted — nextPost stays null so cooldown timer triggers
     }
 
     if (nextPost) {
@@ -811,6 +836,8 @@ export default function Vote() {
 
   // === Cooldown timer: start when all commandments exhausted ===
   const cooldownTriggered = useRef(false);
+  // After cooldown expires, skip merging server votes so the user can re-vote on everything
+  const skipVoteMerge = useRef(false);
   const slotsInitialized = useRef(false);
   const prevUserRef = useRef(user);
 
@@ -844,13 +871,19 @@ export default function Vote() {
       localStorage.setItem(getCooldownKey(user), String(end));
     };
 
-    // Helper to clear cooldown and re-init
+    // Helper to clear cooldown and re-init — wipes local vote memory so user can re-vote
     const clearAndReinit = () => {
       setCooldownEnd(null);
       setCooldownRemaining(0);
       cooldownTriggered.current = false;
       slotsInitialized.current = false;
       resetShownPostIds();
+      // Clear local vote memory so all posts appear unvoted (server still has the votes)
+      skipVoteMerge.current = true;
+      setUserVotes({});
+      userVotesRef.current = {};
+      const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+      localStorage.removeItem(storageKey);
       setShuffleTrigger((t) => t + 1);
     };
 
@@ -910,6 +943,7 @@ export default function Vote() {
       (sortOption !== "swipe" && visibleSlots.length === 0);
     if (allExhausted && !cooldownEnd && !cooldownTriggered.current) {
       cooldownTriggered.current = true;
+      voteStreakRef.current = { direction: "up", count: 0 };
       const end = Date.now() + COOLDOWN_SECONDS * 1000;
       setCooldownEnd(end);
       setCooldownRemaining(COOLDOWN_SECONDS);
@@ -940,16 +974,19 @@ export default function Vote() {
         // Reset cooldown and re-enable voting
         setCooldownEnd(null);
         cooldownEndRef.current = null; // Clear ref immediately so initializeSlots doesn't bail out
-        // NOTE: keep cooldownTriggered true until AFTER initializeSlots sets a new card,
-        // otherwise the exhaustion detection re-triggers a new cooldown immediately
         localStorage.removeItem(getCooldownKey(user));
         resetShownPostIds();
+        voteStreakRef.current = { direction: "up", count: 0 };
+        cooldownTriggered.current = false;
+        // Clear local vote memory so all posts appear unvoted — lets user re-vote on everything
+        skipVoteMerge.current = true;
+        setUserVotes({});
+        userVotesRef.current = {};
+        const storageKey = user ? `userVotes_${user}` : "userVotes_guest";
+        localStorage.removeItem(storageKey);
+        // Re-fetch posts from server to discover new commandments added during cooldown
+        setPostsRefreshTrigger((t) => t + 1);
         setShuffleTrigger((t) => t + 1);
-        // Re-initialize slots so cards/swipe start fresh, then allow future cooldowns
-        setTimeout(() => {
-          if (!guestAtLimitRef.current) initializeSlots();
-          cooldownTriggered.current = false;
-        }, 50);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -992,7 +1029,18 @@ export default function Vote() {
     const post = posts.find((p) => String(p.id) === currentPid);
     if (!post) return;
 
-    const delta = direction === "up" ? 1 : -1;
+    // Already voted the same direction on this post — skip
+    const prevSwipeVote = userVotesRef.current[currentPid];
+    if (prevSwipeVote === direction) {
+      advanceSwipeCard();
+      return;
+    }
+
+    // Calculate correct delta: undo previous vote if changing direction
+    let delta = direction === "up" ? 1 : -1;
+    if (prevSwipeVote) {
+      delta = direction === "up" ? 2 : -2;
+    }
     const newTotal = (post.votes ?? 0) + delta;
 
     // Optimistic update — use correctly computed delta so count matches server
@@ -1292,34 +1340,116 @@ export default function Vote() {
               onMerchClick={() => setShowMerchPopup(true)}
               onCharterClick={() => setShowInfoPopup(true)}
             />
-            {/* Mobile Home Button — fixed top-right */}
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                position: "fixed",
-                top: "0.5rem",
-                right: "0.5rem",
-                zIndex: 1000,
-                backgroundColor: "rgba(20, 15, 5, 0.85)",
-                border: "2px solid #d4af37",
-                borderRadius: "7px",
-                padding: "12px 13px",
-                boxShadow: "0 0 8px rgba(212, 175, 55, 0.2)",
-                color: "#d4af37",
-                fontFamily: "'Cinzel', serif",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-                letterSpacing: "0.06em",
-                minWidth: "50px",
-                minHeight: "50px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              Home
-            </button>
+            {/* Mobile top-right: Hide-downvoted toggle + Home button */}
+            <div style={{
+              position: "fixed",
+              top: "0.5rem",
+              right: "0.5rem",
+              zIndex: 1000,
+              display: "flex",
+              gap: "6px",
+              alignItems: "center",
+            }}>
+              {(mobileTab === "swipe" || mobileTab === "comments") && (
+                <div
+                  onClick={toggleHideDownvoted}
+                  style={{
+                    backgroundColor: "rgba(20, 15, 5, 0.85)",
+                    border: "2px solid rgba(212, 175, 55, 0.3)",
+                    borderRadius: "7px",
+                    padding: "4px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "2px",
+                    cursor: "pointer",
+                    minHeight: "50px",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{
+                      color: hideDownvoted ? "#888" : "#d4af37",
+                      fontFamily: "'Cinzel', serif",
+                      fontWeight: 700,
+                      fontSize: "0.5rem",
+                      letterSpacing: "0.02em",
+                      whiteSpace: "nowrap",
+                      transition: "color 0.2s ease",
+                    }}>
+                      Show
+                    </span>
+                    <div style={{
+                      width: "32px",
+                      height: "18px",
+                      borderRadius: "9px",
+                      backgroundColor: hideDownvoted ? "rgba(100, 80, 40, 0.5)" : "#b79b3d",
+                      border: `1.5px solid ${hideDownvoted ? "#555" : "#d4af37"}`,
+                      position: "relative",
+                      transition: "all 0.25s ease",
+                      flexShrink: 0,
+                    }}>
+                      <div style={{
+                        width: "12px",
+                        height: "12px",
+                        borderRadius: "50%",
+                        backgroundColor: hideDownvoted ? "#888" : "#fdf8e6",
+                        position: "absolute",
+                        top: "2px",
+                        left: hideDownvoted ? "2px" : "16px",
+                        transition: "all 0.25s ease",
+                        boxShadow: hideDownvoted ? "none" : "0 0 6px rgba(212, 175, 55, 0.4)",
+                      }} />
+                    </div>
+                    <span style={{
+                      color: hideDownvoted ? "#d4af37" : "#888",
+                      fontFamily: "'Cinzel', serif",
+                      fontWeight: 700,
+                      fontSize: "0.5rem",
+                      letterSpacing: "0.02em",
+                      whiteSpace: "nowrap",
+                      transition: "color 0.2s ease",
+                    }}>
+                      Hide
+                    </span>
+                  </div>
+                  <span style={{
+                    color: "#c8b070",
+                    fontFamily: "'Cinzel', serif",
+                    fontWeight: 600,
+                    fontSize: "0.4rem",
+                    letterSpacing: "0.01em",
+                    whiteSpace: "nowrap",
+                    opacity: 0.7,
+                  }}>
+                    deplorable commandments
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => navigate("/")}
+                style={{
+                  backgroundColor: "rgba(20, 15, 5, 0.85)",
+                  border: "2px solid #d4af37",
+                  borderRadius: "7px",
+                  padding: "12px 13px",
+                  boxShadow: "0 0 8px rgba(212, 175, 55, 0.2)",
+                  color: "#d4af37",
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  letterSpacing: "0.06em",
+                  minWidth: "50px",
+                  minHeight: "50px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                Home
+              </button>
+            </div>
           </>
         ) : (
           <div style={{
@@ -1332,33 +1462,110 @@ export default function Vote() {
             <div className="login-inline-wrapper">
               <LoginButton />
             </div>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                backgroundColor: "transparent",
-                border: "2px solid #d4af37",
-                borderRadius: "8px",
-                padding: "10px 24px",
-                boxShadow: "0 0 10px rgba(212, 175, 55, 0.2)",
-                color: "#d4af37",
-                fontFamily: "'Cinzel', serif",
-                fontWeight: 700,
-                fontSize: "1.15rem",
-                cursor: "pointer",
-                letterSpacing: "0.06em",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
-                e.currentTarget.style.boxShadow = "0 0 16px rgba(212, 175, 55, 0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.boxShadow = "0 0 10px rgba(212, 175, 55, 0.2)";
-              }}
-            >
-              Home
-            </button>
+            <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+              <div
+                onClick={toggleHideDownvoted}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  cursor: "pointer",
+                  padding: "6px 14px",
+                  borderRadius: "8px",
+                  border: "2px solid rgba(212, 175, 55, 0.3)",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.08)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <span style={{
+                  color: hideDownvoted ? "#888" : "#d4af37",
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.03em",
+                  transition: "color 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}>
+                  Show
+                </span>
+                <div style={{
+                  width: "42px",
+                  height: "24px",
+                  borderRadius: "12px",
+                  backgroundColor: hideDownvoted ? "rgba(100, 80, 40, 0.5)" : "#b79b3d",
+                  border: `1.5px solid ${hideDownvoted ? "#555" : "#d4af37"}`,
+                  position: "relative",
+                  transition: "all 0.25s ease",
+                  flexShrink: 0,
+                }}>
+                  <div style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    backgroundColor: hideDownvoted ? "#888" : "#fdf8e6",
+                    position: "absolute",
+                    top: "2px",
+                    left: hideDownvoted ? "2px" : "20px",
+                    transition: "all 0.25s ease",
+                    boxShadow: hideDownvoted ? "none" : "0 0 8px rgba(212, 175, 55, 0.4)",
+                  }} />
+                </div>
+                <span style={{
+                  color: hideDownvoted ? "#d4af37" : "#888",
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.03em",
+                  transition: "color 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}>
+                  Hide
+                </span>
+                <span style={{
+                  color: "#c8b070",
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 600,
+                  fontSize: "0.7rem",
+                  letterSpacing: "0.02em",
+                  whiteSpace: "nowrap",
+                  opacity: 0.7,
+                }}>
+                  deplorable commandments
+                </span>
+              </div>
+              <button
+                onClick={() => navigate("/")}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "2px solid #d4af37",
+                  borderRadius: "8px",
+                  padding: "10px 24px",
+                  boxShadow: "0 0 10px rgba(212, 175, 55, 0.2)",
+                  color: "#d4af37",
+                  fontFamily: "'Cinzel', serif",
+                  fontWeight: 700,
+                  fontSize: "1.15rem",
+                  cursor: "pointer",
+                  letterSpacing: "0.06em",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.12)";
+                  e.currentTarget.style.boxShadow = "0 0 16px rgba(212, 175, 55, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.boxShadow = "0 0 10px rgba(212, 175, 55, 0.2)";
+                }}
+              >
+                Home
+              </button>
+            </div>
           </div>
         )}
 
@@ -1927,9 +2134,29 @@ export default function Vote() {
                           </p>
                         </>
                       ) : (
-                        <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                          Submit a new one or switch tabs.
-                        </p>
+                        <>
+                          <button
+                            onClick={() => setPostsRefreshTrigger(t => t + 1)}
+                            style={{
+                              fontFamily: "'Cinzel', serif",
+                              fontSize: "0.85rem",
+                              fontWeight: 700,
+                              color: "#d4af37",
+                              backgroundColor: "transparent",
+                              border: "2px solid #d4af37",
+                              borderRadius: "10px",
+                              padding: "10px 20px",
+                              cursor: "pointer",
+                              boxShadow: "0 0 10px rgba(212, 175, 55, 0.15)",
+                              marginBottom: "8px",
+                            }}
+                          >
+                            Check for new commandments
+                          </button>
+                          <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                            Or submit a new one or switch tabs.
+                          </p>
+                        </>
                       )}
                     </div>
                   )}
@@ -2352,9 +2579,29 @@ export default function Vote() {
                             </p>
                           </>
                         ) : (
-                          <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
-                            Switch to the Declare tab to submit a new one.
-                          </p>
+                          <>
+                            <button
+                              onClick={() => setPostsRefreshTrigger(t => t + 1)}
+                              style={{
+                                fontFamily: "'Cinzel', serif",
+                                fontSize: "0.95rem",
+                                fontWeight: 700,
+                                color: "#d4af37",
+                                backgroundColor: "transparent",
+                                border: "2px solid #d4af37",
+                                borderRadius: "10px",
+                                padding: "12px 24px",
+                                cursor: "pointer",
+                                boxShadow: "0 0 10px rgba(212, 175, 55, 0.15)",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              Check for new commandments
+                            </button>
+                            <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+                              Or switch to the Declare tab to submit a new one.
+                            </p>
+                          </>
                         )}
                       </div>
                     )}
@@ -2884,7 +3131,7 @@ export default function Vote() {
               lineHeight: 1.6,
               margin: "0 0 1.25rem 0",
             }}>
-              You may only inscribe 15 commandments per day. Return tomorrow to share new wisdom with the collective.
+              You may only inscribe 1 commandment per day. Return tomorrow to share new wisdom with the collective.
             </p>
             <button
               onClick={() => setShowLimitPopup(false)}
