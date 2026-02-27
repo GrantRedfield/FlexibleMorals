@@ -21,6 +21,7 @@ import {
   getCooldownStorageKey,
   isGuestAtLimit,
   getInitialSlots,
+  getVotedCount,
   VISIBLE_COUNT,
   GUEST_VOTE_LIMIT,
   DOWNVOTE_THRESHOLD,
@@ -511,17 +512,10 @@ export default function Vote() {
   }, [userVotes, user]);
 
   // Voted count — use server-side userVotes for accuracy (localStorage can be wiped by cooldown)
-  const votedCount = useMemo(() => {
-    const voterId = user || guestVoterId.current;
-    let count = 0;
-    for (const post of posts) {
-      // Check server-side userVotes first, fall back to local state
-      if (post.userVotes?.[voterId] || userVotes[String(post.id)]) {
-        count++;
-      }
-    }
-    return count;
-  }, [posts, userVotes, user]);
+  const votedCount = useMemo(
+    () => getVotedCount(posts, userVotes, user || guestVoterId.current),
+    [posts, userVotes, user]
+  );
   const totalCount = posts.length;
 
   // === Mobile: infinite scroll handler ===

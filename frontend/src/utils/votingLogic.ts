@@ -287,3 +287,47 @@ export function getInitialSlots(
   }));
   return { slots: initial, swipePostId: null };
 }
+
+/**
+ * Compute voted count using both server-side userVotes and local state.
+ * Server userVotes survive cooldown; local votes are wiped on cooldown expiry.
+ * This ensures the counter always shows the accurate total.
+ */
+export function getVotedCount(
+  posts: Post[],
+  localVotes: Record<string, VoteDirection | null>,
+  voterId: string
+): number {
+  let count = 0;
+  for (const post of posts) {
+    if (post.userVotes?.[voterId] || localVotes[String(post.id)]) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Compute the reverted vote state after a failed API call.
+ * Undoes the optimistic delta on the post's vote count and restores the
+ * previous vote direction in the local votes map.
+ */
+export function computeRevertedVoteState(
+  posts: Post[],
+  postId: string,
+  delta: number,
+  localVotes: Record<string, VoteDirection | null>,
+  previousVote: VoteDirection | null | undefined
+): { updatedPosts: Post[]; updatedVotes: Record<string, VoteDirection | null> } {
+  const updatedPosts = posts.map((p) => {
+    if (String(p.id) !== postId) return p;
+    return { ...p, votes: (p.votes ?? 0) - delta };
+  });
+  const updatedVotes = { ...localVotes };
+  if (previousVote) {
+    updatedVotes[postId] = previousVote;
+  } else {
+    delete updatedVotes[postId];
+  }
+  return { updatedPosts, updatedVotes };
+}
