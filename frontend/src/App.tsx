@@ -4,6 +4,7 @@ import Vote from "./pages/Vote";
 import Comments from "./pages/Comments";
 import About from "./pages/About";
 import DonorProfile from "./pages/DonorProfile";
+import Archive from "./pages/Archive";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
       <Route path="/vote" element={<Vote />} />
       <Route path="/comments/:postId" element={<Comments />} />
       <Route path="/about" element={<About />} />
+      <Route path="/archive" element={<Archive />} />
       <Route path="/donor" element={<DonorProfile />} />
     </Routes>
   );

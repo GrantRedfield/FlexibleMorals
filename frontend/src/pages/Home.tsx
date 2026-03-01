@@ -534,6 +534,13 @@ export default function Home() {
         </button>
       </div>
 
+      {/* ✅ "ARCHIVES" link */}
+      <div className="info-link-container" style={{ top: "11rem" }}>
+        <button onClick={() => navigate("/archive")} className="info-link">
+          ARCHIVES
+        </button>
+      </div>
+
       {/* ✅ Merch popup */}
       {showMerchPopup && (
         <div className="popup-overlay" onClick={() => setShowMerchPopup(false)}>

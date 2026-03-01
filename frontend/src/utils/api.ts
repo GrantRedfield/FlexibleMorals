@@ -45,6 +45,22 @@ export const clearUserVotes = async (userId: string) => {
   return res.data;
 };
 
+// === Archive API ===
+
+export const getArchivedPosts = async (month?: string) => {
+  const params: Record<string, any> = { _t: Date.now() };
+  if (month) params.month = month;
+  const res = await axios.get(`${API_BASE}/posts/archive`, { params });
+  return res.data;
+};
+
+export const getArchiveMonths = async () => {
+  const res = await axios.get(`${API_BASE}/posts/archive/months`, {
+    params: { _t: Date.now() },
+  });
+  return res.data;
+};
+
 // === Donor API ===
 
 export const getDonorStatus = async (username: string) => {

@@ -858,7 +858,7 @@ export default function Comments() {
           }}
         >
           <button
-            onClick={() => navigate(cameFrom === "home" ? "/" : "/vote")}
+            onClick={() => navigate(cameFrom === "home" ? "/" : cameFrom === "archive" ? "/archive" : "/vote")}
             style={{
               backgroundColor: "transparent",
               color: "#d4af37",
@@ -870,7 +870,7 @@ export default function Comments() {
               fontWeight: 600,
             }}
           >
-            {cameFrom === "home" ? "← Back to Home" : "← Back to Voting"}
+            {cameFrom === "home" ? "← Back to Home" : cameFrom === "archive" ? "← Back to Archives" : "← Back to Voting"}
           </button>
           {isMobile && (
             <div className="login-inline-wrapper">

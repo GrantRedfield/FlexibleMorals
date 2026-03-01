@@ -18,6 +18,7 @@ import stripeRoutes from "./routes/stripeRoutes.ts";
 import chatRoutes from "./routes/chatRoutes.ts";
 import commentRoutes from "./routes/commentRoutes.ts";
 import authRoutes from "./routes/authRoutes.js";
+import { runMonthlyResetIfNeeded } from "./lib/monthlyReset.ts";
 
 const app = express();
 
@@ -81,7 +82,8 @@ app.get("/posts", async (req, res) => {
   try {
     res.set("Cache-Control", "no-store");
     const posts = await getAllPosts();
-    const formatted = posts.map((p) => ({
+    const activePosts = posts.filter((p) => !p.archived);
+    const formatted = activePosts.map((p) => ({
       id: p.PK?.replace("POST#", ""),
       title: p.title ?? "",
       content: p.body ?? "",
@@ -94,6 +96,52 @@ app.get("/posts", async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching posts:", err);
     res.status(500).json({ error: "Failed to fetch posts." });
+  }
+});
+
+// === GET /posts/archive — archived posts, optionally filtered by month ===
+app.get("/posts/archive", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const month = req.query.month as string | undefined;
+    const posts = await getAllPosts();
+    let archived = posts.filter((p) => p.archived === true);
+
+    if (month) {
+      archived = archived.filter((p) => p.monthYear === month);
+    }
+
+    // Sort by votes descending
+    archived.sort((a, b) => Number(b.votes ?? 0) - Number(a.votes ?? 0));
+
+    const formatted = archived.map((p) => ({
+      id: p.PK?.replace("POST#", ""),
+      title: p.title ?? "",
+      content: p.body ?? "",
+      votes: Number(p.votes ?? p.score ?? 0),
+      username: p.authorId ?? "unknown",
+      createdAt: p.createdAt ?? null,
+      monthYear: p.monthYear ?? null,
+    }));
+    res.json(formatted);
+  } catch (err) {
+    console.error("❌ Error fetching archived posts:", err);
+    res.status(500).json({ error: "Failed to fetch archived posts." });
+  }
+});
+
+// === GET /posts/archive/months — list distinct archived months ===
+app.get("/posts/archive/months", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const posts = await getAllPosts();
+    const archived = posts.filter((p) => p.archived === true && p.monthYear);
+    const months = [...new Set(archived.map((p) => p.monthYear as string))];
+    months.sort((a, b) => b.localeCompare(a)); // Newest first
+    res.json(months);
+  } catch (err) {
+    console.error("❌ Error fetching archive months:", err);
+    res.status(500).json({ error: "Failed to fetch archive months." });
   }
 });
 
@@ -322,6 +370,10 @@ app.post("/posts/bulk-vote", async (req, res) => {
         if (!getRes.Item) continue;
 
         const post = unmarshall(getRes.Item);
+
+        // Skip archived posts
+        if (post.archived) continue;
+
         const userVotes = post.userVotes || {};
         const previousVote = userVotes[userId];
 
@@ -390,6 +442,12 @@ app.post("/posts/:id/vote", async (req, res) => {
     if (!getRes.Item) return res.status(404).json({ error: "Post not found" });
 
     const post = unmarshall(getRes.Item);
+
+    // Reject votes on archived posts
+    if (post.archived) {
+      return res.status(403).json({ error: "Cannot vote on archived posts" });
+    }
+
     let votes = Number(post.votes ?? 0);
     let userVotes = post.userVotes || {};
 
@@ -434,4 +492,9 @@ app.listen(PORT, () => {
   const cognitoEnabled = !!process.env.COGNITO_USER_POOL_ID && !!process.env.COGNITO_CLIENT_ID;
   console.log(`✅ FlexibleMorals backend running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
   console.log(`   Auth: ${cognitoEnabled ? "Amazon Cognito" : "Legacy JWT"}`);
+
+  // Run monthly reset on startup (archives old posts, seeds new commandments)
+  runMonthlyResetIfNeeded().catch((err) => {
+    console.error("❌ Monthly reset failed (server continues):", err);
+  });
 });
