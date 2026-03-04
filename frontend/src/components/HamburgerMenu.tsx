@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import DonorBadge from "./DonorBadge";
@@ -9,10 +8,10 @@ interface HamburgerMenuProps {
   onOfferingClick: () => void;
   onMerchClick: () => void;
   onCharterClick: () => void;
+  onVideosClick: () => void;
 }
 
-export default function HamburgerMenu({ onOfferingClick, onMerchClick, onCharterClick }: HamburgerMenuProps) {
-  const navigate = useNavigate();
+export default function HamburgerMenu({ onOfferingClick, onMerchClick, onCharterClick, onVideosClick }: HamburgerMenuProps) {
   const { user, logout, openLoginModal } = useAuth();
   const { getDonorStatus, loadDonorStatuses } = useDonor();
   const [isOpen, setIsOpen] = useState(false);
@@ -99,8 +98,8 @@ export default function HamburgerMenu({ onOfferingClick, onMerchClick, onCharter
           <button onClick={() => handleNav(onCharterClick)} className={`hamburger-nav-btn${!user ? " hamburger-nav-glow" : ""}`}>
             Our Charter
           </button>
-          <button onClick={() => handleNav(() => navigate("/archive"))} className="hamburger-nav-btn">
-            Archives
+          <button onClick={() => handleNav(onVideosClick)} className="hamburger-nav-btn">
+            Promotional Content
           </button>
         </nav>
       </div>

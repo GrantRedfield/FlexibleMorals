@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { getPosts, voteOnPost, bulkVoteOnPosts, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown, clearUserVotes } from "../utils/api";
+import { getPosts, voteOnPost, bulkVoteOnPosts, createPost, getComments, checkVoteCooldown, setVoteCooldown as apiSetVoteCooldown, clearUserVotes, getArchivedPosts } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useDonor } from "../context/DonorContext";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -10,6 +10,7 @@ import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import HamburgerMenu from "../components/HamburgerMenu";
 import DonationPopup from "../components/DonationPopup";
+import VideoPopup from "../components/VideoPopup";
 import {
   getNextUnvotedPost,
   getNextSwipePost,
@@ -113,6 +114,7 @@ export default function Vote() {
   const [showMerchPopup, setShowMerchPopup] = useState(false);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
+  const [showVideoPopup, setShowVideoPopup] = useState(false);
 
   // Hide-downvoted toggle — hides posts below -5 votes (default ON, persisted in localStorage)
   const [hideDownvoted, setHideDownvoted] = useState<boolean>(() => {
@@ -134,6 +136,11 @@ export default function Vote() {
   const [mobileFilter, setMobileFilter] = useState<MobileFilter>("top");
   const [mobileVisibleCount, setMobileVisibleCount] = useState(10);
   const mobileScrollRef = useRef<HTMLDivElement>(null);
+
+  // Time period filter for Comments tab (month = active only, year/all include archived)
+  const [timePeriod, setTimePeriod] = useState<"month" | "year" | "all">("month");
+  const [archivedPosts, setArchivedPosts] = useState<Post[]>([]);
+  const archivedFetchedRef = useRef(false);
 
   // Swipe mode state
   const [swipeResult, setSwipeResult] = useState<{ direction: "up" | "down"; delta: number; newTotal: number } | null>(null);
@@ -238,9 +245,37 @@ export default function Vote() {
     return 0;
   });
 
+  // Fetch archived posts when user switches to year/all time period
+  useEffect(() => {
+    if (timePeriod === "month" || archivedFetchedRef.current) return;
+    const fetchArchived = async () => {
+      try {
+        const data = await getArchivedPosts();
+        setArchivedPosts(Array.isArray(data) ? data : []);
+        archivedFetchedRef.current = true;
+      } catch (err) {
+        console.error("Failed to fetch archived posts:", err);
+      }
+    };
+    fetchArchived();
+  }, [timePeriod]);
+
+  // Combine active + archived posts based on time period filter
+  const displayPosts = useMemo(() => {
+    if (timePeriod === "month") return posts;
+    const activeIds = new Set(posts.map(p => String(p.id)));
+    const deduped = archivedPosts.filter(p => !activeIds.has(String(p.id)));
+    if (timePeriod === "year") {
+      const currentYear = new Date().getFullYear().toString();
+      const yearArchived = deduped.filter(p => p.createdAt?.startsWith(currentYear));
+      return [...posts, ...yearArchived];
+    }
+    return [...posts, ...deduped];
+  }, [posts, archivedPosts, timePeriod]);
+
   // Sorting logic
   const sortedPosts = useMemo(() => {
-    const base = filterByDownvoteThreshold(posts, hideDownvoted);
+    const base = filterByDownvoteThreshold(displayPosts, hideDownvoted);
     const sorted = [...base];
     switch (sortOption) {
       case "top":
@@ -271,11 +306,11 @@ export default function Vote() {
       default:
         return sorted;
     }
-  }, [posts, sortOption, shuffleTrigger, hideDownvoted]);
+  }, [displayPosts, sortOption, shuffleTrigger, hideDownvoted]);
 
   // Mobile Comments tab: sort posts by mobileFilter (independent of desktop sortOption)
   const mobileFilteredPosts = useMemo(() => {
-    const base = filterByDownvoteThreshold(posts, hideDownvoted);
+    const base = filterByDownvoteThreshold(displayPosts, hideDownvoted);
     const sorted = [...base];
     switch (mobileFilter) {
       case "top":
@@ -302,7 +337,7 @@ export default function Vote() {
       default:
         return sorted;
     }
-  }, [posts, mobileFilter, shuffleTrigger, hideDownvoted]);
+  }, [displayPosts, mobileFilter, shuffleTrigger, hideDownvoted]);
 
   // Mobile Comments tab: slice for infinite scroll
   const mobileVisiblePosts = useMemo(
@@ -1308,6 +1343,7 @@ export default function Vote() {
               onOfferingClick={() => setShowDonationPopup(true)}
               onMerchClick={() => setShowMerchPopup(true)}
               onCharterClick={() => setShowInfoPopup(true)}
+              onVideosClick={() => setShowVideoPopup(true)}
             />
             {/* Mobile top-right: Hide-downvoted toggle + Home button */}
             <div style={{
@@ -1613,39 +1649,73 @@ export default function Vote() {
 
         {/* === SUB-FILTER BUTTONS (Comments tab only) === */}
         {mobileTab === "comments" && (
-          <div style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: isMobile ? "5px" : "8px",
-            marginBottom: isMobile ? "0.2rem" : "0.5rem",
-            marginTop: "0.15rem",
-            flexWrap: "wrap",
-          }}>
-            {(["top", "hot", "new", "random"] as MobileFilter[]).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => {
-                  setMobileFilter(filter);
-                  setMobileVisibleCount(10);
-                  setShuffleTrigger((t) => t + 1);
-                }}
-                style={{
-                  padding: isMobile ? "4px 14px" : "6px 20px",
-                  borderRadius: "5px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: isMobile ? "0.75rem" : "0.85rem",
-                  fontFamily: "'Cinzel', serif",
-                  backgroundColor: mobileFilter === filter ? "#b79b3d" : "transparent",
-                  color: mobileFilter === filter ? "#fdf8e6" : "#d1b97b",
-                  border: mobileFilter === filter ? "1.5px solid #d4af37" : "1.5px solid #555",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </button>
-            ))}
-          </div>
+          <>
+            {/* Time period filter */}
+            <div style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: isMobile ? "5px" : "8px",
+              marginBottom: isMobile ? "0.15rem" : "0.3rem",
+              marginTop: "0.15rem",
+            }}>
+              {([["month", "Month"], ["year", "Year"], ["all", "All Time"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => {
+                    setTimePeriod(value);
+                    setMobileVisibleCount(10);
+                  }}
+                  style={{
+                    padding: isMobile ? "4px 12px" : "6px 18px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: isMobile ? "0.7rem" : "0.8rem",
+                    fontFamily: "'Cinzel', serif",
+                    backgroundColor: timePeriod === value ? "#b79b3d" : "transparent",
+                    color: timePeriod === value ? "#fdf8e6" : "#d1b97b",
+                    border: timePeriod === value ? "1.5px solid #d4af37" : "1.5px solid #555",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Sort order filter */}
+            <div style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: isMobile ? "5px" : "8px",
+              marginBottom: isMobile ? "0.2rem" : "0.5rem",
+              flexWrap: "wrap",
+            }}>
+              {(["top", "hot", "new", "random"] as MobileFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => {
+                    setMobileFilter(filter);
+                    setMobileVisibleCount(10);
+                    setShuffleTrigger((t) => t + 1);
+                  }}
+                  style={{
+                    padding: isMobile ? "4px 14px" : "6px 20px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: isMobile ? "0.75rem" : "0.85rem",
+                    fontFamily: "'Cinzel', serif",
+                    backgroundColor: mobileFilter === filter ? "#b79b3d" : "transparent",
+                    color: mobileFilter === filter ? "#fdf8e6" : "#d1b97b",
+                    border: mobileFilter === filter ? "1.5px solid #d4af37" : "1.5px solid #555",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Desktop sort buttons removed — using tab system now */}
@@ -3127,6 +3197,12 @@ export default function Vote() {
       <DonationPopup
         isOpen={showDonationPopup}
         onClose={() => setShowDonationPopup(false)}
+      />
+
+      {/* Video popup */}
+      <VideoPopup
+        isOpen={showVideoPopup}
+        onClose={() => setShowVideoPopup(false)}
       />
 
       {/* Merch popup */}

@@ -3,6 +3,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useNavigate } from "react-router-dom";
 import { getPosts } from "../utils/api";
 import DonationPopup from "../components/DonationPopup";
+import VideoPopup from "../components/VideoPopup";
 import DonorBadge from "../components/DonorBadge";
 import LoginButton from "../components/LoginButton";
 import ChatBox from "../components/ChatBox";
@@ -43,6 +44,8 @@ export default function Home() {
   const [showMerchPopup, setShowMerchPopup] = useState(false);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showDonationPopup, setShowDonationPopup] = useState(false);
+  const [showVideoPopup, setShowVideoPopup] = useState(false);
+  const [showVideosLink, setShowVideosLink] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [showPrayerHands, setShowPrayerHands] = useState(false);
@@ -124,6 +127,13 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+
+  // ✅ Floating "Videos" link on desktop — appears after 5s, stays visible
+  useEffect(() => {
+    if (isMobile) return;
+    const timeout = setTimeout(() => setShowVideosLink(true), 5000);
+    return () => clearTimeout(timeout);
+  }, [isMobile]);
 
   // ✅ Fetch posts — initial load + poll every 30s + refetch on window focus
   useEffect(() => {
@@ -475,9 +485,18 @@ export default function Home() {
           onOfferingClick={() => setShowDonationPopup(true)}
           onMerchClick={() => setShowMerchPopup(true)}
           onCharterClick={() => setShowInfoPopup(true)}
+          onVideosClick={() => setShowVideoPopup(true)}
         />
       ) : (
-        <LoginButton />
+        <>
+          <LoginButton />
+          <div
+            className={`videos-float-link${showVideosLink ? " videos-float-visible" : ""}`}
+            onClick={() => setShowVideoPopup(true)}
+          >
+            Promotional Content
+          </div>
+        </>
       )}
 
       {/* Chat Box (Right Side) */}
@@ -520,6 +539,12 @@ export default function Home() {
         onClose={() => setShowDonationPopup(false)}
       />
 
+      {/* ✅ Video popup */}
+      <VideoPopup
+        isOpen={showVideoPopup}
+        onClose={() => setShowVideoPopup(false)}
+      />
+
       {/* ✅ Merch link */}
       <div className="merch-link-container">
         <button onClick={() => setShowMerchPopup(true)} className="merch-link">
@@ -531,13 +556,6 @@ export default function Home() {
       <div className="info-link-container">
         <button onClick={() => setShowInfoPopup(true)} className={`info-link${!user ? " charter-glow" : ""}`}>
           OUR CHARTER
-        </button>
-      </div>
-
-      {/* ✅ "ARCHIVES" link */}
-      <div className="info-link-container" style={{ top: "11rem" }}>
-        <button onClick={() => navigate("/archive")} className="info-link">
-          ARCHIVES
         </button>
       </div>
 

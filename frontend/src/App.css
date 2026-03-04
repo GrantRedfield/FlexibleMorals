@@ -928,6 +928,39 @@
   color: #d4af37;
 }
 
+/* === Floating Videos Link (desktop only) === */
+.videos-float-link {
+  position: fixed;
+  top: 27%;
+  left: 1rem;
+  z-index: 1000;
+  background-color: rgba(20, 15, 5, 0.9);
+  border: 3px solid #d4af37;
+  border-radius: 10px;
+  padding: 16px 32px;
+  color: #d4af37;
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(212, 175, 55, 0.3);
+  opacity: 0;
+  transition: opacity 1s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+.videos-float-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.videos-float-link:hover {
+  background-color: rgba(212, 175, 55, 0.2);
+  border-color: #f0d060;
+  color: #f0d060;
+  transform: scale(1.05);
+}
+
 /* =========================================================
    MOBILE RESPONSIVE — max-width: 768px
    ========================================================= */
@@ -1064,6 +1097,11 @@
 
   /* --- Login button: hidden on mobile (replaced by hamburger menu) --- */
   .login-button-container {
+    display: none !important;
+  }
+
+  /* --- Videos float link: hidden on mobile --- */
+  .videos-float-link {
     display: none !important;
   }
 
