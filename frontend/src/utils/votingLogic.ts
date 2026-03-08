@@ -40,24 +40,32 @@ export function getNextUnvotedPost(
   currentVisibleIds: Set<string>,
   shownPostIds: Set<string>,
   userVotes: Record<string, VoteDirection | null>,
-  _currentUser?: string | null
+  currentUser?: string | null
 ): Post | null {
-  // Phase 1: unvoted, not yet shown this cycle, not currently visible
+  // Phase 1: unvoted, not yet shown this cycle, not currently visible, not own
   for (const post of sortedPosts) {
     const pid = String(post.id);
-    if (!currentVisibleIds.has(pid) && !shownPostIds.has(pid) && !userVotes[pid]) {
+    if (
+      !currentVisibleIds.has(pid) &&
+      !shownPostIds.has(pid) &&
+      !userVotes[pid] &&
+      post.username !== currentUser
+    ) {
       return post;
     }
   }
 
   // Phase 2: unvoted, not currently visible (cycle reset for unvoted batch)
   const anyUnvotedAvailable = sortedPosts.some(
-    (p) => !currentVisibleIds.has(String(p.id)) && !userVotes[String(p.id)]
+    (p) =>
+      !currentVisibleIds.has(String(p.id)) &&
+      !userVotes[String(p.id)] &&
+      p.username !== currentUser
   );
   if (anyUnvotedAvailable) {
     for (const post of sortedPosts) {
       const pid = String(post.id);
-      if (!currentVisibleIds.has(pid) && !userVotes[pid]) {
+      if (!currentVisibleIds.has(pid) && !userVotes[pid] && post.username !== currentUser) {
         return post;
       }
     }
@@ -277,9 +285,10 @@ export function getInitialSlots(
     return { slots: [], swipePostId: null };
   }
 
-  // Desktop: prefer unvoted posts for initial slots; fill remaining with voted posts
-  const unvoted = sortedPosts.filter((p) => !userVotes[String(p.id)]);
-  const voted = sortedPosts.filter((p) => !!userVotes[String(p.id)]);
+  // Desktop: prefer unvoted posts for initial slots; exclude own posts, fill remaining with voted posts
+  const notOwn = sortedPosts.filter((p) => p.username !== currentUser);
+  const unvoted = notOwn.filter((p) => !userVotes[String(p.id)]);
+  const voted = notOwn.filter((p) => !!userVotes[String(p.id)]);
   const prioritized = [...unvoted, ...voted];
   const initial = prioritized.slice(0, visibleCount).map((p) => ({
     postId: String(p.id),
