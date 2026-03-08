@@ -359,14 +359,14 @@ describe("Cross-cutting interactions", () => {
     expect(result.swipePostId).toBeNull();
   });
 
-  it("logged-in user with all own posts in desktop mode still sees them", () => {
+  it("logged-in user with all own posts in desktop mode gets no cards", () => {
     const posts = [
       makePost("p1", { username: "alice" }),
       makePost("p2", { username: "alice" }),
     ];
-    // Desktop mode doesn't filter by username for display (only for voting)
+    // Desktop mode now filters out own posts
     const result = getInitialSlots(posts, {}, VISIBLE_COUNT, "alice", "top");
-    expect(result.slots).toHaveLength(2);
+    expect(result.slots).toHaveLength(0);
   });
 
   it("guest gets cards when not at limit", () => {

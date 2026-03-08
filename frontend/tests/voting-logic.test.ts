@@ -94,11 +94,16 @@ describe("getNextUnvotedPost", () => {
     expect(result).toBeNull();
   });
 
-  it("ignores currentUser param (desktop mode doesn't filter by own)", () => {
-    const posts = [makePost("p1", { username: "alice" })];
-    // currentUser is passed but getNextUnvotedPost doesn't filter by username
+  it("excludes currentUser's own posts in desktop mode", () => {
+    const posts = [makePost("p1", { username: "alice" }), makePost("p2", { username: "bob" })];
     const result = getNextUnvotedPost(posts, new Set(), new Set(), {}, "alice");
-    expect(result?.id).toBe("p1");
+    expect(result?.id).toBe("p2");
+  });
+
+  it("returns null when all posts belong to currentUser", () => {
+    const posts = [makePost("p1", { username: "alice" })];
+    const result = getNextUnvotedPost(posts, new Set(), new Set(), {}, "alice");
+    expect(result).toBeNull();
   });
 });
 
